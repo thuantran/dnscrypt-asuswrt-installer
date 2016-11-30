@@ -9,8 +9,94 @@ INPUT="$BOLD => $NORM"
 
 cd /tmp
 
-echo -e "$INFO This script will install dnscrypt and related files."
-echo -e "$INFO dnscrypt and related files (~0.5MB) will be installed to jffs"
-echo -e "$INFO no other data will be changed."
-echo -e "$INFO Also some start scripts will be installed or modified as appropriate."
+echo -e "$INFO This script will install dnscrypt-proxy and related files (~0.5MB)"
+echo -e "$INFO to jffs, no other data will be changed."
+echo -e "$INFO Also some start scripts will be installed/modified as required."
 echo
+
+URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen
+URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/master
+
+inst_ip_update () {
+  echo "install dns ip update"
+}
+
+update_ip () {
+  echo -en "$INPUT Do you want to set up OpenDNS account ip update /jffs $BOLD[y/n]$NORM: "
+  read YESNO
+  case $YESNO in
+    y|Y)
+      inst_ip_update
+      ;;
+    n|N)
+      exit 0
+      ;;
+    *)
+      echo -e "$ERROR Invalid input! Exiting..."
+      exit 1
+      ;;
+  esac
+}
+
+inst_dnscrypt () {
+  TARG=/jffs/dnscrypt
+  CURL="curl -L -k -s -O"
+  rm -rf $TARG
+  mkdir -p $TARG
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to create $TARG! Exiting..."
+    exit 1
+  fi
+
+  cd $TARG
+  echo -e "$INFO Downloading dnscrypt-resolvers.csv"
+  $CURL $URL_GEN/dnscrypt-resolvers.csv && chmod 644 dnscrypt-resolvers.csv
+  echo -e "$INFO Downloading dnscrypt-start"
+  $CURL $URL_GEN/dnscrypt-start && chmod 755 dnscrypt-start
+  echo -e "$INFO Downloading dnscrypt-proxy"
+  $CURL $URL_ARCH/dnscrypt-proxy && chmod 755 dnscrypt-proxy
+  echo -e "$INFO Downloading nonroot"
+  $CURL $URL_ARCH/nonroot && chmod 755 nonroot
+
+  cd /jffs/scripts
+  echo -e "$INFO Downloading dnsmasq.postconf"
+  $CURL $URL_GEN/dnsmasq.postconf && chmod 755 dnsmasq.postconf
+
+  if [ "`grep dnscrypt-start wan-start`" ]; then
+    if [ ! -f wan-start ]; then
+      echo "#!/bin/sh" > wan-start
+      echo "" >> wan-start
+      chmod 755 wan-start
+    fi
+    echo "$TARG/dnscrypt-start" >> wan-start
+  fi
+
+  update_ip
+}
+
+case $(uname -m) in
+  armv7l)
+    URL_ARCH=$URL_ARCH/armv7
+    echo -e "$INFO Detected ARM architecture."
+    echo
+    ;;
+  *)
+    echo "This is unsupported platform, sorry."
+    exit 1
+    ;;
+esac
+
+echo -en "$INPUT Do you want to install dnscrypt-proxy to /jffs $BOLD[y/n]$NORM: "
+read YESNO
+case $YESNO in
+  y|Y)
+    inst_dnscrypt
+    ;;
+  n|N)
+    exit 0
+    ;;
+  *)
+    echo -e "$ERROR Invalid input! Exiting..."
+    exit 1
+    ;;
+esac

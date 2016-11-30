@@ -1,3 +1,4 @@
+#!/bin/sh
 [ `pidof $(basename $0)|wc -w` -gt 2 ] && logger "ddns-start quit due to multiple instances" && exit 0
 OPENDNS_USER=""
 OPENDNS_PASSWORD=""
