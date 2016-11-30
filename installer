@@ -1,0 +1,16 @@
+#!/bin/sh
+
+BOLD="\033[1m"
+NORM="\033[0m"
+INFO="$BOLD Info: $NORM"
+ERROR="$BOLD *** Error: $NORM"
+WARNING="$BOLD * Warning: $NORM"
+INPUT="$BOLD => $NORM"
+
+cd /tmp
+
+echo -e "$INFO This script will install dnscrypt and related files."
+echo -e "$INFO dnscrypt and related files (~0.5MB) will be installed to jffs"
+echo -e "$INFO no other data will be changed."
+echo -e "$INFO Also some start scripts will be installed or modified as appropriate."
+echo
