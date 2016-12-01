@@ -40,7 +40,7 @@ inst_ip_update () {
 }
 
 update_ip () {
-  echo -en "$INPUT Do you want to set up OpenDNS account ip update /jffs $BOLD[y/n]$NORM: "
+  echo -en "$INPUT Do you want to set up OpenDNS account ip update $BOLD[y/n]$NORM: "
   read YESNO
   case $YESNO in
     y|Y)
