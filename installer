@@ -17,8 +17,26 @@ echo
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/master
 
+finalize () {
+  echo -e "$INFO dnscrypt setup completed!"
+}
+
 inst_ip_update () {
-  echo "install dns ip update"
+  echo -en "$INPUT Please enter OpenDNS username$NORM: "
+  read -r USERNAME
+  echo -en "$INPUT Please enter OpenDNS password$NORM: "
+  read -r PW1
+  echo -en "$INPUT Please reenter OpenDNS password$NORM: "
+  read -r PW2
+  if [ "$PW1" != "$PW2" ]; then
+    echo -e "$ERROR Password entered incorrectly! Exiting..."
+    exit 1 
+  fi
+
+  TARG=/jffs/dnscrypt/dnscrypt-start
+  sed -i "/^OPENDNS_USER=/s/$/\"$USERNAME\"/" $TARG
+  sed -i "/^OPENDNS_PASSWORD=/s/$/\"$PW1\"/" $TARG
+  finalize
 }
 
 update_ip () {
@@ -29,7 +47,7 @@ update_ip () {
       inst_ip_update
       ;;
     n|N)
-      exit 0
+      finalize
       ;;
     *)
       echo -e "$ERROR Invalid input! Exiting..."
@@ -62,7 +80,7 @@ inst_dnscrypt () {
   echo -e "$INFO Downloading dnsmasq.postconf"
   $CURL $URL_GEN/dnsmasq.postconf && chmod 755 dnsmasq.postconf
 
-  if [ "`grep dnscrypt-start wan-start`" ]; then
+  if [ -z "`grep dnscrypt-start wan-start`" ]; then
     if [ ! -f wan-start ]; then
       echo "#!/bin/sh" > wan-start
       echo "" >> wan-start

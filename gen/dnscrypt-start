@@ -1,7 +1,7 @@
 #!/bin/sh
-[ `pidof $(basename $0)|wc -w` -gt 2 ] && logger "ddns-start quit due to multiple instances" && exit 0
-OPENDNS_USER=""
-OPENDNS_PASSWORD=""
+[ `pidof $(basename $0)|wc -w` -gt 2 ] && exit 0
+OPENDNS_USER=
+OPENDNS_PASSWORD=
 
 (
 while [ `nvram get ntp_ready` -eq 0 ]; do
