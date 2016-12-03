@@ -1,9 +1,0 @@
-#!/bin/sh
-
-[ -z "`pidof dnscrypt-proxy`" ] && exit 0
-
-CONFIG=$1
-source /usr/sbin/helper.sh
-
-pc_append "no-resolv" $CONFIG
-pc_append "server=127.0.0.1#65053" $CONFIG

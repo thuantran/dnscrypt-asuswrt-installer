@@ -21,6 +21,30 @@ finalize () {
   echo -e "$INFO dnscrypt setup completed!"
 }
 
+write_postconf () {
+  MAGIC="########## dnscrypt-asuswrt-installer ##########"
+  TARG=/jffs/scripts/dnsmasq.postconf
+  if [ ! -f $TARG ]; then
+    echo -e "$INFO Creating dnsmasq.postconf file"
+    echo "#!/bin/sh" > $TARG
+  fi
+  chmod 755 $TARG
+  if [ "`grep dnscrypt-asuswrt-installer $TARG`" ]; then
+    echo -e "$INFO dnsmasq.postconf file already configured"
+  else
+    echo -e "$INFO Configure dnsmasq.postconf file for dnscrypt"
+    echo "" >> $TARG
+    echo $MAGIC >> $TARG
+    echo -e 'if [ "`pidof dnscrypt-proxy`" ]; then' >> $TARG
+    echo -e '  TARG3T=/etc/dnsmasq.conf' >> $TARG
+    echo -e '  source /usr/sbin/helper.sh' >> $TARG
+    echo -e '  pc_append "no-resolv" $TARG3T' >> $TARG
+    echo -e '  pc_append "server=127.0.0.1#65053" $TARG3T' >> $TARG
+    echo -e 'fi' >> $TARG
+    echo $MAGIC >> $TARG
+  fi
+}
+
 inst_ip_update () {
   echo -en "$INPUT Please enter OpenDNS username$NORM: "
   read -r USERNAME
@@ -68,7 +92,7 @@ inst_dnscrypt () {
 
   cd $TARG
   echo -e "$INFO Downloading dnscrypt-resolvers.csv"
-  $CURL $URL_GEN/dnscrypt-resolvers.csv && chmod 644 dnscrypt-resolvers.csv
+  $CURL https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv && chmod 644 dnscrypt-resolvers.csv
   echo -e "$INFO Downloading dnscrypt-start"
   $CURL $URL_GEN/dnscrypt-start && chmod 755 dnscrypt-start
   echo -e "$INFO Downloading dnscrypt-proxy"
@@ -77,18 +101,20 @@ inst_dnscrypt () {
   $CURL $URL_ARCH/nonroot && chmod 755 nonroot
 
   cd /jffs/scripts
-  echo -e "$INFO Downloading dnsmasq.postconf"
-  $CURL $URL_GEN/dnsmasq.postconf && chmod 755 dnsmasq.postconf
-
-  if [ -z "`grep dnscrypt-start wan-start`" ]; then
-    if [ ! -f wan-start ]; then
-      echo "#!/bin/sh" > wan-start
-      echo "" >> wan-start
-      chmod 755 wan-start
-    fi
+  if [ ! -f wan-start ]; then
+    echo -e "$INFO Creating wan-start file"
+    echo "#!/bin/sh" > wan-start
+    echo "" >> wan-start
+    chmod 755 wan-start
+  fi
+  if [ "`grep dnscrypt-start wan-start`" ]; then
+    echo -e "$INFO wan-start file already configured"
+  else
+    echo -e "$INFO Configure wan-start file for dnscrypt"
     echo "$TARG/dnscrypt-start" >> wan-start
   fi
 
+  write_postconf
   update_ip
 }
 
