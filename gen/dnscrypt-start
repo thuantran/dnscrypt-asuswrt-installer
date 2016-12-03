@@ -3,17 +3,32 @@
 OPENDNS_USER=
 OPENDNS_PASSWORD=
 
+update_opendns () {
+  ARG=$1
+  [ $ARG -gt 2 ] && return
+  RET=`curl -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
+  case "$RET" in
+    good*)
+      logger "OpenDNS: Update IP succeeded"
+      ;;
+    badauth*)
+      logger "OpenDNS: Wrong username or password"
+      ;;
+    *)
+      logger "OpenDNS: Received error $RET"
+      sleep 1
+      update_opendns $((ARG+1))
+      ;;
+  esac
+}
+
 (
 while [ `nvram get ntp_ready` -eq 0 ]; do
   sleep 2
 done
 
 if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
-  if [ "`curl -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="|grep good`" ]; then
-    logger "Update OpenDNS IP succeeded"
-  else
-    logger "Update OpenDNS IP failed"
-  fi
+  update_opendns 0
 fi
 
 if [ -z "`pidof dnscrypt-proxy`" ]; then
