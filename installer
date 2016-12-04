@@ -21,6 +21,11 @@ case $(uname -m) in
     echo -e "$INFO Detected ARM architecture."
     echo
     ;;
+  mips)
+    URL_ARCH=$URL_ARCH/mips
+    echo -e "$INFO Detected MIPSEL architecture."
+    echo
+    ;;
   *)
     echo "This is unsupported platform, sorry."
     exit 1
