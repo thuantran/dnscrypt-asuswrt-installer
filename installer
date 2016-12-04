@@ -49,16 +49,6 @@ download_file () {
   done
 }
 
-remove_jffs_script () {
-  local TARG=$1
-  FILENAME="`basename \"$TARG\"`"
-  COMMAND="$2"
-
-  if [ "`grep $COMMAND $TARG`" ]; then
-    grep -v $COMMAND $TARG > $TARG
-  fi
-}
-
 write_jffs_script () {
   local TARG=$1
   FILENAME="`basename \"$TARG\"`"
@@ -137,7 +127,7 @@ inst_dnscrypt () {
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
 
   yesno_query "Do you want to set up OpenDNS account ip update" inst_ip_update
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "remove_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
 
   echo -e "$INFO dnscrypt setup completed!"
   echo -e "$INFO Please reboot your router for the changes to take effect!"
