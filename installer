@@ -7,40 +7,89 @@ ERROR="$BOLD *** Error: $NORM"
 WARNING="$BOLD * Warning: $NORM"
 INPUT="$BOLD => $NORM"
 
-cd /tmp
-
 echo -e "$INFO This script will install dnscrypt-proxy and related files (~0.5MB)"
 echo -e "$INFO to jffs, no other data will be changed."
 echo -e "$INFO Also some start scripts will be installed/modified as required."
 echo
 
+case $(uname -m) in
+  armv7l)
+    URL_ARCH=$URL_ARCH/armv7
+    echo -e "$INFO Detected ARM architecture."
+    echo
+    ;;
+  *)
+    echo "This is unsupported platform, sorry."
+    exit 1
+    ;;
+esac
+
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/master
 
-finalize () {
-  echo -e "$INFO dnscrypt setup completed!"
-}
-
-write_postconf () {
-  MAGIC="########## dnscrypt-asuswrt-installer ##########"
-  TARG=/jffs/scripts/dnsmasq.postconf
-  if [ ! -f $TARG ]; then
-    echo -e "$INFO Creating dnsmasq.postconf file"
-    echo "#!/bin/sh" > $TARG
-  fi
-  chmod 755 $TARG
-
-  BOUNDS=`grep -n dnscrypt-asuswrt-installer $TARG|cut -d':' -f1|xargs|tr ' ' ','`
+del_between_magic () {
+  TARG=$1
+  MAGIC=$2
+  BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|xargs|tr ' ' ','`
   if [ "$BOUNDS" ]; then
     sed -i "${BOUNDS}d" $TARG
   fi
+}
 
-  if [ "`grep dnsmasq-dnscrypt-reconfig $TARG`" ]; then
-    echo -e "$INFO dnsmasq.postconf file already configured"
-  else
-    echo -e "$INFO Configure dnsmasq.postconf file for dnscrypt"
-    echo "/jffs/dnscrypt/dnsmasq-dnscrypt-reconfig" >> $TARG
+download_file () {
+  cd "$1"
+  shift
+  PERM="$1"
+  shift
+  
+  for URL in "$@"; do
+    FILENAME="`basename $URL`"
+    echo -e "$INFO Downloading $FILENAME"
+    curl -L -k -s -O "$URL" && chmod $PERM $FILENAME
+  done
+}
+
+write_jffs_script () {
+  TARG="$1"
+  FILENAME="`basename \"$TARG\"`"
+  COMMAND="$2"
+
+  if [ ! -f $TARG ]; then
+    echo -e "$INFO Creating $FILENAME file"
+    echo "#!/bin/sh" > $TARG
   fi
+  chmod 755 $TARG
+  del_between_magic $TARG dnscrypt-asuswrt-installer
+
+  if [ `grep -c -F "[ -x \"$COMMAND\" ] && \"$COMMAND\"" $TARG` -gt 0 ]; then
+    echo -e "$INFO $FILENAME file already configured"
+  else
+    echo -e "$INFO Configure $FILENAME file for dnscrypt"
+    if [ "`grep \"^$COMMAND\"`" ]; then
+      sed "s~^/jffs/dnscrypt/dnscrypt-start~[ -x $COMMAND ] \&\& $COMMAND~" $TARG
+    else
+      echo "" > $TARG
+      echo "[ -x $COMMAND ] && $COMMAND" >> $TARG
+    fi
+  fi
+}
+
+yesno_query () {
+  QUERY=$1
+  TARG_FUNC=$2
+  echo -en "$INPUT $QUERY $BOLD[y/n]$NORM: "
+  read YESNO
+  case $YESNO in
+    y|Y)
+      eval $TARG_FUNC
+      ;;
+    n|N)
+      ;;
+    *)
+      echo -e "$ERROR Invalid input!"
+      yesno_query "$@"
+      ;;
+  esac
 }
 
 inst_ip_update () {
@@ -58,29 +107,10 @@ inst_ip_update () {
   TARG=/jffs/dnscrypt/dnscrypt-start
   sed -i "/^OPENDNS_USER=/s/$/\"$USERNAME\"/" $TARG
   sed -i "/^OPENDNS_PASSWORD=/s/$/\"$PW1\"/" $TARG
-  finalize
-}
-
-update_ip () {
-  echo -en "$INPUT Do you want to set up OpenDNS account ip update $BOLD[y/n]$NORM: "
-  read YESNO
-  case $YESNO in
-    y|Y)
-      inst_ip_update
-      ;;
-    n|N)
-      finalize
-      ;;
-    *)
-      echo -e "$ERROR Invalid input! Exiting..."
-      exit 1
-      ;;
-  esac
 }
 
 inst_dnscrypt () {
   TARG=/jffs/dnscrypt
-  CURL="curl -L -k -s -O"
   rm -rf $TARG
   mkdir -p $TARG
   if [ $? -ne 0 ]; then
@@ -88,59 +118,16 @@ inst_dnscrypt () {
     exit 1
   fi
 
-  cd $TARG
-  echo -e "$INFO Downloading dnscrypt-resolvers.csv"
-  $CURL https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv && chmod 644 dnscrypt-resolvers.csv
-  echo -e "$INFO Downloading dnsmasq-dnscrypt-reconfig"
-  $CURL $URL_GEN/dnsmasq-dnscrypt-reconfig && chmod 755 dnsmasq-dnscrypt-reconfig
-  echo -e "$INFO Downloading dnscrypt-start"
-  $CURL $URL_GEN/dnscrypt-start && chmod 755 dnscrypt-start
-  echo -e "$INFO Downloading dnscrypt-proxy"
-  $CURL $URL_ARCH/dnscrypt-proxy && chmod 755 dnscrypt-proxy
-  echo -e "$INFO Downloading nonroot"
-  $CURL $URL_ARCH/nonroot && chmod 755 nonroot
+  download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv
+  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_GEN/dnscrypt-start $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
 
-  cd /jffs/scripts
-  if [ ! -f wan-start ]; then
-    echo -e "$INFO Creating wan-start file"
-    echo "#!/bin/sh" > wan-start
-    echo "" >> wan-start
-  fi
-  chmod 755 wan-start
-  if [ "`grep dnscrypt-start wan-start`" ]; then
-    echo -e "$INFO wan-start file already configured"
-  else
-    echo -e "$INFO Configure wan-start file for dnscrypt"
-    echo "$TARG/dnscrypt-start" >> wan-start
-  fi
+  write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
+  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
+  
+  yesno_query "Do you want to set up OpenDNS account ip update" inst_ip_update
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules"
 
-  write_postconf
-  update_ip
+  echo -e "$INFO dnscrypt setup completed!"
 }
 
-case $(uname -m) in
-  armv7l)
-    URL_ARCH=$URL_ARCH/armv7
-    echo -e "$INFO Detected ARM architecture."
-    echo
-    ;;
-  *)
-    echo "This is unsupported platform, sorry."
-    exit 1
-    ;;
-esac
-
-echo -en "$INPUT Do you want to install dnscrypt-proxy to /jffs $BOLD[y/n]$NORM: "
-read YESNO
-case $YESNO in
-  y|Y)
-    inst_dnscrypt
-    ;;
-  n|N)
-    exit 0
-    ;;
-  *)
-    echo -e "$ERROR Invalid input! Exiting..."
-    exit 1
-    ;;
-esac
+yesno_query "Do you want to install dnscrypt-proxy to /jffs" inst_dnscrypt
