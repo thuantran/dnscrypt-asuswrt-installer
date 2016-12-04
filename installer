@@ -29,19 +29,17 @@ write_postconf () {
     echo "#!/bin/sh" > $TARG
   fi
   chmod 755 $TARG
-  if [ "`grep dnscrypt-asuswrt-installer $TARG`" ]; then
+
+  BOUNDS=`grep -n dnscrypt-asuswrt-installer $TARG|cut -d':' -f1|xargs|tr ' ' ','`
+  if [ "$BOUNDS" ]; then
+    sed -i "${BOUNDS}d" $TARG
+  fi
+
+  if [ "`grep dnsmasq-dnscrypt-reconfig $TARG`" ]; then
     echo -e "$INFO dnsmasq.postconf file already configured"
   else
     echo -e "$INFO Configure dnsmasq.postconf file for dnscrypt"
-    echo "" >> $TARG
-    echo $MAGIC >> $TARG
-    echo -e 'if [ "`pidof dnscrypt-proxy`" ]; then' >> $TARG
-    echo -e '  TARG3T=/etc/dnsmasq.conf' >> $TARG
-    echo -e '  source /usr/sbin/helper.sh' >> $TARG
-    echo -e '  pc_append "no-resolv" $TARG3T' >> $TARG
-    echo -e '  pc_append "server=127.0.0.1#65053" $TARG3T' >> $TARG
-    echo -e 'fi' >> $TARG
-    echo $MAGIC >> $TARG
+    echo "/jffs/dnscrypt/dnsmasq-dnscrypt-reconfig" >> $TARG
   fi
 }
 
@@ -93,6 +91,8 @@ inst_dnscrypt () {
   cd $TARG
   echo -e "$INFO Downloading dnscrypt-resolvers.csv"
   $CURL https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv && chmod 644 dnscrypt-resolvers.csv
+  echo -e "$INFO Downloading dnsmasq-dnscrypt-reconfig"
+  $CURL $URL_GEN/dnsmasq-dnscrypt-reconfig && chmod 755 dnsmasq-dnscrypt-reconfig
   echo -e "$INFO Downloading dnscrypt-start"
   $CURL $URL_GEN/dnscrypt-start && chmod 755 dnscrypt-start
   echo -e "$INFO Downloading dnscrypt-proxy"
@@ -105,8 +105,8 @@ inst_dnscrypt () {
     echo -e "$INFO Creating wan-start file"
     echo "#!/bin/sh" > wan-start
     echo "" >> wan-start
-    chmod 755 wan-start
   fi
+  chmod 755 wan-start
   if [ "`grep dnscrypt-start wan-start`" ]; then
     echo -e "$INFO wan-start file already configured"
   else
