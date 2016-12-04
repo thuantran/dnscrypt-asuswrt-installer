@@ -12,6 +12,9 @@ echo -e "$INFO to jffs, no other data will be changed."
 echo -e "$INFO Also some start scripts will be installed/modified as required."
 echo
 
+URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen
+URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/master
+
 case $(uname -m) in
   armv7l)
     URL_ARCH=$URL_ARCH/armv7
@@ -24,11 +27,8 @@ case $(uname -m) in
     ;;
 esac
 
-URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen
-URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/master
-
 del_between_magic () {
-  TARG=$1
+  local TARG=$1
   MAGIC=$2
   BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|xargs|tr ' ' ','`
   if [ "$BOUNDS" ]; then
@@ -50,7 +50,7 @@ download_file () {
 }
 
 write_jffs_script () {
-  TARG="$1"
+  local TARG=$1
   FILENAME="`basename \"$TARG\"`"
   COMMAND="$2"
 
@@ -61,14 +61,14 @@ write_jffs_script () {
   chmod 755 $TARG
   del_between_magic $TARG dnscrypt-asuswrt-installer
 
-  if [ `grep -c -F "[ -x \"$COMMAND\" ] && \"$COMMAND\"" $TARG` -gt 0 ]; then
+  if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND" $TARG` -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
     echo -e "$INFO Configure $FILENAME file for dnscrypt"
-    if [ "`grep \"^$COMMAND\"`" ]; then
-      sed "s~^/jffs/dnscrypt/dnscrypt-start~[ -x $COMMAND ] \&\& $COMMAND~" $TARG
+    if [ "`grep \"^$COMMAND\" $TARG`" ]; then
+      sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND~" $TARG
     else
-      echo "" > $TARG
+      echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND" >> $TARG
     fi
   fi
@@ -104,13 +104,13 @@ inst_ip_update () {
     exit 1 
   fi
 
-  TARG=/jffs/dnscrypt/dnscrypt-start
+  local TARG=/jffs/dnscrypt/dnscrypt-start
   sed -i "/^OPENDNS_USER=/s/$/\"$USERNAME\"/" $TARG
   sed -i "/^OPENDNS_PASSWORD=/s/$/\"$PW1\"/" $TARG
 }
 
 inst_dnscrypt () {
-  TARG=/jffs/dnscrypt
+  local TARG=/jffs/dnscrypt
   rm -rf $TARG
   mkdir -p $TARG
   if [ $? -ne 0 ]; then
