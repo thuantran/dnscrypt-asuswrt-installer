@@ -49,8 +49,14 @@ download_file () {
 
   for URL in "$@"; do
     FILENAME="`basename $URL`"
-    echo -e "$INFO Downloading $FILENAME"
-    curl -L -k -s -O "$URL" && chmod $PERM $FILENAME
+    MD5SUM_OLD="`md5sum $FILENAME`"
+    MD5SUM_CURR="`curl -L -k -s -O \"${URL}.md5sum\"`"
+    if [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+      echo -e "$INFO $FILENAME is up to date. Skipping..."
+    else
+      echo -e "$INFO Downloading $FILENAME"
+      curl -L -k -s -O "$URL" && chmod $PERM $FILENAME
+    fi
   done
 }
 
