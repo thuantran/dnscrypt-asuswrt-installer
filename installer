@@ -111,9 +111,9 @@ inst_ip_update () {
     exit 1
   fi
 
-  local TARG=/jffs/dnscrypt/dnscrypt-start
-  sed -i "/^OPENDNS_USER=/s/$/\"$USERNAME\"/" $TARG
-  sed -i "/^OPENDNS_PASSWORD=/s/$/\"$PW1\"/" $TARG
+  local TARG=/jffs/dnscrypt/.opendns-auth
+  echo "OPENDNS_USER=\"$USERNAME\"" > $TARG
+  echo "OPENDNS_PASSWORD=\"$PW1\"" >> $TARG
 }
 
 inst_dnscrypt () {
@@ -132,7 +132,7 @@ inst_dnscrypt () {
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
 
   yesno_query "Do you want to set up OpenDNS account ip update" inst_ip_update
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "rm -rf $TARG/.opendns-auth"
 
   echo -e "$INFO dnscrypt setup completed!"
   echo -e "$INFO Please reboot your router for the changes to take effect!"
