@@ -49,8 +49,8 @@ download_file () {
 
   for URL in "$@"; do
     FILENAME="`basename $URL`"
-    MD5SUM_OLD="`md5sum $FILENAME`"
-    MD5SUM_CURR="`curl -L -k -s -O \"${URL}.md5sum\"`"
+    MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
+    MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
     if [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
@@ -124,7 +124,6 @@ inst_ip_update () {
 
 inst_dnscrypt () {
   local TARG=/jffs/dnscrypt
-  rm -rf $TARG
   mkdir -p $TARG
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to create $TARG! Exiting..."
