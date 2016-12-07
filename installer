@@ -32,6 +32,10 @@ case $(uname -m) in
     ;;
 esac
 
+_quote() {
+  echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
+}
+
 del_between_magic () {
   local TARG=$1
   MAGIC=$2
@@ -60,6 +64,17 @@ download_file () {
   done
 }
 
+write_conf () {
+  local TARG=/jffs/dnscrypt/.config
+  KEY=$1
+  VALUE=$(_quote $2)
+  [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $TARG ; chmod 644 $TARG
+  if [ ! -f $TARG ]; then
+    touch $TARG && chmod 644 $TARG
+  fi
+  sed -i "/^$KEY=/s/=.*/=$VALUE/" $TARG
+}
+
 write_jffs_script () {
   local TARG=$1
   FILENAME="`basename \"$TARG\"`"
@@ -69,7 +84,7 @@ write_jffs_script () {
     echo -e "$INFO Creating $FILENAME file"
     echo "#!/bin/sh" > $TARG
   fi
-  chmod 755 $TARG
+  chmod 755 $COMMAND
   del_between_magic $TARG dnscrypt-asuswrt-installer
 
   if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND" $TARG` -gt 0 ]; then
@@ -106,6 +121,11 @@ yesno_query () {
 }
 
 inst_ip_update () {
+  if [ "$1" -eq 0 ]; then
+    write_conf OPENDNS_USER ""
+    write_conf OPENDNS_PASSWORD ""
+    return
+  fi
   echo -en "$INPUT Please enter OpenDNS username$NORM: "
   read -r USERNAME
   echo -en "$INPUT Please enter OpenDNS password$NORM: "
@@ -117,9 +137,8 @@ inst_ip_update () {
     exit 1
   fi
 
-  local TARG=/jffs/dnscrypt/.opendns-auth
-  echo "OPENDNS_USER=\"$USERNAME\"" > $TARG
-  echo "OPENDNS_PASSWORD=\"$PW1\"" >> $TARG
+  write_conf OPENDNS_USER "\"$USERNAME\""
+  write_conf OPENDNS_PASSWORD "\"$PW1\""
 }
 
 inst_dnscrypt () {
@@ -136,8 +155,8 @@ inst_dnscrypt () {
   write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
 
-  yesno_query "Do you want to set up OpenDNS account ip update" inst_ip_update
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "rm -rf $TARG/.opendns-auth"
+  yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
 
   echo -e "$INFO dnscrypt setup completed!"
   echo -e "$INFO Please reboot your router for the changes to take effect!"

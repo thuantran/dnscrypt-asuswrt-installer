@@ -1,6 +1,6 @@
 #!/bin/sh
 [ `pidof $(basename $0)|wc -w` -gt 2 ] && exit 0
-[ -f /jffs/dnscrypt/.opendns-auth ] && . /jffs/dnscrypt/.opendns-auth
+[ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
 update_opendns () {
   ARG=$1
