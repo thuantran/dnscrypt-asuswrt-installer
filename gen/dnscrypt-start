@@ -31,7 +31,7 @@ if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
 fi
 
 if [ -z "`pidof dnscrypt-proxy`" ]; then
-  /jffs/dnscrypt/nonroot nobody /jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R cisco
+  /jffs/dnscrypt/nonroot nobody /jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $OPENDNS_SERVER
   if [ $? -eq 0 ]; then
     logger "dnscrypt-proxy started"
     sleep 1
