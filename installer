@@ -156,6 +156,7 @@ choose_dnscrypt_server () {
   fi
 
   eval ITEM="\$ITEM$CHOSEN"
+  [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
   write_conf OPENDNS_SERVER "$ITEM"
 }
 
@@ -195,7 +196,7 @@ inst_dnscrypt () {
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
 
   choose_dnscrypt_server
-  yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0"
+  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0"
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
 
   echo -e "$INFO dnscrypt setup completed!"
