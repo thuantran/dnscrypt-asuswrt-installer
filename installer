@@ -39,9 +39,9 @@ _quote() {
 del_between_magic () {
   local TARG=$1
   MAGIC=$2
-  BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|xargs|tr ' ' ','`
+  BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|tr '\n' ','`
   if [ "$BOUNDS" ]; then
-    sed -i "${BOUNDS}d" $TARG
+    sed -i "${BOUNDS%,}d" $TARG
   fi
 }
 
