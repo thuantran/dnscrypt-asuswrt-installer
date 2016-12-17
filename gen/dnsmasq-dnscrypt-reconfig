@@ -1,7 +1,5 @@
 #!/bin/sh
 
-[ -z "`pidof dnscrypt-proxy`" ] && exit 0
-
 append_on_demand () {
   TARGET="$1"
   shift
