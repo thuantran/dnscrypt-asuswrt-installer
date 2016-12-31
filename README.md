@@ -60,6 +60,11 @@ echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscr
 ```
 in current directory and send me the archive for debug.
 
+I also need follwoing information:
+- Which dns server you selected during dnscrypt installtion
+- Which router you're using
+- Firmware and its version
+
 # How I made this:
 - Compiling and stripping dnscrypt-proxy and nonroot using firmware building toolchain from asuswrt-merlin
 - Write the installer script with stuffs inspired from entware-setup.sh from asuswrt-merlin
