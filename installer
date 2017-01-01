@@ -32,6 +32,12 @@ case $(uname -m) in
     ;;
 esac
 
+if [ "`nvram get jffs2_format`" == "1" ]; then
+  echo -e "$ERROR JFFS partition is scheduled to be reformatted"
+  echo -e "$ERROR Please reboot to format or disable that setting and try again. Exiting..."
+  exit 1
+fi
+
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
 }
