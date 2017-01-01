@@ -125,6 +125,20 @@ yesno_query () {
   esac
 }
 
+check_jffs_enabled () {
+  JFFS2_ENABLED=`nvram get jffs2_enable`
+  JFFS2_SCRIPTS=`nvram get jffs2_scripts`
+
+  if [ $JFFS2_ENABLED -ne 1 ] || [ $JFFS2_SCRIPTS -ne 1 ]; then
+    echo -e "$INFO JFFS custom scripts and configs are not enabled. Enabling them"
+    nvram set jffs2_enable=1
+    nvram set jffs2_scripts=1
+    nvram commit
+  else
+    echo -e "$INFO JFFS custom scripts and configs are already enabled"
+  fi
+}
+
 choose_dnscrypt_server () {
   local TARG=/jffs/dnscrypt/dnscrypt-resolvers.csv
   if [ -z "$1" ]; then
@@ -195,6 +209,7 @@ inst_dnscrypt () {
   write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
 
+  check_jffs_enabled
   choose_dnscrypt_server
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
