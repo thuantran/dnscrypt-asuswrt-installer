@@ -89,13 +89,13 @@ write_conf () {
 write_jffs_script () {
   local TARG=$1
   FILENAME="`basename \"$TARG\"`"
-  COMMAND="$2"
+  COMMAND=$2
 
   if [ ! -f $TARG ]; then
     echo -e "$INFO Creating $FILENAME file"
     echo "#!/bin/sh" > $TARG
   fi
-  chmod 755 $TARG
+  chmod 755 $TARG $COMMAND
   del_between_magic $TARG dnscrypt-asuswrt-installer
 
   if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND" $TARG` -gt 0 ]; then
