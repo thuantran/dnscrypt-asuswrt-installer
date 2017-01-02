@@ -42,9 +42,9 @@ in result.
 
 Otherwise running this command:
 ```
-killall dnscrypt-proxy
+pidof dnscrypt-proxy
 ```
-will kill your internet :D. Reboot your router after to restore your internet.
+will return a number.
 
 # How to report issue:
 I need following directory and files:
