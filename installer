@@ -95,7 +95,7 @@ write_jffs_script () {
     echo -e "$INFO Creating $FILENAME file"
     echo "#!/bin/sh" > $TARG
   fi
-  chmod 755 $COMMAND
+  chmod 755 $TARG
   del_between_magic $TARG dnscrypt-asuswrt-installer
 
   if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND" $TARG` -gt 0 ]; then
