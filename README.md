@@ -14,6 +14,8 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
 - Handling ntp update at router boot up by starting dnscrypt-proxy with --ignore-timestamps option and restarting it without this option after ntp update has completed
 - Redirect all DNS queries on your network to dnscrypt if user chooses to
+- Include haveged for better speed with dnscrypt and other cryptographic applications
+- Ability to run another dnscrypt-proxy instance for IPv6 dnscrypt DNS resolver
 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
