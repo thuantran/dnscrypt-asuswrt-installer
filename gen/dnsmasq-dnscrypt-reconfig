@@ -1,5 +1,7 @@
 #!/bin/sh
 
+[ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
+
 append_on_demand () {
   TARGET="$1"
   shift
@@ -11,3 +13,4 @@ append_on_demand () {
 }
 
 append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
+[ "$OPENDNS_SERVER_V6" ] && append_on_demand /etc/dnsmasq.conf "server=127.0.0.1#65054"

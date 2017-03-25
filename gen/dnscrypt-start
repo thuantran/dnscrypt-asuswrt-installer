@@ -3,6 +3,7 @@
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 NONROOT="/jffs/dnscrypt/nonroot nobody"
 DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $OPENDNS_SERVER"
+DNSCRYPT_START_V6="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $OPENDNS_SERVER_V6"
 
 update_opendns () {
   if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
@@ -27,8 +28,9 @@ update_opendns () {
 }
 
 (
-DNSCRYPT_PID=`pidof dnscrypt-proxy`
+DNSCRYPT_PID="`pidof dnscrypt-proxy|cut -d' ' -f1`"
 if [ -z "$DNSCRYPT_PID" ]; then
+  $NONROOT /jffs/dnscrypt/haveged -w 1024 -v 1
   $NONROOT $DNSCRYPT_START -I
   if [ $? -eq 0 ]; then
     logger "dnscrypt-proxy started for boot services"
@@ -37,7 +39,7 @@ if [ -z "$DNSCRYPT_PID" ]; then
   fi
 else
   OLD_CMD="`cat /proc/$DNSCRYPT_PID/cmdline | tr '\000' ' '`"
-  if [ "${OLD_CMD%?}" == "$DNSCRYPT_START" ]; then
+  if [ "${OLD_CMD%?}" == "$DNSCRYPT_START" ] || [ "${OLD_CMD%?}" == "$DNSCRYPT_START_V6" ]; then
     update_opendns 0
     exit 0
   fi
@@ -49,6 +51,7 @@ while [ `nvram get ntp_ready` -eq 0 ]; do
 done
 killall dnscrypt-proxy
 $NONROOT $DNSCRYPT_START
+[ "$OPENDNS_SERVER_V6" ] && $NONROOT $DNSCRYPT_START_V6
 if [ $? -eq 0 ]; then
   logger "dnscrypt-proxy restarted for normal operations"
 else
