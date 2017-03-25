@@ -30,7 +30,7 @@ update_opendns () {
 (
 DNSCRYPT_PID="`pidof dnscrypt-proxy|cut -d' ' -f1`"
 if [ -z "$DNSCRYPT_PID" ]; then
-  $NONROOT /jffs/dnscrypt/haveged -w 1024 -v 1
+  /jffs/dnscrypt/haveged -w1024 -v1
   $NONROOT $DNSCRYPT_START -I
   if [ $? -eq 0 ]; then
     logger "dnscrypt-proxy started for boot services"
@@ -50,11 +50,6 @@ while [ `nvram get ntp_ready` -eq 0 ]; do
   sleep 2
 done
 killall dnscrypt-proxy
-$NONROOT $DNSCRYPT_START
-[ "$OPENDNS_SERVER_V6" ] && $NONROOT $DNSCRYPT_START_V6
-if [ $? -eq 0 ]; then
-  logger "dnscrypt-proxy restarted for normal operations"
-else
-  logger "ERROR: Unable to start dnscrypt-proxy for normal operations"
-fi
+$NONROOT $DNSCRYPT_START && logger "dnscrypt-proxy restarted for normal operations"
+[ "$OPENDNS_SERVER_V6" ] && $NONROOT $DNSCRYPT_START_V6 && logger "dnscrypt-proxy started for IPv6"
 )&
