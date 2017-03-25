@@ -50,6 +50,8 @@ while [ `nvram get ntp_ready` -eq 0 ]; do
   sleep 2
 done
 killall dnscrypt-proxy
-$NONROOT $DNSCRYPT_START && logger "dnscrypt-proxy restarted for normal operations"
-[ "$OPENDNS_SERVER_V6" ] && $NONROOT $DNSCRYPT_START_V6 && logger "dnscrypt-proxy started for IPv6"
+$NONROOT $DNSCRYPT_START && logger "dnscrypt-proxy IPv4 restarted for normal operations" || logger "ERROR: Unable to start dnscrypt-proxy for normal IPv4 operations"
+if [ "$OPENDNS_SERVER_V6" ]; then
+  $NONROOT $DNSCRYPT_START_V6 && logger "dnscrypt-proxy IPv6 started" || logger "ERROR: Unable to start dnscrypt-proxy for IPv6"
+fi
 )&
