@@ -172,6 +172,7 @@ choose_dnscrypt_server () {
   fi
   CHOSEN=$TMP
   if [ $1 -eq 2 ] && [ $CHOSEN == "n" ]; then
+    write_conf DNS$1 ""
     return
   fi
   if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
