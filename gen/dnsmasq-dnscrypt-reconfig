@@ -13,4 +13,4 @@ append_on_demand () {
 }
 
 append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
-[ "$OPENDNS_SERVER_V6" ] && append_on_demand /etc/dnsmasq.conf "server=127.0.0.1#65054"
+[ "$DNS2" ] && append_on_demand /etc/dnsmasq.conf "server=127.0.0.1#65054"
