@@ -270,6 +270,7 @@ inst_dnscrypt () {
   fi
 
   download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_GEN/dnscrypt-start $URL_ARCH/haveged
+  rm -rf $TARG/dnscrypt-proxy $TARG/nonroot
 
   write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
