@@ -1,9 +1,9 @@
 #!/bin/sh
 [ `pidof $(basename $0)|wc -w` -gt 2 ] && exit 0
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
-NONROOT="/jffs/dnscrypt/nonroot nobody"
-DNSCRYPT_START1="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS1"
-DNSCRYPT_START2="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS2"
+NONROOT="nonroot nobody"
+DNSCRYPT_START1="dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -R $DNS1"
+DNSCRYPT_START2="dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -R $DNS2"
 
 update_opendns () {
   if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
@@ -31,7 +31,11 @@ update_opendns () {
 DNSCRYPT_PID="`pidof dnscrypt-proxy|cut -d' ' -f1`"
 if [ -z "$DNSCRYPT_PID" ]; then
   /jffs/dnscrypt/haveged -w1024 -v1
+  while [ ! -d /tmp/opt ]; do
+    sleep 1
+  done
   $NONROOT $DNSCRYPT_START1 -I
+  service restart_dnsmasq
   if [ $? -eq 0 ]; then
     logger "dnscrypt-proxy started for boot services"
   else
@@ -47,7 +51,7 @@ fi
 update_opendns 0
 
 while [ `nvram get ntp_ready` -eq 0 ]; do
-  sleep 2
+  sleep 1
 done
 killall dnscrypt-proxy
 logger "Restart dnscrypt-proxy for normal operations"
