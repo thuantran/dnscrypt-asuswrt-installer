@@ -5,6 +5,15 @@ NONROOT="nonroot nobody"
 DNSCRYPT_START1="dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -R $DNS1"
 DNSCRYPT_START2="dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -R $DNS2"
 
+start_dnscrypt () {
+  [ -z "`ps|grep dnscrypt|grep '\-I$'`" ] && exit 0
+  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  killall dnscrypt-proxy
+  logger "Start dnscrypt-proxy for normal operations"
+  $NONROOT $DNSCRYPT_START1
+  [ "$DNS2" ] && $NONROOT $DNSCRYPT_START2
+}
+
 update_opendns () {
   if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
     return
@@ -28,33 +37,21 @@ update_opendns () {
 }
 
 (
-DNSCRYPT_PID="`pidof dnscrypt-proxy|cut -d' ' -f1`"
-if [ -z "$DNSCRYPT_PID" ]; then
-  /jffs/dnscrypt/haveged -w1024 -v1
-  while [ ! -d /tmp/opt ]; do
-    sleep 1
-  done
-  $NONROOT $DNSCRYPT_START1 -I
-  service restart_dnsmasq
-  if [ $? -eq 0 ]; then
-    logger "dnscrypt-proxy started for boot services"
+[ -z "`pidof haveged`" ] && /jffs/dnscrypt/haveged -w1024 -v1
+while [ -z "`which dnscrypt-proxy`" ]; do sleep 1; done
+if [ -z "`pidof dnscrypt-proxy`" ]; then
+  if [ `nvram get ntp_ready` -eq 0 ]; then
+    $NONROOT $DNSCRYPT_START1 -I
+    if [ $? -eq 0 ]; then
+      logger "dnscrypt-proxy started for boot services"
+    else
+      logger "ERROR: Unable to start dnscrypt-proxy for boot services"
+    fi
   else
-    logger "ERROR: Unable to start dnscrypt-proxy for boot services"
+    start_dnscrypt
   fi
-else
-  OLD_CMD="`cat /proc/$DNSCRYPT_PID/cmdline | tr '\000' ' '`"
-  if [ "${OLD_CMD%?}" == "$DNSCRYPT_START1" ] || [ "${OLD_CMD%?}" == "$DNSCRYPT_START2" ]; then
-    update_opendns 0
-    exit 0
-  fi
+  service restart_dnsmasq
 fi
 update_opendns 0
-
-while [ `nvram get ntp_ready` -eq 0 ]; do
-  sleep 1
-done
-killall dnscrypt-proxy
-logger "Restart dnscrypt-proxy for normal operations"
-$NONROOT $DNSCRYPT_START1
-[ "$DNS2" ] && $NONROOT $DNSCRYPT_START2
+start_dnscrypt
 )&
