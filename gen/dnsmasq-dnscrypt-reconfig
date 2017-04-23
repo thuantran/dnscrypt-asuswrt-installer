@@ -1,6 +1,5 @@
 #!/bin/sh
 
-[ -z "`pidof dnscrypt-proxy`" ] && exit 0
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
 append_on_demand () {

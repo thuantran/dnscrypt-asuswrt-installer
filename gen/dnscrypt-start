@@ -6,7 +6,6 @@ DNSCRYPT_START1="dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --lo
 DNSCRYPT_START2="dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -R $DNS2"
 
 start_dnscrypt () {
-  [ -z "`ps|grep dnscrypt|grep '\-I$'`" ] && exit 0
   while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
   killall dnscrypt-proxy
   logger "Start dnscrypt-proxy for normal operations"
@@ -41,6 +40,7 @@ update_opendns () {
 while [ -z "`which dnscrypt-proxy`" ]; do sleep 1; done
 if [ -z "`pidof dnscrypt-proxy`" ]; then
   if [ `nvram get ntp_ready` -eq 0 ]; then
+    BOOT=1
     $NONROOT $DNSCRYPT_START1 -I
     if [ $? -eq 0 ]; then
       logger "dnscrypt-proxy started for boot services"
@@ -50,8 +50,7 @@ if [ -z "`pidof dnscrypt-proxy`" ]; then
   else
     start_dnscrypt
   fi
-  service restart_dnsmasq
 fi
 update_opendns 0
-start_dnscrypt
+[ $BOOT ] && start_dnscrypt
 )&
