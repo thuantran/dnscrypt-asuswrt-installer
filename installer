@@ -13,24 +13,20 @@ echo -e "$INFO Also some start scripts will be installed/modified as required."
 echo
 
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen
-URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/master
 
-case $(uname -m) in
-  armv7l)
-    URL_ARCH=$URL_ARCH/armv7
-    echo -e "$INFO Detected ARM architecture."
-    echo
-    ;;
-  mips)
-    URL_ARCH=$URL_ARCH/mips
-    echo -e "$INFO Detected MIPSEL architecture."
-    echo
-    ;;
-  *)
-    echo "This is unsupported platform, sorry."
-    exit 1
-    ;;
-esac
+_install_pkg () {
+  PKGS="`opkg list-installed`"
+  if [ -z "`echo $PKGS|grep $1`" ]; then
+    opkg install $1
+    if [ $? -ne 0 ]; then
+      echo -e "$ERROR Unable to install $1. Exiting..."
+      exit 1
+    fi
+    echo "NEW_INSTALL"
+  else
+    echo -e "$INFO $1 already exists, do nothing"
+  fi
+}
 
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
@@ -68,28 +64,13 @@ check_jffs_enabled () {
 
 check_install_dnscrypt () {
   opkg update
-  PKGS="`opkg list-installed`"
-  if [ -z "`echo $PKGS|grep nonroot`" ]; then
-    opkg install nonroot
-    if [ $? -ne 0 ]; then
-      echo -e "$ERROR Unable to install nonroot. Exiting..."
-      exit 1
-    fi
-  else
-    echo -e "$INFO nonroot already exists, do nothing"
-  fi
-  if [ -z "`echo $PKGS|grep dnscrypt-proxy`" ]; then
-    opkg install dnscrypt-proxy
-    if [ $? -ne 0 ]; then
-      echo -e "$ERROR Unable to install dnscrypt-proxy. Exiting..."
-      exit 1
-    fi
+  opkg upgrade
+  _install_pkg rngd
+  _install_pkg nonroot
+  if [ "`_install_pkg dnscrypt-proxy`" ]; then
     DNS_ENT="`cat /opt/etc/init.d/*dnscrypt*|grep ^ARGS=|awk 'NF>1{print $NF}'`"
     DNS_ENT=${DNS_ENT%?}
-  else
-    echo -e "$INFO dnscrypt-proxy already exists, do nothing"
   fi
-  chmod 000 /opt/etc/init.d/*dnscrypt*
 }
 
 del_between_magic () {
@@ -269,8 +250,8 @@ inst_dnscrypt () {
     exit 1
   fi
 
-  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_GEN/dnscrypt-start $URL_ARCH/haveged
-  rm -rf $TARG/dnscrypt-proxy $TARG/nonroot
+  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_GEN/dnscrypt-start
+  rm -rf $TARG/dnscrypt-proxy $TARG/nonroot $TARG/haveged
 
   write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig

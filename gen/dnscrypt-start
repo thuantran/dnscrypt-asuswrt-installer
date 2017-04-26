@@ -36,8 +36,12 @@ update_opendns () {
 }
 
 (
-[ -z "`pidof haveged`" ] && /jffs/dnscrypt/haveged -w1024 -v1
+[ -z "`pidof rngd`" ] && rngd -r /dev/urandom
 while [ -z "`which dnscrypt-proxy`" ]; do sleep 1; done
+if [ -x `echo /opt/etc/init.d/*dnscrypt*|cut -d' ' -f1` ]; then
+  chmod 000 /opt/etc/init.d/*dnscrypt*
+  killall dnscrypt-proxy
+fi
 if [ -z "`pidof dnscrypt-proxy`" ]; then
   if [ `nvram get ntp_ready` -eq 0 ]; then
     BOOT=1
