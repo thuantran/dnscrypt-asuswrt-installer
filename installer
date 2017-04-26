@@ -65,7 +65,7 @@ check_jffs_enabled () {
 check_install_dnscrypt () {
   opkg update
   opkg upgrade
-  _install_pkg rngd
+  _install_pkg rng-tools
   _install_pkg nonroot
   if [ "`_install_pkg dnscrypt-proxy`" ]; then
     DNS_ENT="`cat /opt/etc/init.d/*dnscrypt*|grep ^ARGS=|awk 'NF>1{print $NF}'`"
