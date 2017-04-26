@@ -16,16 +16,17 @@ URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/m
 
 _install_pkg () {
   PKGS="`opkg list-installed`"
-  if [ -z "`echo $PKGS|grep $1`" ]; then
+  if [ -z "`echo $PKGS|grep \"$1 \"`" ]; then
     opkg install $1
     if [ $? -ne 0 ]; then
       echo -e "$ERROR Unable to install $1. Exiting..."
       exit 1
     fi
-    echo "NEW_INSTALL"
+    return 1
   else
     echo -e "$INFO $1 already exists, do nothing"
   fi
+  return 0
 }
 
 _quote() {
@@ -67,7 +68,8 @@ check_install_dnscrypt () {
   opkg upgrade
   _install_pkg rng-tools
   _install_pkg nonroot
-  if [ "`_install_pkg dnscrypt-proxy`" ]; then
+  _install_pkg dnscrypt-proxy
+  if [ $? -eq 1 ]; then
     DNS_ENT="`cat /opt/etc/init.d/*dnscrypt*|grep ^ARGS=|awk 'NF>1{print $NF}'`"
     DNS_ENT=${DNS_ENT%?}
   fi
