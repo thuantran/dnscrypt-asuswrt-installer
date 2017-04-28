@@ -7,6 +7,6 @@ case $RAN_PRV in
     /jffs/dnscrypt/haveged -w1024 -v1
     ;;
   rngd)
-    rngd -r $RNG_DEV
+    /jffs/dnscrypt/rngd -r $RNG_DEV
     ;;
 esac

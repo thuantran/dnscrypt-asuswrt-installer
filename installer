@@ -69,6 +69,14 @@ check_jffs_enabled () {
 choose_dnscrypt_server () {
   if [ $1 -eq 1 ] && [ -z $2 ]; then
     [ -z "$DNS_ENT" ] && echo -e "$INFO Available DNS servers: "
+    case $(uname -m) in
+      armv7l)
+          SERVER_LIST=/jffs/dnscrypt/dnscrypt-resolvers.csv
+        ;;
+      mips)
+          SERVER_LIST=/opt/share/dnscrypt-proxy/dnscrypt-resolvers.csv
+        ;;
+    esac
     INDEX=0
     while read LINE; do
       if [ $INDEX -eq 0 ]; then
@@ -80,7 +88,7 @@ choose_dnscrypt_server () {
       SERVER="`echo $SERVER | cut -d':' -f1`"
       eval "ITEM$INDEX=$SERVER"
       INDEX=$((INDEX+1))
-    done < /opt/share/dnscrypt-proxy/dnscrypt-resolvers.csv
+    done < $SERVER_LIST
     if [ "$DNS_ENT" ]; then
       echo -e "$INFO Use selected DNS server during dnscrypt-proxy installation"
       write_conf DNS$1 "$DNS_ENT"
@@ -208,10 +216,12 @@ inst_random () {
   read CHOSEN
   case $CHOSEN in
     1)
+      rm -f rngd
       download_file $TARG 755 $URL_ARCH/haveged
       write_conf RAN_PRV haveged
       ;;
     2)
+      rm -f haveged
       download_file $TARG 755 $URL_ARCH/rngd
       write_conf RAN_PRV rngd
       inst_truerng
@@ -302,8 +312,9 @@ main () {
   case $(uname -m) in
     armv7l)
       download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv
-      download_file $TARG 755 $URL_ARCH/nonroot $URL_ARCH/dnscrypt-proxy
+      download_file $TARG 755 $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot $URL_ARCH/random-start
       inst_random
+      write_jffs_script /jffs/scripts/init-start $TARG/random-start
       ;;
     mips)
       rm -rf $TARG/dnscrypt-proxy $TARG/nonroot $TARG/haveged
@@ -313,9 +324,7 @@ main () {
       inst_truerng
       ;;
   esac
-
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
-  write_jffs_script /jffs/scripts/init-start $TARG/random-start
   write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
 
   choose_dnscrypt_server 1
