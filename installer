@@ -321,7 +321,7 @@ main () {
       rm -rf $TARG/dnscrypt-proxy $TARG/nonroot $TARG/haveged
       check_entware_installed
       inst_entware_dnscrypt
-      inst_truerng
+      inst_ran_dev
       ;;
   esac
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
