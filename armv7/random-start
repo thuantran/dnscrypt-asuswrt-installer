@@ -1,0 +1,12 @@
+#!/bin/sh
+
+[ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
+
+case $RAN_PRV in
+  haveged)
+    /jffs/dnscrypt/haveged -w1024 -v1
+    ;;
+  rngd)
+    rngd -r $RNG_DEV
+    ;;
+esac

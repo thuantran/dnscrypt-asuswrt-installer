@@ -36,8 +36,8 @@ update_opendns () {
 }
 
 (
-[ -z "`pidof rngd`" ] && rngd -r /dev/urandom
 while [ -z "`which dnscrypt-proxy`" ]; do sleep 1; done
+[ -z "`pidof rngd`" ] && rngd -r $RNG_DEV
 if [ -x `echo /opt/etc/init.d/*dnscrypt*|cut -d' ' -f1` ]; then
   chmod 000 /opt/etc/init.d/*dnscrypt*
   killall dnscrypt-proxy
