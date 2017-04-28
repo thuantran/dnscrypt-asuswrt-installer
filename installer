@@ -224,7 +224,7 @@ inst_random () {
       rm -f haveged
       download_file $TARG 755 $URL_ARCH/rngd
       write_conf RAN_PRV rngd
-      inst_truerng
+      inst_ran_dev
       ;;
     *)
       echo -e "$ERROR Invalid character entered! Retrying..."
@@ -233,7 +233,8 @@ inst_random () {
   esac
 }
 
-inst_truerng () {
+inst_ran_dev () {
+  # TODO write different random device
   write_conf RNG_DEV "/dev/urandom"
 }
 
@@ -320,7 +321,6 @@ main () {
       rm -rf $TARG/dnscrypt-proxy $TARG/nonroot $TARG/haveged
       check_entware_installed
       inst_entware_dnscrypt
-      write_conf RAN_PRV rngd
       inst_truerng
       ;;
   esac
