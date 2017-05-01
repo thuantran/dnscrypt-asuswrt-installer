@@ -256,7 +256,7 @@ main () {
   fi
 
   download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv
-  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_ARCH/dnscrypt-proxy $URL_ARCH/dnscrypt-start $URL_ARCH/nonroot $URL_ARCH/random-start
+  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_ARCH/dnscrypt-proxy $URL_GEN/dnscrypt-start $URL_ARCH/nonroot $URL_GEN/random-start
 
   inst_random
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig

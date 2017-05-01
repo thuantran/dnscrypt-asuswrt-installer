@@ -2,7 +2,7 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 
 # Requirements:
 - ARM or MIPSEL based ASUS routers
-- asuswrt-merlin firmwares or compatible with entware-ng
+- asuswrt-merlin firmwares or compatible
 - jffs support and script enabled
 
 # Incompatibilities:
@@ -10,11 +10,11 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 
 # Current features:
 - Running as nobody through nonroot binary (using --user requires change to passwd)
-- Support ARM and MIPSEL based routers through entware-ng binaries
+- Support ARM and MIPSEL based routers through self built binaries with no dependencies apart from requirements above
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
 - Handling ntp update at router boot up by starting dnscrypt-proxy with --ignore-timestamps option and restarting it without this option after ntp update has completed
 - Redirect all DNS queries on your network to dnscrypt if user chooses to
-- Install rngd for better speed with dnscrypt and other cryptographic applications
+- Install haveged/rngd for better speed with dnscrypt and other cryptographic applications
 - Ability to run two dnscrypt-proxy instances for IPv6 or backup DNS
 
 # Changelog:
