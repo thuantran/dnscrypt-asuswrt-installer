@@ -7,32 +7,6 @@ ERROR="$BOLD *** Error: $NORM"
 WARNING="$BOLD * Warning: $NORM"
 INPUT="$BOLD => $NORM"
 
-echo -e "$INFO This script will install dnscrypt-proxy and related files (<1MB)"
-echo -e "$INFO to jffs, no other data will be changed."
-echo -e "$INFO Also some start scripts will be installed/modified as required."
-echo
-
-[ $1 ] && BRANCH=$1 || BRANCH=master
-URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
-URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
-
-case $(uname -m) in
-  armv7l)
-    URL_ARCH=$URL_ARCH/armv7
-    echo -e "$INFO Detected ARM architecture."
-    echo
-    ;;
-  mips)
-    URL_ARCH=$URL_ARCH/mips
-    echo -e "$INFO Detected MIPSEL architecture."
-    echo
-    ;;
-  *)
-    echo "This is unsupported platform, sorry."
-    exit 1
-    ;;
-esac
-
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
 }
@@ -104,6 +78,14 @@ choose_dnscrypt_server () {
   [ $1 -eq 1 ] && choose_dnscrypt_server 2
 }
 
+create_dir () {
+  mkdir -p "$1"
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to create $1! Exiting..."
+    exit 1
+  fi
+}
+
 del_between_magic () {
   local TARG=$1
   MAGIC=$2
@@ -132,6 +114,23 @@ download_file () {
   done
 }
 
+inst_dnscrypt () {
+  local TARG=/jffs/dnscrypt
+  create_dir $TARG
+
+  download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv
+  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_ARCH/dnscrypt-proxy $URL_GEN/dnscrypt-start $URL_ARCH/nonroot
+
+  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
+  write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
+  choose_dnscrypt_server 1
+  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
+
+  echo -e "$INFO Install a (P)RNG for better cryptographic operations"
+  inst_random
+}
+
 inst_ip_update () {
   if [ "$1" -eq 0 ]; then
     write_conf OPENDNS_USER ""
@@ -155,6 +154,8 @@ inst_ip_update () {
 
 inst_random () {
   local TARG=/jffs/dnscrypt
+  create_dir $TARG
+
   if [ -z $1 ]; then
     echo -e "$INFO Available random number generator providers:"
     echo -e "  1) HAVEGED (Preferred if you do not have a HW RNG)"
@@ -165,20 +166,22 @@ inst_random () {
   case $CHOSEN in
     1)
       rm -f rngd
-      download_file $TARG 755 $URL_ARCH/haveged
+      download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/random-start
       write_conf RAN_PRV haveged
       ;;
     2)
       rm -f haveged
-      download_file $TARG 755 $URL_ARCH/rngd
+      download_file $TARG 755 $URL_ARCH/rngd $URL_GEN/random-start
       write_conf RAN_PRV rngd
       inst_ran_dev
       ;;
     *)
       echo -e "$ERROR Invalid character entered! Retrying..."
       inst_random x
+      return
       ;;
   esac
+  write_jffs_script /jffs/scripts/init-start $TARG/random-start
 }
 
 inst_ran_dev () {
@@ -247,29 +250,52 @@ write_jffs_script () {
   fi
 }
 
-main () {
-  local TARG=/jffs/dnscrypt
-  mkdir -p $TARG
-  if [ $? -ne 0 ]; then
-    echo -e "$ERROR Unable to create $TARG! Exiting..."
+[ $1 ] && BRANCH=$1 || BRANCH=master
+URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
+URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
+
+case $(uname -m) in
+  armv7l)
+    URL_ARCH=$URL_ARCH/armv7
+    echo -e "$INFO Detected ARM architecture."
+    ;;
+  mips)
+    URL_ARCH=$URL_ARCH/mips
+    echo -e "$INFO Detected MIPSEL architecture."
+    ;;
+  *)
+    echo "This is unsupported platform, sorry."
     exit 1
-  fi
-
-  download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv
-  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_ARCH/dnscrypt-proxy $URL_GEN/dnscrypt-start $URL_ARCH/nonroot $URL_GEN/random-start
-
-  inst_random
-  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
-  write_jffs_script /jffs/scripts/init-start $TARG/random-start
-  write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
-
-  choose_dnscrypt_server 1
-  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
-
-  echo -e "$INFO dnscrypt setup completed!"
-  echo -e "$INFO Please reboot your router for the changes to take effect!"
-}
+    ;;
+esac
 
 check_jffs_enabled
-yesno_query "Do you want to install dnscrypt-proxy to /jffs" main "exit 0"
+
+echo -e "$INFO This script can install dnscrypt-proxy with a chosen (P)RNG or only the latter"
+echo -e "$INFO Choose what you want to do:"
+echo -e "  1) Install dnscrypt and (P)RNG"
+echo -e "  2) Install (P)RNG only"
+echo -en "$INPUT Please enter the number designates your selection or any other key to exit$NORM: "
+read CHOSEN
+case $CHOSEN in
+  1)
+    echo -e "$INFO This operation will install dnscrypt-proxy and related files (<1MB)"
+    echo -e "$INFO to jffs, no other data will be changed."
+    echo -e "$INFO Also some start scripts will be installed/modified as required."
+    echo
+    yesno_query "Do you want to install dnscrypt-proxy to /jffs" inst_dnscrypt "exit 0"
+    ;;
+  2)
+    echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
+    echo -e "$INFO to jffs, no other data will be changed."
+    echo -e "$INFO Also some start scripts will be installed/modified as required."
+    echo
+    yesno_query "Do you want to install (P)RNG to /jffs" inst_random "exit 0"
+    ;;
+  *)
+    echo -e "$ERROR Invalid character entered! Exiting..."
+    exit 1
+    ;;
+esac
+echo -e "$INFO Setup completed!"
+echo -e "$INFO Please reboot your router for the changes to take effect!"
