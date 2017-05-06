@@ -166,12 +166,12 @@ inst_random () {
   case $CHOSEN in
     1)
       rm -f rngd
-      download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/random-start
+      download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/init-start $URL_GEN/services-stop
       write_conf RAN_PRV haveged
       ;;
     2)
       rm -f haveged
-      download_file $TARG 755 $URL_ARCH/rngd $URL_GEN/random-start
+      download_file $TARG 755 $URL_ARCH/rngd $URL_GEN/init-start $URL_GEN/services-stop
       write_conf RAN_PRV rngd
       inst_ran_dev
       ;;
@@ -181,7 +181,8 @@ inst_random () {
       return
       ;;
   esac
-  write_jffs_script /jffs/scripts/init-start $TARG/random-start
+  write_jffs_script /jffs/scripts/init-start $TARG/init-start
+  write_jffs_script /jffs/scripts/services-stop $TARG/services-stop
 }
 
 inst_ran_dev () {

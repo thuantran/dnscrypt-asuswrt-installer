@@ -1,5 +1,7 @@
 #!/bin/sh
 
+/jffs/dnscrypt/fake-hwclock load
+
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
 case $RAN_PRV in
