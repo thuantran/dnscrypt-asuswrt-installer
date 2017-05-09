@@ -15,6 +15,7 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - Handling ntp update at router boot up by starting dnscrypt-proxy with --ignore-timestamps option and restarting it without this option after ntp update has completed
 - Redirect all DNS queries on your network to dnscrypt if user chooses to
 - Install haveged/rngd for better speed with dnscrypt and other cryptographic applications
+- Support various HW RNG such as TrueRNG (tested with v3), TrueRNGpro, OneRNG, EntropyKey
 - Ability to run two dnscrypt-proxy instances for IPv6 or backup DNS
 
 # Changelog:
