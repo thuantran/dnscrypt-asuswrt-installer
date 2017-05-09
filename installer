@@ -161,17 +161,19 @@ inst_random () {
     echo -e "  1) HAVEGED (Preferred if you do not have a HW RNG)"
     echo -e "  2) RNGD (Preferred if you have a HW RNG)"
   fi
+  echo -e "$INFO If you choose a HW RNG, please have it plugged in now before"
+  echo -e "$INFO proceeding with your selection."
   echo -en "$INPUT Please enter the number designates your selection$NORM: "
   read CHOSEN
   case $CHOSEN in
     1)
-      rm -f rngd
+      rm -f rngd stty
       download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/init-start $URL_GEN/services-stop
       write_conf RAN_PRV haveged
       ;;
     2)
       rm -f haveged
-      download_file $TARG 755 $URL_ARCH/rngd $URL_GEN/init-start $URL_GEN/services-stop
+      download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/init-start $URL_GEN/services-stop
       write_conf RAN_PRV rngd
       inst_ran_dev
       ;;
@@ -186,8 +188,34 @@ inst_random () {
 }
 
 inst_ran_dev () {
-  # TODO write different random device
-  write_conf RNG_DEV "/dev/urandom"
+  if [ -c /dev/ttyACM0 ]; then
+    PRODSTR=`cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=`
+    VID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 1`
+    PID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 2`
+    if [ "$VID" == "4d8" ] && [ "$PID" == "f5fe" ]; then
+      echo -e "$INFO Found TrueRNG USB HW RNG"
+      RNG_DEV=ttyACM0
+    fi
+    if [ "$VID" == "16d0" ] && [ "$PID" == "aa0" ]; then
+      echo -e "$INFO Found TrueRNGpro USB HW RNG"
+      RNG_DEV=ttyACM0
+    fi
+    if [ "$VID" == "1d50" ] && [ "$PID" == "6086" ]; then
+      echo -e "$INFO Found OneRNG USB HW RNG"
+      RNG_DEV=ttyACM0
+    fi
+    if [ "$VID" == "20df" ] && [ "$PID" == "1" ]; then
+      echo -e "$INFO Found EntropyKey USB HW RNG"
+      RNG_DEV=ttyACM0
+    fi
+  fi
+
+  if [ -z $RNG_DEV ]; then
+    echo -e "$ERROR Unable to find any HW RNG device! Retrying..."
+    inst_random
+    return
+  fi
+  write_conf RNG_DEV "/dev/$RNG_DEV"
 }
 
 yesno_query () {
