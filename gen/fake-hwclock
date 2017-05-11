@@ -1,18 +1,15 @@
 #!/bin/sh
-SCRIPT=$(readlink -f "$0")
-SCRIPTPATH=$(dirname "$SCRIPT")
-TIME_FILE=${SCRIPTPATH}/fake-hwclock.data
-
 COMMAND=$1
 
 case $COMMAND in
   save)
-    date -u '+%Y-%m-%d %H:%M:%S' > $TIME_FILE
+    touch "$0"
     ;;
   load)
-    [ -e $TIME_FILE ] && date -u -s "`cat $TIME_FILE`"
-    if [ `nvram get ntp_ready` -eq 0 ]; then
-      cru a FAKERTC "*/15 * * * * ${SCRIPTPATH}/fake-hwclock save"
-    fi
+    date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+    (
+    while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+    while true; do touch "$0"; sleep 900; done
+    ) &
     ;;
 esac
