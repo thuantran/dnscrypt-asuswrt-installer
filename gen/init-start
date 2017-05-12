@@ -5,7 +5,6 @@
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
 init_hwrng () {
-  modprobe cdc_acm
   COUNT=0
   while [ ! -c $RNG_DEV ]; do
     if [ $COUNT -gt 120 ]; then
