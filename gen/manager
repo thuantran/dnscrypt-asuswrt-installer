@@ -1,0 +1,110 @@
+#!/bin/sh
+
+. /jffs/dnscrypt/.config
+
+append_on_demand () {
+  TARGET="$1"
+  shift
+  for LINE in "$@"; do
+    if [ -z "`grep -F \"$LINE\" $TARGET`" ]; then
+      echo "$LINE" >> $TARGET
+    fi
+  done
+}
+
+clock_load () {
+  date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+  (
+  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  while true; do touch "$0"; sleep 900; done
+  )&
+}
+
+clock_save () {
+  touch "$0"
+}
+
+init_hwrng () {
+  COUNT=0
+  while [ ! -c $RNG_DEV ]; do
+    if [ $COUNT -gt 120 ]; then
+      logger "ERROR: Unable to find HWRNG device. Aborting..."
+      exit 1
+    fi
+    COUNT=$((COUNT+1))
+    sleep 1
+  done
+  /jffs/dnscrypt/stty raw -echo -ixoff -F $RNG_DEV speed 115200
+  /jffs/dnscrypt/rngd -r $RNG_DEV
+  [ $? -eq 0 ] && logger "rngd: Started for $RNG_DEV"
+}
+
+update_opendns () {
+  if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
+    return
+  fi
+  ARG=$1
+  [ $ARG -gt 2 ] && return
+  RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
+  case "$RET" in
+    good*)
+      logger "OpenDNS: Update IP succeeded"
+      ;;
+    badauth*)
+      logger "OpenDNS: Wrong username or password"
+      ;;
+    *)
+      logger "OpenDNS: Received error $RET"
+      sleep 1
+      update_opendns $((ARG+1))
+      ;;
+  esac
+}
+
+case $1 in
+  dnscrypt-start)
+    (
+    NONROOT="/jffs/dnscrypt/nonroot nobody"
+    DNSCRYPT_START1="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS1"
+    DNSCRYPT_START2="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS2"
+    if [ -z "`pidof dnscrypt-proxy`" ]; then
+      BOOT=1
+      $NONROOT $DNSCRYPT_START1 -I
+      if [ $? -eq 0 ]; then
+        logger "dnscrypt-proxy started for boot services"
+      else
+        logger "ERROR: Unable to start dnscrypt-proxy for boot services"
+      fi
+    fi
+    update_opendns 0
+    [ -z $BOOT ] && exit 0
+    while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+    killall dnscrypt-proxy
+    logger "Start dnscrypt-proxy for normal operations"
+    $NONROOT $DNSCRYPT_START1
+    [ "$DNS2" ] && $NONROOT $DNSCRYPT_START2
+    )&
+    ;;
+  dnsmasq)
+    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
+    [ "$DNS2" ] && append_on_demand /etc/dnsmasq.conf "server=127.0.0.1#65054"
+    ;;
+  fw-rules)
+    iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
+    iptables -t nat -A PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
+    ;;
+  init-start)
+    clock_load
+    case $RAN_PRV in
+      haveged)
+        /jffs/dnscrypt/haveged -w1024 -v1
+        ;;
+      rngd)
+        init_hwrng &
+        ;;
+    esac
+    ;;
+  services-stop)
+    clock_save
+    ;;
+esac

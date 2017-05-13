@@ -95,6 +95,18 @@ del_between_magic () {
   fi
 }
 
+del_jffs_script () {
+  local TARG=$1
+  LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|cut -d':' -f1`
+  [ -z $LINE_NUM ] && return
+  sed -i "${LINE_NUM}d" $TARG
+  if [ $LINE_NUM -gt 1 ]; then
+    LINE_NUM=$((LINE_NUM-1))
+    LINE_ABOVE=`sed "$LINE_NUMq;d" services-stop`
+    [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" $TARG
+  fi
+}
+
 download_file () {
   cd "$1"
   shift
@@ -119,13 +131,13 @@ inst_dnscrypt () {
   create_dir $TARG
 
   download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-proxy/master/dnscrypt-resolvers.csv
-  download_file $TARG 755 $URL_GEN/dnsmasq-dnscrypt-reconfig $URL_GEN/dnscrypt-fw-rules $URL_ARCH/dnscrypt-proxy $URL_GEN/dnscrypt-start $URL_ARCH/nonroot
+  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
 
-  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/dnsmasq-dnscrypt-reconfig
-  write_jffs_script /jffs/scripts/wan-start $TARG/dnscrypt-start
+  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/manager dnsmasq
+  write_jffs_script /jffs/scripts/wan-start $TARG/manager dnscrypt-start
   choose_dnscrypt_server 1
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/dnscrypt-fw-rules" "chmod 000 $TARG/dnscrypt-fw-rules"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/manager fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
 
   echo -e "$INFO Install a (P)RNG for better cryptographic operations"
   inst_random
@@ -168,12 +180,12 @@ inst_random () {
   case $CHOSEN in
     1)
       rm -f rngd stty
-      download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/init-start $URL_GEN/services-stop
+      download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/manager
       write_conf RAN_PRV haveged
       ;;
     2)
       rm -f haveged
-      download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/init-start $URL_GEN/services-stop
+      download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
       write_conf RAN_PRV rngd
       inst_ran_dev
       ;;
@@ -183,8 +195,8 @@ inst_random () {
       return
       ;;
   esac
-  write_jffs_script /jffs/scripts/init-start $TARG/init-start
-  write_jffs_script /jffs/scripts/services-stop $TARG/services-stop
+  write_jffs_script /jffs/scripts/init-start $TARG/manager init-start
+  write_jffs_script /jffs/scripts/services-stop $TARG/manager services-stop
 }
 
 inst_ran_dev () {
@@ -258,6 +270,7 @@ write_jffs_script () {
   local TARG=$1
   FILENAME="`basename \"$TARG\"`"
   COMMAND=$2
+  OP=$3
 
   if [ ! -f $TARG ]; then
     echo -e "$INFO Creating $FILENAME file"
@@ -266,15 +279,16 @@ write_jffs_script () {
   chmod 755 $TARG $COMMAND
   del_between_magic $TARG dnscrypt-asuswrt-installer
 
-  if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND" $TARG` -gt 0 ]; then
+  if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND $OP" $TARG` -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
     echo -e "$INFO Configure $FILENAME file for dnscrypt"
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
-      sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND~" $TARG
+      sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
-      echo "" >> $TARG
-      echo "[ -x $COMMAND ] && $COMMAND" >> $TARG
+      del_jffs_script $TARG
+      [ -z "`tail -1 $TARG`" ] && echo "" >> $TARG
+      echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
   fi
 }
