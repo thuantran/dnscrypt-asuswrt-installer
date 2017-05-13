@@ -46,10 +46,15 @@ choose_dnscrypt_server () {
       eval "ITEM$INDEX=$SERVER"
       INDEX=$((INDEX+1))
     done < /jffs/dnscrypt/dnscrypt-resolvers.csv
-    echo -en "$INPUT Please choose DNS server\n$BOLD[1-`expr $INDEX - 1`]$NORM: "
-  elif [ $1 -eq 2 ] && [ -z $2 ]; then
-    echo -en "$INPUT Please choose 2nd DNS server or press n to skip\n$BOLD[1-`expr $INDEX - 1`/n]$NORM: "
   fi
+  case $1 in
+    1)
+      echo -en "$INPUT Please choose DNS server\n$BOLD[1-`expr $INDEX - 1`]$NORM: "
+      ;;
+    2)
+      echo -en "$INPUT Please choose 2nd DNS server or press n to skip\n$BOLD[1-`expr $INDEX - 1`/n]$NORM: "
+      ;;
+  esac
   read TMP
   if [ $1 -eq 2 ] && [ "$TMP" == "$CHOSEN" ]; then
     echo -e "$ERROR Duplicate selection! Retrying..."
@@ -76,6 +81,11 @@ choose_dnscrypt_server () {
   write_conf DNS$1 "$ITEM"
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
   [ $1 -eq 1 ] && choose_dnscrypt_server 2
+}
+
+cleanup () {
+  local TARG=/jffs/dnscrypt
+  rm -f $TARG/dnscrypt-fw-rules $TARG/dnscrypt-start $TARG/dnsmasq-dnscrypt-reconfig $TARG/fake-hwclock* $TARG/init-start $TARG/services-stop
 }
 
 create_dir () {
@@ -187,7 +197,7 @@ inst_random () {
       rm -f haveged
       download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
       write_conf RAN_PRV rngd
-      inst_ran_dev
+      inst_ran_dev || return
       ;;
     *)
       echo -e "$ERROR Invalid character entered! Retrying..."
@@ -195,6 +205,7 @@ inst_random () {
       return
       ;;
   esac
+
   write_jffs_script /jffs/scripts/init-start $TARG/manager init-start
   write_jffs_script /jffs/scripts/services-stop $TARG/manager services-stop
 }
@@ -224,8 +235,8 @@ inst_ran_dev () {
 
   if [ -z $RNG_DEV ]; then
     echo -e "$ERROR Unable to find any HW RNG device! Retrying..."
-    inst_random
-    return
+    inst_random x
+    return 1
   fi
   write_conf RNG_DEV "/dev/$RNG_DEV"
 }
@@ -313,6 +324,7 @@ case $(uname -m) in
 esac
 
 check_jffs_enabled
+cleanup
 
 echo -e "$INFO This script can install dnscrypt-proxy with a chosen (P)RNG or only the latter"
 echo -e "$INFO Choose what you want to do:"
