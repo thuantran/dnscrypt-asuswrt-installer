@@ -102,7 +102,7 @@ del_jffs_script () {
   sed -i "${LINE_NUM}d" $TARG
   if [ $LINE_NUM -gt 1 ]; then
     LINE_NUM=$((LINE_NUM-1))
-    LINE_ABOVE=`sed "$LINE_NUMq;d" services-stop`
+    LINE_ABOVE=`sed "$LINE_NUMq;d" $TARG`
     [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" $TARG
   fi
 }
@@ -287,7 +287,7 @@ write_jffs_script () {
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
       del_jffs_script $TARG
-      [ -z "`tail -1 $TARG`" ] && echo "" >> $TARG
+      [ `tail -1 /jffs/scripts/services-stop|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
   fi
