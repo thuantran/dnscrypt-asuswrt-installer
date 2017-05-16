@@ -39,6 +39,28 @@ init_hwrng () {
   [ $? -eq 0 ] && logger "rngd: Started for $RNG_DEV"
 }
 
+start_dnscrypt () {
+  NONROOT="/jffs/dnscrypt/nonroot nobody"
+  DNSCRYPT_START1="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS1"
+  DNSCRYPT_START2="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS2"
+  if [ -z "`pidof dnscrypt-proxy`" ]; then
+    BOOT=1
+    $NONROOT $DNSCRYPT_START1 -I
+    if [ $? -eq 0 ]; then
+      logger "dnscrypt-proxy started for boot services"
+    else
+      logger "ERROR: Unable to start dnscrypt-proxy for boot services"
+    fi
+  fi
+  update_opendns 0
+  [ -z $BOOT ] && exit 0
+  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  killall dnscrypt-proxy
+  logger "Start dnscrypt-proxy for normal operations"
+  $NONROOT $DNSCRYPT_START1
+  [ "$DNS2" ] && $NONROOT $DNSCRYPT_START2
+}
+
 update_opendns () {
   if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
     return
@@ -63,27 +85,7 @@ update_opendns () {
 
 case $1 in
   dnscrypt-start)
-    (
-    NONROOT="/jffs/dnscrypt/nonroot nobody"
-    DNSCRYPT_START1="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS1"
-    DNSCRYPT_START2="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS2"
-    if [ -z "`pidof dnscrypt-proxy`" ]; then
-      BOOT=1
-      $NONROOT $DNSCRYPT_START1 -I
-      if [ $? -eq 0 ]; then
-        logger "dnscrypt-proxy started for boot services"
-      else
-        logger "ERROR: Unable to start dnscrypt-proxy for boot services"
-      fi
-    fi
-    update_opendns 0
-    [ -z $BOOT ] && exit 0
-    while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
-    killall dnscrypt-proxy
-    logger "Start dnscrypt-proxy for normal operations"
-    $NONROOT $DNSCRYPT_START1
-    [ "$DNS2" ] && $NONROOT $DNSCRYPT_START2
-    )&
+    start_dnscrypt &
     ;;
   dnsmasq)
     append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
