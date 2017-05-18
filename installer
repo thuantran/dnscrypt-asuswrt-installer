@@ -157,9 +157,9 @@ inst_cert () {
   CONFIG=$TARG/.config
   CERT=$TARG/$DOMAIN/fullchain.cer
   KEY=$TARG/$DOMAIN/$DOMAIN.key
+  mkdir -p $TARG
+  download_file $TARG 755 $URL_GEN/renew https://raw.githubusercontent.com/Neilpang/acme.sh/master/acme.sh
   if [ ! -f $CERT ] || [ ! -f $KEY ]; then
-    mkdir -p $TARG
-    download_file $TARG 755 $URL_GEN/renew https://raw.githubusercontent.com/Neilpang/acme.sh/master/acme.sh
     echo -e "$INFO Stopping webui"
     iptables-save > /root/rules
     service stop_httpd
@@ -168,12 +168,12 @@ inst_cert () {
     $TARG/acme.sh --issue --tls --home $TARG -d $DOMAIN
     iptables-restore < /root/rules
     rm -f /root/rules
-    echo -e "$INFO Starting webui"
   fi
 
   chmod 600 $KEY
   cp -a $CERT /etc/cert.pem
   cp -a $KEY /etc/key.pem
+  echo -e "$INFO Starting webui"
   service restart_httpd
   write_conf DOMAIN $DOMAIN $CONFIG
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/renew dnsmasq
