@@ -63,7 +63,7 @@ choose_dnscrypt_server () {
   fi
   CHOSEN=$TMP
   if [ $1 -eq 2 ] && [ $CHOSEN == "n" ]; then
-    write_conf DNS$1 ""
+    write_conf DNS$1 "" /jffs/dnscrypt/.config
     return
   fi
   if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
@@ -78,7 +78,7 @@ choose_dnscrypt_server () {
   fi
 
   eval ITEM="\$ITEM$CHOSEN"
-  write_conf DNS$1 "$ITEM"
+  write_conf DNS$1 "$ITEM" /jffs/dnscrypt/.config
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
   [ $1 -eq 1 ] && choose_dnscrypt_server 2
 }
@@ -107,7 +107,8 @@ del_between_magic () {
 
 del_jffs_script () {
   local TARG=$1
-  LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|cut -d':' -f1`
+  local OP=$2
+  LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep $OP|cut -d':' -f1`
   [ -z $LINE_NUM ] && return
   sed -i "${LINE_NUM}d" $TARG
   if [ $LINE_NUM -gt 1 ]; then
@@ -136,6 +137,45 @@ download_file () {
   done
 }
 
+inst_cert () {
+  DOMAIN=`nvram get ddns_hostname_x`
+  [ -z "$DOMAIN" ] && DOMAIN=`nvram get ddns_hostname_old`
+  if [ "$DOMAIN" ]; then
+    echo -e "$INFO Found domain: $DOMAIN"
+  else
+    echo -e "$INFO No domain found,"
+    echo -e "$INFO assume user's WAN is static IP with domain already setup"
+    echo -en "$INPUT Please enter your domain$NORM: "
+    read -r DOMAIN
+  fi
+
+  local TARG=/jffs/cert
+  CONFIG=$TARG/.config
+  CERT=$TARG/$DOMAIN/fullchain.cer
+  KEY=$TARG/$DOMAIN/$DOMAIN.key
+  if [ ! -f $CERT ] || [ ! -f $KEY ]; then
+    mkdir -p $TARG
+    download_file $TARG 755 $URL_GEN/renew https://raw.githubusercontent.com/Neilpang/acme.sh/master/acme.sh
+    echo -e "$INFO Stopping webui"
+    iptables-save > /root/rules
+    service stop_httpd
+    sleep 2
+    iptables -I INPUT -p tcp --destination-port 443 -j ACCEPT
+    $TARG/acme.sh --issue --tls --home $TARG -d $DOMAIN
+    iptables-restore < /root/rules
+    rm -f /root/rules
+    echo -e "$INFO Starting webui"
+  fi
+
+  chmod 600 $KEY
+  cp -a $CERT /etc/cert.pem
+  cp -a $KEY /etc/key.pem
+  service restart_httpd
+  write_conf DOMAIN $DOMAIN $CONFIG
+  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/renew dnsmasq
+  write_jffs_script /jffs/scripts/init-start $TARG/renew boot
+}
+
 inst_dnscrypt () {
   local TARG=/jffs/dnscrypt
   create_dir $TARG
@@ -155,8 +195,8 @@ inst_dnscrypt () {
 
 inst_ip_update () {
   if [ "$1" -eq 0 ]; then
-    write_conf OPENDNS_USER ""
-    write_conf OPENDNS_PASSWORD ""
+    write_conf OPENDNS_USER "" /jffs/dnscrypt/.config
+    write_conf OPENDNS_PASSWORD "" /jffs/dnscrypt/.config
     return
   fi
   echo -en "$INPUT Please enter OpenDNS username$NORM: "
@@ -170,8 +210,8 @@ inst_ip_update () {
     exit 1
   fi
 
-  write_conf OPENDNS_USER "\"$USERNAME\""
-  write_conf OPENDNS_PASSWORD "\"$PW1\""
+  write_conf OPENDNS_USER "\"$USERNAME\"" /jffs/dnscrypt/.config
+  write_conf OPENDNS_PASSWORD "\"$PW1\"" /jffs/dnscrypt/.config
 }
 
 inst_random () {
@@ -191,12 +231,12 @@ inst_random () {
     1)
       rm -f rngd stty
       download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/manager
-      write_conf RAN_PRV haveged
+      write_conf RAN_PRV haveged /jffs/dnscrypt/.config
       ;;
     2)
       rm -f haveged
       download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
-      write_conf RAN_PRV rngd
+      write_conf RAN_PRV rngd /jffs/dnscrypt/.config
       inst_ran_dev || return
       ;;
     *)
@@ -238,7 +278,7 @@ inst_ran_dev () {
     inst_random x
     return 1
   fi
-  write_conf RNG_DEV "/dev/$RNG_DEV"
+  write_conf RNG_DEV "/dev/$RNG_DEV" /jffs/dnscrypt/.config
 }
 
 yesno_query () {
@@ -262,7 +302,7 @@ yesno_query () {
 }
 
 write_conf () {
-  local TARG=/jffs/dnscrypt/.config
+  local TARG=$3
   KEY="$1"
   VALUE="$2"
   [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $TARG && chmod 644 $TARG
@@ -297,8 +337,8 @@ write_jffs_script () {
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
-      del_jffs_script $TARG
-      [ `tail -1 /jffs/scripts/services-stop|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
+      del_jffs_script $TARG $OP
+      [ `tail -1 $TARG|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
   fi
@@ -326,10 +366,10 @@ esac
 check_jffs_enabled
 cleanup
 
-echo -e "$INFO This script can install dnscrypt-proxy with a chosen (P)RNG or only the latter"
 echo -e "$INFO Choose what you want to do:"
 echo -e "  1) Install dnscrypt and (P)RNG"
 echo -e "  2) Install (P)RNG only"
+echo -e "  3) Install Let's Encrypt certificate"
 echo -en "$INPUT Please enter the number designates your selection or any other key to exit$NORM: "
 read CHOSEN
 case $CHOSEN in
@@ -346,6 +386,13 @@ case $CHOSEN in
     echo -e "$INFO Also some start scripts will be installed/modified as required."
     echo
     yesno_query "Do you want to install (P)RNG to /jffs" inst_random "exit 0"
+    ;;
+  3)
+    echo -e "$INFO This operation will install Let's Encrypt certificate in place of"
+    echo -e "$INFO the self signed certificate to jffs, no other data will be changed."
+    echo -e "$INFO Also some start scripts will be installed/modified as required."
+    echo
+    yesno_query "Do you want to proceed" inst_cert "exit 0"
     ;;
   *)
     echo -e "$ERROR Invalid character entered! Exiting..."
