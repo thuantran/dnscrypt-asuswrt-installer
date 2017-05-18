@@ -1,0 +1,27 @@
+#!/bin/sh
+
+. /jffs/cert/.config
+
+if [ $1 == boot ]; then
+  cp -a /jffs/cert/timos.me/fullchain.cer /etc/cert.pem
+  cp -a /jffs/cert/timos.me/timos.me.key /etc/key.pem
+
+  cru a LETSENCRYPT "0 0 * * * /jffs/cert/renew.sh"
+  exit 0
+fi
+
+if [ $1 == dnsmasq ]; then
+  echo "address=/$DOMAIN/`nvram get lan_ipaddr`" >> /etc/dnsmasq.conf
+  exit 0
+fi
+
+CERT=/jffs/cert/$DOMAIN/fullchain.cer
+KEY=/jffs/cert/$DOMAIN/$DOMAIN.key
+
+/jffs/cert/acme.sh --cron --home /jffs/cert
+if [ "`find $CERT -mmin -20`" ] && [ "`find $KEY -mmin -20`" ]; then
+  chmod 600 $KEY
+  cp -a $CERT /etc/cert.pem
+  cp -a $KEY /etc/key.pem
+  service restart_httpd
+fi
