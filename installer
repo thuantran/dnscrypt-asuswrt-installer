@@ -160,8 +160,9 @@ inst_cert () {
   mkdir -p $TARG
   download_file $TARG 755 $URL_GEN/renew https://raw.githubusercontent.com/Neilpang/acme.sh/master/acme.sh
   if [ ! -f $CERT ] || [ ! -f $KEY ]; then
-    echo -e "$INFO Stopping webui"
+    echo -e "$INFO No key and certificate found, getting new cert and key"
     iptables-save > /root/rules
+    echo -e "$INFO Stopping webui"
     service stop_httpd
     sleep 2
     iptables -I INPUT -p tcp --destination-port 443 -j ACCEPT
@@ -173,7 +174,7 @@ inst_cert () {
   chmod 600 $KEY
   cp -a $CERT /etc/cert.pem
   cp -a $KEY /etc/key.pem
-  echo -e "$INFO Starting webui"
+  echo -e "$INFO Restarting webui"
   service restart_httpd
   write_conf DOMAIN $DOMAIN $CONFIG
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/renew dnsmasq
