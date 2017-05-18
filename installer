@@ -108,7 +108,11 @@ del_between_magic () {
 del_jffs_script () {
   local TARG=$1
   local OP=$2
-  LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep $OP|cut -d':' -f1`
+  if [ "$3" == "x" ]; then
+    LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep -v manager|cut -d':' -f1`
+  else
+    LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|cut -d':' -f1`
+  fi
   [ -z $LINE_NUM ] && return
   sed -i "${LINE_NUM}d" $TARG
   if [ $LINE_NUM -gt 1 ]; then
@@ -187,7 +191,7 @@ inst_dnscrypt () {
   write_jffs_script /jffs/scripts/wan-start $TARG/manager dnscrypt-start
   choose_dnscrypt_server 1
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/manager fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/manager fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
 
   echo -e "$INFO Install a (P)RNG for better cryptographic operations"
   inst_random
@@ -337,7 +341,7 @@ write_jffs_script () {
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
-      del_jffs_script $TARG $OP
+      del_jffs_script $TARG $OP x
       [ `tail -1 $TARG|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
