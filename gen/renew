@@ -1,8 +1,10 @@
 #!/bin/sh
 
-. /jffs/cert/.config
-CERT=/jffs/cert/$DOMAIN/fullchain.cer
-KEY=/jffs/cert/$DOMAIN/$DOMAIN.key
+if [ -f /jffs/cert/.config ]; then
+  . /jffs/cert/.config
+  CERT=/jffs/cert/$DOMAIN/fullchain.cer
+  KEY=/jffs/cert/$DOMAIN/$DOMAIN.key
+fi
 
 case $1 in
   boot)
