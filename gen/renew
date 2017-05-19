@@ -22,11 +22,9 @@ case $1 in
   post-hook)
     iptables-restore < /root/rules
     rm -f /root/rules
-    if [ "`find $CERT -mmin -20`" ] && [ "`find $KEY -mmin -20`" ]; then
-      chmod 600 $KEY
-      cp -a $CERT /etc/cert.pem
-      cp -a $KEY /etc/key.pem
-    fi
+    chmod 600 $KEY
+    cp -a $CERT /etc/cert.pem
+    cp -a $KEY /etc/key.pem
     echo -e "$INFO Restarting webui"
     service restart_httpd
     ;;
