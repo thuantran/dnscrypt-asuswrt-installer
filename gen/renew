@@ -15,7 +15,7 @@ kill_proc_by_port () {
       if [ -d /proc/$PID/fd ] && [ "`ls -l /proc/$PID/fd|grep \"socket\:\[$SOCKET\]\"`" ]; then
         echo "Found process with pid $PID using port $1, kill it"
         logger "Found process with pid $PID using port $1, kill it"
-        CMDLINE="`cat  /proc/11956/cmdline |tr '\0' ' '`"
+        CMDLINE="`cat  /proc/$PID/cmdline |tr '\0' ' '`"
         CMDLINE=${CMDLINE%?}
         echo "Process command \"${CMDLINE}\""
         logger "Process command \"${CMDLINE}\""
