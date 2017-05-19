@@ -6,6 +6,30 @@ if [ -f /jffs/cert/.config ]; then
   KEY=/jffs/cert/$DOMAIN/$DOMAIN.key
 fi
 
+kill_proc_by_port () {
+  PORT=`printf "%x" $1`
+  for PID in `ls /proc |grep '^[0-9]*$'`; do
+    for ITEM in `cat /proc/net/tcp|awk '{print $2}'|grep -i -n :$PORT`; do
+      NO=`echo $ITEM|cut -d':' -f1`
+      SOCKET=`sed -n ${NO}p /proc/net/tcp|awk '{print $10}'`
+      if [ -d /proc/$PID/fd ] && [ "`ls -l /proc/$PID/fd|grep \"socket\:\[$SOCKET\]\"`" ]; then
+        echo "Found process with pid $PID using port $1, kill it"
+        logger "Found process with pid $PID using port $1, kill it"
+        CMDLINE="`cat  /proc/11956/cmdline |tr '\0' ' '`"
+        CMDLINE=${CMDLINE%?}
+        echo "Process command \"${CMDLINE}\""
+        logger "Process command \"${CMDLINE}\""
+        echo "Please reboot your router or rerun the process as appropriate"
+        logger "Please reboot your router or rerun the process as appropriate"
+        kill $PID
+        sleep 2
+        kill -9 $PID
+        break
+      fi
+    done
+  done
+}
+
 case $1 in
   boot)
     cp -a $CERT /etc/cert.pem
@@ -32,6 +56,7 @@ case $1 in
     iptables-save > /root/rules
     echo -e "$INFO Stopping webui"
     service stop_httpd
+    kill_proc_by_port 443
     sleep 2
     iptables -I INPUT -p tcp --destination-port 443 -j ACCEPT
     ;;
