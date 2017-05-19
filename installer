@@ -161,21 +161,11 @@ inst_cert () {
   download_file $TARG 755 $URL_GEN/renew https://raw.githubusercontent.com/Neilpang/acme.sh/master/acme.sh
   if [ ! -f $CERT ] || [ ! -f $KEY ]; then
     echo -e "$INFO No key and certificate found, getting new cert and key"
-    iptables-save > /root/rules
-    echo -e "$INFO Stopping webui"
-    service stop_httpd
-    sleep 2
-    iptables -I INPUT -p tcp --destination-port 443 -j ACCEPT
-    $TARG/acme.sh --issue --tls --home $TARG -d $DOMAIN
-    iptables-restore < /root/rules
-    rm -f /root/rules
+    $TARG/acme.sh --issue --tls --home $TARG -d $DOMAIN --pre-hook "$TARG/renew pre-hook" --post-hook "/$TARG/renew post-hook"
+  else
+    echo -e "$INFO Found already created certificate, do nothing"
   fi
 
-  chmod 600 $KEY
-  cp -a $CERT /etc/cert.pem
-  cp -a $KEY /etc/key.pem
-  echo -e "$INFO Restarting webui"
-  service restart_httpd
   write_conf DOMAIN $DOMAIN $CONFIG
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/renew dnsmasq
   write_jffs_script /jffs/scripts/init-start $TARG/renew boot
@@ -397,6 +387,7 @@ case $CHOSEN in
     echo -e "$INFO the self signed certificate to jffs, no other data will be changed."
     echo -e "$INFO Also some start scripts will be installed/modified as required."
     echo
+    echo -e "$INFO You need to use router dns server for this to work."
     yesno_query "Do you want to proceed" inst_cert "exit 0"
     ;;
   *)

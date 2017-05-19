@@ -4,22 +4,35 @@
 CERT=/jffs/cert/$DOMAIN/fullchain.cer
 KEY=/jffs/cert/$DOMAIN/$DOMAIN.key
 
-if [ $1 == boot ]; then
-  cp -a $CERT /etc/cert.pem
-  cp -a $KEY /etc/key.pem
+case $1 in
+  boot)
+    cp -a $CERT /etc/cert.pem
+    cp -a $KEY /etc/key.pem
 
-  cru a LETSENCRYPT "0 0 * * * /jffs/cert/renew"
-  exit 0
-fi
-if [ $1 == dnsmasq ]; then
-  echo "address=/$DOMAIN/`nvram get lan_ipaddr`" >> /etc/dnsmasq.conf
-  exit 0
-fi
-
-/jffs/cert/acme.sh --cron --home /jffs/cert
-if [ "`find $CERT -mmin -20`" ] && [ "`find $KEY -mmin -20`" ]; then
-  chmod 600 $KEY
-  cp -a $CERT /etc/cert.pem
-  cp -a $KEY /etc/key.pem
-  service restart_httpd
-fi
+    cru a LETSENCRYPT "0 0 * * * /jffs/cert/renew cron"
+    ;;
+  cron)
+    /jffs/cert/acme.sh --cron --home /jffs/cert
+    ;;
+  dnsmasq)
+    echo "address=/$DOMAIN/`nvram get lan_ipaddr`" >> /etc/dnsmasq.conf
+    ;;
+  post-hook)
+    iptables-restore < /root/rules
+    rm -f /root/rules
+    if [ "`find $CERT -mmin -20`" ] && [ "`find $KEY -mmin -20`" ]; then
+      chmod 600 $KEY
+      cp -a $CERT /etc/cert.pem
+      cp -a $KEY /etc/key.pem
+    fi
+    echo -e "$INFO Restarting webui"
+    service restart_httpd
+    ;;
+  pre-hook)
+    iptables-save > /root/rules
+    echo -e "$INFO Stopping webui"
+    service stop_httpd
+    sleep 2
+    iptables -I INPUT -p tcp --destination-port 443 -j ACCEPT
+    ;;
+esac
