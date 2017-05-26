@@ -6,6 +6,17 @@ if [ -f /jffs/cert/.config ]; then
   KEY=/jffs/cert/$DOMAIN/$DOMAIN.key
 fi
 
+httpd_port_op () {
+  HTTPSPORT=`nvram get misc_httpsport_x`
+  HTTPS_LANPORT=`nvram get https_lanport`
+  HTTPPORT=`nvram get misc_httpport_x`
+  HTTP_LANPORT=`nvram get http_lanport`
+
+  if [ "$HTTPSPORT" == "$2" ] || [ "$HTTPS_LANPORT" == "$2" ] || [ "$HTTPPORT" == "$2" ] || [ "$HTTP_LANPORT" == "$2" ]; then
+    service ${1}_httpd
+  fi
+}
+
 kill_proc_by_port () {
   PORT=`printf "%x" $1`
   for PID in `ls /proc |grep '^[0-9]*$'`; do
@@ -30,6 +41,8 @@ kill_proc_by_port () {
   done
 }
 
+
+
 case $1 in
   boot)
     cp -a $CERT /etc/cert.pem
@@ -50,12 +63,12 @@ case $1 in
     cp -a $CERT /etc/cert.pem
     cp -a $KEY /etc/key.pem
     echo -e "$INFO Restarting webui"
-    service restart_httpd
+    httpd_port_op restart 443
     ;;
   pre-hook)
     iptables-save > /root/rules
     echo -e "$INFO Stopping webui"
-    service stop_httpd
+    httpd_port_op stop 443
     kill_proc_by_port 443
     sleep 2
     iptables -I INPUT -p tcp --destination-port 443 -j ACCEPT
