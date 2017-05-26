@@ -158,15 +158,15 @@ inst_cert () {
   CERT=$TARG/$DOMAIN/fullchain.cer
   KEY=$TARG/$DOMAIN/$DOMAIN.key
   mkdir -p $TARG
+  write_conf DOMAIN $DOMAIN $CONFIG
   download_file $TARG 755 $URL_GEN/renew https://raw.githubusercontent.com/Neilpang/acme.sh/master/acme.sh
   if [ ! -f $CERT ] || [ ! -f $KEY ]; then
     echo -e "$INFO No key and certificate found, getting new cert and key"
-    $TARG/acme.sh --issue --tls --home $TARG -d $DOMAIN --pre-hook "$TARG/renew pre-hook" --post-hook "/$TARG/renew post-hook"
+    $TARG/acme.sh --issue --tls --home $TARG -d $DOMAIN --pre-hook "$TARG/renew pre-hook" --post-hook "$TARG/renew post-hook"
   else
     echo -e "$INFO Found already created certificate, do nothing"
   fi
 
-  write_conf DOMAIN $DOMAIN $CONFIG
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/renew dnsmasq
   write_jffs_script /jffs/scripts/init-start $TARG/renew boot
 }
