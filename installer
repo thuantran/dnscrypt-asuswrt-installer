@@ -145,7 +145,7 @@ inst_dnscrypt () {
   local TARG=/jffs/dnscrypt
   create_dir $TARG
 
-  download_file $TARG 644 https://raw.githubusercontent.com/jedisct1/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv
+  download_file $TARG 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv
   download_file $TARG 755 $URL_GEN/manager $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
 
   write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/manager dnsmasq
