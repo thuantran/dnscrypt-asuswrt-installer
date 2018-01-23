@@ -31,6 +31,17 @@ check_jffs_enabled () {
   fi
 }
 
+check_swap () {
+  echo 1
+  SWAP_SIZE=`cat /proc/meminfo | grep SwapTotal | awk '{print $2}'`
+  [ $SWAP_SIZE -gt 0 ] && return 0
+
+  echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, a swap file is recommended"
+  echo -e "$INFO You need an external storage to host this file"
+  echo
+  yesno_query "Do you want to install a swap file (512MB on ext filesystem partition)?" inst_swap
+}
+
 choose_dnscrypt_server () {
   if [ $1 -eq 1 ] && [ -z $2 ]; then
     echo -e "$INFO Available DNS servers: "
@@ -142,20 +153,21 @@ download_file () {
 }
 
 inst_dnscrypt () {
-  local TARG=/jffs/dnscrypt
-  create_dir $TARG
+  echo inst_dnscrypt
+  # local TARG=/jffs/dnscrypt
+  # create_dir $TARG
 
-  download_file $TARG 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv
-  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
+  # download_file $TARG 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv
+  # download_file $TARG 755 $URL_GEN/manager $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
 
-  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/manager dnsmasq
-  write_jffs_script /jffs/scripts/wan-start $TARG/manager dnscrypt-start
-  choose_dnscrypt_server 1
-  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/manager fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+  # write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/manager dnsmasq
+  # write_jffs_script /jffs/scripts/wan-start $TARG/manager dnscrypt-start
+  # choose_dnscrypt_server 1
+  # [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+  # yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/manager fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
 
-  echo -e "$INFO Install a (P)RNG for better cryptographic operations"
-  inst_random
+  # echo -e "$INFO Install a (P)RNG for better cryptographic operations"
+  # inst_random
 }
 
 inst_ip_update () {
@@ -246,6 +258,49 @@ inst_ran_dev () {
   write_conf RNG_DEV "/dev/$RNG_DEV"
 }
 
+inst_swap () {
+  SWAP_SIZE=524288
+  USB_COUNT=`find /tmp/mnt/ -maxdepth 1 -type d|wc -l`
+  if [ $USB_COUNT -le 1 ]; then
+    echo -e "$ERROR Unable to find any external USB storage"
+    exit 1
+  fi
+
+  for MOUNT in /mnt/*/; do
+    MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
+    MOUNT_FREE=`df -T "$MOUNT"|awk 'FNR==2 {print $5}'`
+
+    if [ ${MOUNT_FS%?} == "ext" ] && [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
+      SWAP_OK=1
+      PARTITIONS="$PARTITIONS $MOUNT"
+    fi
+  done
+
+  if [ -z SWAP_OK ]; then
+    echo -e "$ERROR No suitable external USB storage found\nPlease connect a USB storage with ext filesystem with enough free space"
+    exit 1
+  fi
+
+  echo -e "$INFO Available partition to install swap file:$NORM"
+  INDEX=1
+  for MOUNT in $PARTITIONS; do
+    echo "$INDEX) $MOUNT"
+    eval "ITEM$INDEX=$MOUNT"
+    INDEX=$((INDEX+1))
+  done
+  echo -en "$INPUT Please select the partition to install swap file:$NORM "
+  read CHOSEN
+  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
+    echo -e "$ERROR Invalid character entered! Retrying..."
+    inst_swap
+    return
+  fi
+
+  eval MOUNT="\$ITEM$CHOSEN"
+  dd if=/dev/zero of=$MOUNT/swap bs=1024 count=$SWAP_SIZE
+  mkswap $MOUNT/swap
+}
+
 yesno_query () {
   QUERY=$1
   YES_FUNC=$2
@@ -318,14 +373,14 @@ case $(uname -m) in
     URL_ARCH=$URL_ARCH/armv7
     echo -e "$INFO Detected ARM architecture."
     ;;
-  mips)
-    URL_ARCH=$URL_ARCH/mips
-    echo -e "$INFO Detected MIPSEL architecture."
-    ;;
-  *)
-    echo "This is unsupported platform, sorry."
-    exit 1
-    ;;
+  # mips)
+    # URL_ARCH=$URL_ARCH/mips
+    # echo -e "$INFO Detected MIPSEL architecture."
+    # ;;
+  # *)
+    # echo "This is unsupported platform, sorry."
+    # exit 1
+    # ;;
 esac
 
 check_jffs_enabled
@@ -338,7 +393,8 @@ echo -en "$INPUT Please enter the number designates your selection or any other 
 read CHOSEN
 case $CHOSEN in
   1)
-    echo -e "$INFO This operation will install dnscrypt-proxy and related files (<1MB)"
+    check_swap
+    echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)"
     echo -e "$INFO to jffs, no other data will be changed."
     echo -e "$INFO Also some start scripts will be installed/modified as required."
     echo
