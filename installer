@@ -190,11 +190,13 @@ inst_ip_update () {
   read -r USERNAME
   echo -en "$INPUT Please enter OpenDNS password$NORM: "
   read -rs PW1
+  echo
   echo -en "$INPUT Please reenter OpenDNS password$NORM: "
   read -rs PW2
+  echo
   if [ "$PW1" != "$PW2" ]; then
     echo -e "$ERROR Password entered incorrectly! Exiting..."
-    exit 1
+    inst_ip_update $1
   fi
 
   write_conf OPENDNS_USER "\"$USERNAME\""
