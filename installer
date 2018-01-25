@@ -47,11 +47,9 @@ choose_dnscrypt_server () {
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
   if [ "$1" == "1" ] && [ -z $2 ]; then
     toml_array_clean $TARG server_names
-    OLDIFS=$IFS
-    IFS=$'\n'
     echo -e "$INFO Available DNS servers: "
     INDEX=0
-    for LINE in `curl -s https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv`;do
+    while read -r LINE;do
       if [ $INDEX -eq 0 ]; then
         INDEX=1
         continue
@@ -61,8 +59,7 @@ choose_dnscrypt_server () {
       SERVER="`echo $SERVER | cut -d':' -f1`"
       eval "ITEM$INDEX=$SERVER"
       INDEX=$((INDEX+1))
-    done
-    IFS=$OLDIFS
+    done < /jffs/dnscrypt/dnscrypt-resolvers.csv
   fi
   case $1 in
     1)
@@ -154,28 +151,28 @@ download_file () {
 
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
+  local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v1"
   local TARG=/jffs/dnscrypt
-  local TMP=/root
   create_dir $TARG
 
-  download_file $TMP 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
-  tar xzv -C $TMP -f $TMP/$DNSCRYPT_TAR
+  download_file $TARG 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
+    $RESOLVERS_URL_PREFIX/dnscrypt-resolvers.csv \
+    $RESOLVERS_URL_PREFIX/dnscrypt-resolvers.csv.minisig
+  tar xzv -C $TARG -f $TARG/$DNSCRYPT_TAR
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to download dnscrypt-proxy package for your device"
     return 1
   fi
-
-  cp -r $TMP/$DNSCRYPT_ARCH_TAR/* $TARG
-  rm -r $TMP/$DNSCRYPT_ARCH_TAR $TMP/$DNSCRYPT_TAR
+  chown admin:root $TARG/$DNSCRYPT_ARCH_TAR/*
+  mv $TARG/$DNSCRYPT_ARCH_TAR/* $TARG
+  rm -r $TARG/$DNSCRYPT_ARCH_TAR $TARG/$DNSCRYPT_TAR
   chmod 755 $TARG/dnscrypt-proxy
-
-  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/nonroot
-
-  write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
-  write_manager_script /jffs/scripts/wan-start dnscrypt-start
-
   preset_dnscrypt_settings
   choose_dnscrypt_server 1
+
+  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/nonroot
+  write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+  write_manager_script /jffs/scripts/wan-start dnscrypt-start
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
 
@@ -338,6 +335,7 @@ preset_dnscrypt_settings () {
 
   toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
   toml_var_write $TARG require_nolog "false"
+  toml_var_write $TARG require_nofilter "false"
   toml_var_write $TARG cert_ignore_timestamp "true"
   toml_var_write $TARG log_level "4"
   toml_var_write $TARG use_syslog "true"
