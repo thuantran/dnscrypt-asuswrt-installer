@@ -189,9 +189,9 @@ inst_ip_update () {
   echo -en "$INPUT Please enter OpenDNS username$NORM: "
   read -r USERNAME
   echo -en "$INPUT Please enter OpenDNS password$NORM: "
-  read -r PW1
+  read -rs PW1
   echo -en "$INPUT Please reenter OpenDNS password$NORM: "
-  read -r PW2
+  read -rs PW2
   if [ "$PW1" != "$PW2" ]; then
     echo -e "$ERROR Password entered incorrectly! Exiting..."
     exit 1
