@@ -36,7 +36,7 @@ check_jffs_enabled () {
 check_swap () {
   SWAP_SIZE=`cat /proc/meminfo | grep SwapTotal | awk '{print $2}'`
   if [ $SWAP_SIZE -gt 0 ]; then
-    echo -e "$INFO Swap file is already setup. Exiting..."
+    echo -e "$INFO Swap file is already setup"
     return 0
   fi
 
