@@ -1,5 +1,7 @@
 #!/bin/sh
 
+DNSCRYPT_VER=2.0.0beta9
+
 BOLD="\033[1m"
 NORM="\033[0m"
 INFO="$BOLD Info: $NORM"
@@ -42,10 +44,14 @@ check_swap () {
 }
 
 choose_dnscrypt_server () {
-  if [ $1 -eq 1 ] && [ -z $2 ]; then
+  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
+  if [ "$1" == "1" ] && [ -z $2 ]; then
+    toml_array_clean $TARG server_names
+    OLDIFS=$IFS
+    IFS=$'\n'
     echo -e "$INFO Available DNS servers: "
     INDEX=0
-    while read LINE; do
+    for LINE in `curl -s https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv`;do
       if [ $INDEX -eq 0 ]; then
         INDEX=1
         continue
@@ -55,26 +61,20 @@ choose_dnscrypt_server () {
       SERVER="`echo $SERVER | cut -d':' -f1`"
       eval "ITEM$INDEX=$SERVER"
       INDEX=$((INDEX+1))
-    done < /jffs/dnscrypt/dnscrypt-resolvers.csv
+    done
+    IFS=$OLDIFS
   fi
   case $1 in
     1)
       echo -en "$INPUT Please choose DNS server\n$BOLD[1-`expr $INDEX - 1`]$NORM: "
       ;;
-    2)
-      echo -en "$INPUT Please choose 2nd DNS server or press n to skip\n$BOLD[1-`expr $INDEX - 1`/n]$NORM: "
+    *)
+      echo -en "$INPUT Please choose next DNS server or press n to stop\n$BOLD[1-`expr $INDEX - 1`/n]$NORM: "
       ;;
   esac
-  read TMP
-  if [ $1 -eq 2 ] && [ "$TMP" == "$CHOSEN" ]; then
-    echo -e "$ERROR Duplicate selection! Retrying..."
-    choose_dnscrypt_server $1 x
-    return
-  fi
-  CHOSEN=$TMP
-  if [ $1 -eq 2 ] && [ $CHOSEN == "n" ]; then
-    write_conf DNS$1 ""
-    return
+  read CHOSEN
+  if [ "$1" != "1" ] && [ $CHOSEN == "n" ]; then
+    return 0
   fi
   if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
     echo -e "$ERROR Invalid character entered! Retrying..."
@@ -88,9 +88,10 @@ choose_dnscrypt_server () {
   fi
 
   eval ITEM="\$ITEM$CHOSEN"
-  write_conf DNS$1 "$ITEM"
+  toml_array_write $TARG server_names $ITEM
+
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
-  [ $1 -eq 1 ] && choose_dnscrypt_server 2
+  choose_dnscrypt_server n
 }
 
 cleanup () {
@@ -152,25 +153,34 @@ download_file () {
 }
 
 inst_dnscrypt () {
+  local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
+  local TARG=/jffs/dnscrypt
+  local TMP=/root
+  create_dir $TARG
 
-  echo inst_dnscrypt
-  # local TARG=/jffs/dnscrypt
-  # create_dir $TARG
+  download_file $TMP 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
+  tar xzv -C $TMP -f $TMP/$DNSCRYPT_TAR
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to download dnscrypt-proxy package for your device"
+    return 1
+  fi
 
-  # local TMP=/root
-  # download_file $TMP 644 
-  
-  # download_file $TARG 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv
-  # download_file $TARG 755 $URL_GEN/manager $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
+  cp -r $TMP/$DNSCRYPT_ARCH_TAR/* $TARG
+  rm -r $TMP/$DNSCRYPT_ARCH_TAR $TMP/$DNSCRYPT_TAR
+  chmod 755 $TARG/dnscrypt-proxy
 
-  # write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
-  # write_manager_script /jffs/scripts/wan-start dnscrypt-start
-  # choose_dnscrypt_server 1
-  # [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  # yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/nonroot
 
-  # echo -e "$INFO Install a (P)RNG for better cryptographic operations"
-  # inst_random
+  write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+  write_manager_script /jffs/scripts/wan-start dnscrypt-start
+
+  preset_dnscrypt_settings
+  choose_dnscrypt_server 1
+  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+
+  echo -e "$INFO Install a (P)RNG for better cryptographic operations"
+  inst_random
 }
 
 inst_ip_update () {
@@ -315,11 +325,61 @@ inst_swap () {
   fi
   echo -e "$INFO Please wait..."
   dd if=/dev/zero of=$MOUNT/swap bs=1024 count=$SWAP_SIZE
+  chmod 600 $MOUNT/swap
   mkswap $MOUNT/swap
 
   write_command_script /jffs/scripts/post-mount '[ -f $1/swap ] && swapon $1/swap'
   write_command_script /jffs/scripts/unmount '[ -f $1/swap ] && swapoff $1/swap'
   echo
+}
+
+preset_dnscrypt_settings () {
+  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
+
+  toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
+  toml_var_write $TARG require_nolog "false"
+  toml_var_write $TARG cert_ignore_timestamp "true"
+  toml_var_write $TARG log_level "4"
+  toml_var_write $TARG use_syslog "true"
+  toml_var_write $TARG cache "false"
+}
+
+toml_array_clean () {
+  sed -i "/$2 = /c\\$2 = []" $1
+}
+
+toml_array_write () {
+  local TARG=$1
+  local VAR=$2
+  local VALUE=$3
+
+  local LINE="`grep -F $VAR \"$TARG\"`"
+  if [ "`echo $LINE | grep -F $VALUE "$TARG"`" ]; then
+    echo -e "$INFO $VALUE is already set"
+    return 0
+  fi
+
+  CHAR_BEF_INDEX=$((${#LINE}-2))
+  if [ "${LINE:$CHAR_BEF_INDEX:1}" == '[' ]; then
+    LINE="${LINE%?}'$VALUE']"
+  else
+    LINE="${LINE%?}, '$VALUE']"
+  fi
+
+  sed -i "/$VAR = /c\\$LINE" $TARG
+}
+
+toml_var_write () {
+  local TARG=$1
+  local VAR=$2
+  local VALUE=$3
+
+  if [ "`grep $VAR $TARG`" ]; then
+    sed -i "/$VAR = /c\\$VAR = $VALUE" $TARG
+  else
+    echo "" >> $TARG
+    echo "$VAR = $VALUE" >> $TARG
+  fi
 }
 
 yesno_query () {
@@ -411,6 +471,8 @@ URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 case $(uname -m) in
   armv7l)
     URL_ARCH=$URL_ARCH/armv7
+    DNSCRYPT_ARCH=linux_arm
+    DNSCRYPT_ARCH_TAR=linux-arm
     echo -e "$INFO Detected ARM architecture."
     ;;
   # mips)
