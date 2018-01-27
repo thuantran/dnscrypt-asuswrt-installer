@@ -477,7 +477,13 @@ case $(uname -m) in
     URL_ARCH=$URL_ARCH/armv7
     DNSCRYPT_ARCH=linux_arm
     DNSCRYPT_ARCH_TAR=linux-arm
-    echo -e "$INFO Detected ARM architecture."
+    echo -e "$INFO Detected ARMv7 architecture."
+    ;;
+  aarch64)
+    URL_ARCH=$URL_ARCH/armv7
+    DNSCRYPT_ARCH=linux_arm64
+    DNSCRYPT_ARCH_TAR=linux-arm64
+    echo -e "$INFO Detected ARMv8 architecture."
     ;;
   mips)
     URL_ARCH=$URL_ARCH/mips
@@ -485,10 +491,10 @@ case $(uname -m) in
     DNSCRYPT_ARCH_TAR=linux-mips
     echo -e "$INFO Detected MIPSEL architecture."
     ;;
-  # *)
-    # echo "This is unsupported platform, sorry."
-    # exit 1
-    # ;;
+  *)
+    echo "This is unsupported platform, sorry."
+    exit 1
+    ;;
 esac
 
 check_jffs_enabled
