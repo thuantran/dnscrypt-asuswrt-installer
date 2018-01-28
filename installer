@@ -137,7 +137,7 @@ download_file () {
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
@@ -182,8 +182,7 @@ inst_dnscrypt () {
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
 
-  echo -e "$INFO Install a (P)RNG for better cryptographic operations"
-  inst_random
+  end_op_message 0
 }
 
 inst_ip_update () {
@@ -214,6 +213,7 @@ inst_random () {
   create_dir $TARG
 
   if [ -z $1 ]; then
+    echo -e "$INFO Install a (P)RNG for better cryptographic operations"
     echo -e "$INFO Available random number generator providers:"
     echo -e "  1) HAVEGED (Preferred if you do not have a HW RNG)"
     echo -e "  2) RNGD (Preferred if you have a HW RNG)"
@@ -364,7 +364,7 @@ toml_array_write () {
   local VALUE=$3
 
   local LINE="`grep -F $VAR \"$TARG\"`"
-  if [ "`echo $LINE | grep -F $VALUE "$TARG"`" ]; then
+  if [ "`echo $LINE | grep -F $VALUE`" ]; then
     echo -e "$INFO $VALUE is already set"
     return 0
   fi
@@ -508,7 +508,7 @@ cleanup
 
 menu () {
   echo -e "$INFO Choose what you want to do:"
-  echo -e "  1) Install dnscrypt and (P)RNG"
+  echo -e "  1) Install dnscrypt"
   echo -e "  2) Install (P)RNG only"
   echo -e "  3) Install swap file"
   echo -e "  q) Quit"
