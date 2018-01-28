@@ -45,8 +45,8 @@ start_dnscrypt () {
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall dnscrypt-proxy
   logger "Start dnscrypt-proxy"
-  $NONROOT $DNSCRYPT_START &
-  [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ] && update_opendns 0
+  $NONROOT $DNSCRYPT_START
+  [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ] && update_opendns 0 &
 }
 
 update_opendns () {
@@ -69,7 +69,7 @@ update_opendns () {
 
 case $1 in
   dnscrypt-start)
-    start_dnscrypt &
+    start_dnscrypt
     ;;
   dnsmasq)
     NTP0=`nvram get ntp_server0`

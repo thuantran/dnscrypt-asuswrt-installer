@@ -348,6 +348,7 @@ preset_dnscrypt_settings () {
   toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
   toml_var_write $TARG require_nolog "false"
   toml_var_write $TARG require_nofilter "false"
+  toml_var_write $TARG daemonize "true"
   # toml_var_write $TARG log_level "4"
   toml_var_write $TARG use_syslog "true"
   toml_var_write $TARG cache "false"
