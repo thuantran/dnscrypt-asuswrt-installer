@@ -46,16 +46,12 @@ start_dnscrypt () {
   killall dnscrypt-proxy
   logger "Start dnscrypt-proxy"
   $NONROOT $DNSCRYPT_START &
-  sleep 5
-  update_opendns 0
+  [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ] && update_opendns 0
 }
 
 update_opendns () {
-  if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
-    return
-  fi
-  ARG=$1
-  [ $ARG -gt 2 ] && return
+  sleep 5
+  [ $1 -gt 2 ] && return
   RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
   case "$RET" in
     good*)
@@ -66,8 +62,7 @@ update_opendns () {
       ;;
     *)
       logger "OpenDNS: Received error $RET"
-      sleep 1
-      update_opendns $((ARG+1))
+      update_opendns $(($1+1))
       ;;
   esac
 }
