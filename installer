@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.0beta10
+DNSCRYPT_VER=2.0.0beta11
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -50,7 +50,8 @@ choose_dnscrypt_server () {
     toml_array_clean $TARG server_names
     echo -e "$INFO Available DNS servers: "
     awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
-    INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
+    INDEX=$((`grep -c "^## " /jffs/dnscrypt/public-resolvers.md` + 1))
+    echo "  $INDEX) google: Google DNS over HTTP/2 server"
   fi
   case $1 in
     1)
@@ -69,13 +70,18 @@ choose_dnscrypt_server () {
     choose_dnscrypt_server $1 x
     return
   fi
-  if [ $CHOSEN -lt 1 ] || [ $CHOSEN -gt `expr $INDEX - 1` ] ; then
+  if [ $CHOSEN -lt 1 ] || [ $CHOSEN -gt $INDEX ] ; then
     echo -e "$ERROR Chosen DNS server number is not in range! Retrying..."
     choose_dnscrypt_server $1 x
     return
   fi
 
-  ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  if [ $CHOSEN -lt $INDEX ]; then
+    ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  else
+    ITEM=google
+  fi
+
   toml_array_write $TARG server_names $ITEM
 
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1

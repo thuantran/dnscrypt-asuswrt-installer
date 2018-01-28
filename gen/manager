@@ -79,7 +79,7 @@ case $1 in
   dnsmasq)
     NTP0=`nvram get ntp_server0`
     NTP1=`nvram get ntp_server1`
-    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053" "server=/download.dnscrypt.info/8.8.8.8" "server=/raw.githubusercontent.com/8.8.8.8"
+    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053" "server=/download.dnscrypt.info/8.8.8.8" "server=/dns.google.com/8.8.8.8" "server=/raw.githubusercontent.com/8.8.8.8"
     ;;
   fw-rules)
     iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
