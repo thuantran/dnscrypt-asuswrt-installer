@@ -50,8 +50,8 @@ start_dnscrypt () {
 }
 
 update_opendns () {
-  sleep 5
   [ $1 -gt 2 ] && return
+  sleep 5
   RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
   case "$RET" in
     good*)
