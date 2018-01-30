@@ -170,7 +170,7 @@ inst_dnscrypt () {
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig
   tar xzv -C $TARG -f $TARG/$DNSCRYPT_TAR
   if [ $? -ne 0 ]; then
-    echo -e "$ERROR Unable to download dnscrypt-proxy package for your device"
+    echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
     end_op_message
     return 1
   fi
@@ -370,6 +370,12 @@ setup_dnscrypt () {
     return 1
   fi
   echo -e "$INFO Configuring dnscrypt-proxy..."
+  echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
+  echo -e "$INFO and router services (e.g. ntp) at boot"
+  echo -en "$INPUT Default is 8.8.8.8: $NORM"
+  read DNS_SERVER
+  [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
+  write_conf DNS_INIT $DNS_SERVER
   toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
   toml_var_write $TARG require_nolog "false"
   toml_var_write $TARG require_nofilter "false"
