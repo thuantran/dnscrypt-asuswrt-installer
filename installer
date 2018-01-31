@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.0beta11
+DNSCRYPT_VER=2.0.0beta12
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -46,42 +46,18 @@ check_swap () {
 
 choose_dnscrypt_server () {
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-  if [ "$1" == "1" ] && [ -z $2 ]; then
+  if [ -z $1 ]; then
     toml_array_clean $TARG server_names
     echo -e "$INFO Available DNS servers: "
     awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
-    INDEX=$((`grep -c "^## " /jffs/dnscrypt/public-resolvers.md` + 1))
-    echo "  $INDEX) google: Google DNS over HTTP/2 server"
-  fi
-  case $1 in
-    1)
-      echo -en "$INPUT Please choose DNS server $BOLD[1-$INDEX]$NORM: "
-      ;;
-    *)
-      echo -en "$INPUT Please choose next DNS server or press n to stop $BOLD[1-$INDEX/n]$NORM: "
-      ;;
-  esac
-  read CHOSEN
-  if [ "$1" != "1" ] && [ $CHOSEN == "n" ]; then
-    return 0
-  fi
-  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
-    echo -e "$ERROR Invalid character entered! Retrying..."
-    choose_dnscrypt_server $1 x
-    return
-  fi
-  if [ $CHOSEN -lt 1 ] || [ $CHOSEN -gt $INDEX ] ; then
-    echo -e "$ERROR Chosen DNS server number is not in range! Retrying..."
-    choose_dnscrypt_server $1 x
-    return
-  fi
-
-  if [ $CHOSEN -lt $INDEX ]; then
-    ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+    INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
+    read_input_num "Please choose DNS server" 1 $INDEX
   else
-    ITEM=google
+    read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
+    [ $? -eq 1 ] && return 0
   fi
 
+  ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
   toml_array_write $TARG server_names $ITEM
 
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
@@ -349,16 +325,23 @@ inst_swap () {
 }
 
 read_input_num () {
-  echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
+  if [ -z $4 ]; then
+    echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
+  else
+    echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
+  fi
   read CHOSEN
+  if [ "$CHOSEN" == "n" ]; then
+    return 1
+  fi
   if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
     echo -e "$ERROR Invalid character entered! Retrying..."
-    read_input_num $@
+    read_input_num "$@"
     return
   fi
   if [ $CHOSEN -lt $2 ] || [ $CHOSEN -gt $3 ] ; then
-    echo -e "$ERROR Chosen DNS server number is not in range! Retrying..."
-    read_input_num $@
+    echo -e "$ERROR Chosen number is not in range! Retrying..."
+    read_input_num "$@"
     return
   fi
 }
@@ -372,14 +355,13 @@ setup_dnscrypt () {
   echo -e "$INFO Configuring dnscrypt-proxy..."
   echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
   echo -e "$INFO and router services (e.g. ntp) at boot"
-  echo -en "$INPUT Default is 8.8.8.8: $NORM"
+  echo -en "$INPUT Default is ${BOLD}9.9.9.9: $NORM"
   read DNS_SERVER
-  [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
+  [ -z $DNS_SERVER ] && DNS_SERVER=9.9.9.9
   write_conf DNS_INIT $DNS_SERVER
   toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
   toml_var_write $TARG require_nolog "false"
   toml_var_write $TARG require_nofilter "false"
-  toml_var_write $TARG daemonize "true"
   toml_var_write $TARG use_syslog "true"
   toml_var_write $TARG cache "false"
   toml_var_write $TARG cert_ignore_timestamp "true"
@@ -387,7 +369,7 @@ setup_dnscrypt () {
   read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
   toml_var_write $TARG log_level "$CHOSEN"
 
-  choose_dnscrypt_server 1
+  choose_dnscrypt_server
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
 }
