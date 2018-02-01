@@ -12,18 +12,6 @@ append_on_demand () {
   done
 }
 
-clock_load () {
-  date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-  (
-  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
-  while true; do touch "$0"; sleep 900; done
-  )&
-}
-
-clock_save () {
-  touch "$0"
-}
-
 init_hwrng () {
   COUNT=0
   while [ ! -c $RNG_DEV ]; do
@@ -87,7 +75,8 @@ case $1 in
     iptables -t nat -A PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
     ;;
   init-start)
-    clock_load
+    date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+    cru a "CLOCK_SAVE" "*/15 * * * * touch \"$0\""
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1
@@ -98,6 +87,6 @@ case $1 in
     esac
     ;;
   services-stop)
-    clock_save
+    touch "$0"
     ;;
 esac
