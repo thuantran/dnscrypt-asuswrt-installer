@@ -150,7 +150,7 @@ inst_dnscrypt () {
     end_op_message
     return 1
   fi
-  chown admin:root $TARG/$DNSCRYPT_ARCH_TAR/*
+  chown `nvram get http_username`:root $TARG/$DNSCRYPT_ARCH_TAR/*
   mv $TARG/$DNSCRYPT_ARCH_TAR/* $TARG
   rm -r $TARG/$DNSCRYPT_ARCH_TAR $TARG/$DNSCRYPT_TAR
   chmod 755 $TARG/dnscrypt-proxy
