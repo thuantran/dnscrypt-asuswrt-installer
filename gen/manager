@@ -60,15 +60,7 @@ case $1 in
     start_dnscrypt
     ;;
   dnsmasq)
-    NTP0=`nvram get ntp_server0`
-    NTP1=`nvram get ntp_server1`
-    append_on_demand /etc/dnsmasq.conf "no-resolv" \
-      "server=127.0.0.1#65053" \
-      "server=/$NTP0/$DNS_INIT" \
-      "server=/$NTP1/$DNS_INIT" \
-      "server=/download.dnscrypt.info/$DNS_INIT" \
-      "server=/dns.google.com/$DNS_INIT" \
-      "server=/raw.githubusercontent.com/$DNS_INIT"
+    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
     ;;
   fw-rules)
     iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)

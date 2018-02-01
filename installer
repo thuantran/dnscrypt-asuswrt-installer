@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.0beta12
+DNSCRYPT_VER=2.0.0rc
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -355,14 +355,15 @@ setup_dnscrypt () {
   echo -e "$INFO Configuring dnscrypt-proxy..."
   echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
   echo -e "$INFO and router services (e.g. ntp) at boot"
-  echo -en "$INPUT Default is ${BOLD}9.9.9.9: $NORM"
+  echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
   read DNS_SERVER
-  [ -z $DNS_SERVER ] && DNS_SERVER=9.9.9.9
-  write_conf DNS_INIT $DNS_SERVER
+  [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
   toml_global_var_write $TARG listen_addresses "['127.0.0.1:65053']"
   toml_global_var_write $TARG require_nolog "false"
   toml_global_var_write $TARG require_nofilter "false"
   toml_global_var_write $TARG use_syslog "true"
+  toml_global_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
+  toml_global_var_write $TARG ignore_system_dns "true"
   toml_global_var_write $TARG cache "false"
   toml_global_var_write $TARG cert_ignore_timestamp "true"
 
@@ -383,7 +384,7 @@ toml_array_write () {
   local VAR=$2
   local VALUE=$3
 
-  local LINE="`grep -F $VAR \"$TARG\"`"
+  local LINE="`grep -F \"$VAR = \" \"$TARG\"`"
   if [ "`echo $LINE | grep -F $VALUE`" ]; then
     echo -e "$INFO $VALUE is already set"
     return 0
