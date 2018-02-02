@@ -28,7 +28,6 @@ init_hwrng () {
 }
 
 start_dnscrypt () {
-  export TZ="`nvram get time_zone_x`"
   NONROOT="/jffs/dnscrypt/nonroot nobody"
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall dnscrypt-proxy
