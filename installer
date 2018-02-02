@@ -163,7 +163,10 @@ inst_dnscrypt () {
     return 1
   fi
 
-  echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, a swap file is recommended"
+  echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
+  echo -e "$INFO  - Add swap"
+  echo -e "$INFO  - Add a RNG"
+  echo -e "$INFO  - Set your timezone"
   end_op_message 0
 }
 
@@ -364,7 +367,6 @@ setup_dnscrypt () {
   toml_global_var_write $TARG require_nofilter "false"
   toml_global_var_write $TARG use_syslog "true"
   toml_global_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
-  toml_global_var_write $TARG ignore_system_dns "true"
   toml_global_var_write $TARG cache "false"
   toml_global_var_write $TARG cert_ignore_timestamp "true"
 
@@ -374,6 +376,39 @@ setup_dnscrypt () {
   choose_dnscrypt_server
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+}
+
+setup_timezone () {
+  local TARG=/jffs/dnscrypt
+  local TMP=/root
+
+  PKG_LIST=Packages.html
+  download_file $TMP 644 $URL_TZ/$PKG_LIST
+  INDEX=`grep -c "zoneinfo.*ipk" $TMP/$PKG_LIST`
+  echo -e "$INFO Available general geographic locations:"
+  grep -o "zoneinfo.*ipk" $TMP/$PKG_LIST|awk -F'[-_]' '++i {printf "  "; printf i") "; print $2}'
+  read_input_num "Select your location" 1 $INDEX
+
+  TZ_LIST=`awk -F'"' -v INDEX=$CHOSEN '/zoneinfo.*ipk/{i++} i==INDEX {print $4;exit}' $TMP/$PKG_LIST`
+  download_file $TMP 644 $URL_TZ/$TZ_LIST
+
+  tar xzf $TMP/$TZ_LIST -C $TMP ./data.tar.gz
+  INDEX=`tar tzf $TMP/data.tar.gz | awk '!/\/$/ {print $0}'|wc  -l`
+  echo -e "$INFO Available cities:"
+  tar tzf $TMP/data.tar.gz | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
+  read_input_num "Select your city" 1 $INDEX
+
+  TZ_FILE=`tar tzf $TMP/data.tar.gz | awk -F'/' -v INDEX=$CHOSEN '!/\/$/ {++i;if (i==INDEX){print $0}}'`
+  tar xzf $TMP/data.tar.gz -C $TMP "$TZ_FILE"
+  cp $TZ_FILE $TARG/localtime
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to get your timezone file"
+    end_op_message
+    return 1
+  fi
+
+  rm -r $TMP/$PKG_LIST $TMP/$TZ_LIST $TMP/data.tar.gz $TMP/opt
+  end_op_message 0
 }
 
 toml_array_clean () {
@@ -499,22 +534,26 @@ write_manager_script () {
 [ $1 ] && BRANCH=$1 || BRANCH=master
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
+URL_TZ=http://pkg.entware.net/binaries
 
 case $(uname -m) in
   armv7l)
     URL_ARCH=$URL_ARCH/armv7
+    URL_TZ=$URL_TZ/armv7
     DNSCRYPT_ARCH=linux_arm
     DNSCRYPT_ARCH_TAR=linux-arm
     echo -e "$INFO Detected ARMv7 architecture."
     ;;
   aarch64)
     URL_ARCH=$URL_ARCH/armv7
+    URL_TZ=$URL_TZ/armv7
     DNSCRYPT_ARCH=linux_arm64
     DNSCRYPT_ARCH_TAR=linux-arm64
     echo -e "$INFO Detected ARMv8 architecture."
     ;;
   mips)
     URL_ARCH=$URL_ARCH/mips
+    URL_TZ=$URL_TZ/mipsel
     DNSCRYPT_ARCH=linux_mips
     DNSCRYPT_ARCH_TAR=linux-mips
     echo -e "$INFO Detected MIPSEL architecture."
@@ -532,8 +571,9 @@ menu () {
   echo -e "$INFO Choose what you want to do:"
   echo -e "  1) Install dnscrypt-proxy"
   echo -e "  2) Configure dnscrypt-proxy"
-  echo -e "  3) Install (P)RNG"
-  echo -e "  4) Install swap file"
+  echo -e "  3) Configure timezone"
+  echo -e "  4) Install (P)RNG"
+  echo -e "  5) Install swap file"
   echo -e "  q) Quit"
   echo -en "$INPUT Please enter the number designates your selection: $NORM"
   read CHOSEN
@@ -551,13 +591,19 @@ menu () {
       yesno_query "Do you want to proceed?" "setup_dnscrypt ; end_op_message 0" "menu"
       ;;
     3)
+      echo -e "$INFO This operation allows you to configure your router"
+      echo -e "$INFO timezone for background services and processes"
+      echo
+      yesno_query "Do you want to proceed?" setup_timezone "menu"
+      ;;
+    4)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
       yesno_query "Do you want to install (P)RNG to /jffs" inst_random "menu"
       ;;
-    4)
+    5)
       echo -e "$INFO This operation will install a swap file for your device"
       echo -e "$INFO You need an external USB storage to host this file"
       echo
