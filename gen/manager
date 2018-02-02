@@ -60,7 +60,9 @@ case $1 in
     start_dnscrypt
     ;;
   dnsmasq)
-    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
+    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053" \
+      "server=/download.dnscrypt.info/$DNS_INIT" \
+      "server=/dns.google.com/$DNS_INIT"
     ;;
   fw-rules)
     iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
@@ -68,7 +70,8 @@ case $1 in
     ;;
   init-start)
     date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-    cru a "CLOCK_SAVE" "*/15 * * * * touch \"$0\""
+    (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+    while true; do touch "$0"; sleep 900; done)&
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1
