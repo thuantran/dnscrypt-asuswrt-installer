@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.0rc
+DNSCRYPT_VER=2.0.0rc2
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -350,11 +350,13 @@ read_input_num () {
 }
 
 setup_dnscrypt () {
+  local TARG_ORI=/jffs/dnscrypt/example-dnscrypt-proxy.toml
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-  if [ ! -f $TARG ]; then
+  if [ ! -f $TARG ] && [ ! -f $TARG_ORI ] ; then
     echo -e "$ERROR Unable to find $TARG. Aborting..."
     return 1
   fi
+  cp -f $TARG_ORI $TARG
   echo -e "$INFO Configuring dnscrypt-proxy..."
   echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
   echo -e "$INFO and router services (e.g. ntp) at boot"
