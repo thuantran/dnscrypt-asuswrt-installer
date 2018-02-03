@@ -382,32 +382,21 @@ setup_timezone () {
   local TARG=/jffs/dnscrypt
   local TMP=/root
 
-  PKG_LIST=Packages.html
-  download_file $TMP 644 $URL_TZ/$PKG_LIST
-  INDEX=`grep -c "zoneinfo.*ipk" $TMP/$PKG_LIST`
-  echo -e "$INFO Available general geographic locations:"
-  grep -o "zoneinfo.*ipk" $TMP/$PKG_LIST|awk -F'[-_]' '++i {printf "  "; printf i") "; print $2}'
-  read_input_num "Select your location" 1 $INDEX
+  download_file $TMP 644 $URL_GEN/zoneinfo.zip
+  INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
+  echo -e "$INFO Available timezones/locations:"
+  unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk '{++i;print "  "i") "$0}'
+  read_input_num "Select your timezone/location" 1 $INDEX
 
-  TZ_LIST=`awk -F'"' -v INDEX=$CHOSEN '/zoneinfo.*ipk/{i++} i==INDEX {print $4;exit}' $TMP/$PKG_LIST`
-  download_file $TMP 644 $URL_TZ/$TZ_LIST
-
-  tar xzf $TMP/$TZ_LIST -C $TMP ./data.tar.gz
-  INDEX=`tar tzf $TMP/data.tar.gz | awk '!/\/$/ {print $0}'|wc  -l`
-  echo -e "$INFO Available cities:"
-  tar tzf $TMP/data.tar.gz | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
-  read_input_num "Select your city" 1 $INDEX
-
-  TZ_FILE=`tar tzf $TMP/data.tar.gz | awk -F'/' -v INDEX=$CHOSEN '!/\/$/ {++i;if (i==INDEX){print $0}}'`
-  tar xzf $TMP/data.tar.gz -C $TMP "$TZ_FILE"
-  cp $TZ_FILE $TARG/localtime
+  TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
+  unzip -p zoneinfo.zip $TZ_FILE > $TARG/localtime
   if [ $? -ne 0 ]; then
-    echo -e "$ERROR Unable to get your timezone file"
+    echo -e "$ERROR Unable to set your timezone file"
     end_op_message
     return 1
   fi
 
-  rm -r $TMP/$PKG_LIST $TMP/$TZ_LIST $TMP/data.tar.gz $TMP/opt
+  rm -r $TMP/zoneinfo.zip
   end_op_message 0
 }
 
@@ -534,26 +523,22 @@ write_manager_script () {
 [ $1 ] && BRANCH=$1 || BRANCH=master
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
-URL_TZ=http://pkg.entware.net/binaries
 
 case $(uname -m) in
   armv7l)
     URL_ARCH=$URL_ARCH/armv7
-    URL_TZ=$URL_TZ/armv7
     DNSCRYPT_ARCH=linux_arm
     DNSCRYPT_ARCH_TAR=linux-arm
     echo -e "$INFO Detected ARMv7 architecture."
     ;;
   aarch64)
     URL_ARCH=$URL_ARCH/armv7
-    URL_TZ=$URL_TZ/armv7
     DNSCRYPT_ARCH=linux_arm64
     DNSCRYPT_ARCH_TAR=linux-arm64
     echo -e "$INFO Detected ARMv8 architecture."
     ;;
   mips)
     URL_ARCH=$URL_ARCH/mips
-    URL_TZ=$URL_TZ/mipsel
     DNSCRYPT_ARCH=linux_mips
     DNSCRYPT_ARCH_TAR=linux-mips
     echo -e "$INFO Detected MIPSEL architecture."
