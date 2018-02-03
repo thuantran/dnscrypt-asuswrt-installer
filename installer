@@ -361,12 +361,12 @@ setup_dnscrypt () {
   echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
   read DNS_SERVER
   [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
-  write_conf DNS_INIT "$DNS_SERVER"
   toml_global_var_write $TARG listen_addresses "['127.0.0.1:65053']"
   toml_global_var_write $TARG require_nolog "false"
   toml_global_var_write $TARG require_nofilter "false"
   toml_global_var_write $TARG use_syslog "true"
   toml_global_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
+  toml_global_var_write $TARG ignore_system_dns "true"
   toml_global_var_write $TARG cache "false"
   toml_global_var_write $TARG cert_ignore_timestamp "true"
 
