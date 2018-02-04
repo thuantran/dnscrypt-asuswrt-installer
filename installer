@@ -371,7 +371,6 @@ setup_dnscrypt () {
   toml_global_var_write $TARG ignore_system_dns "true"
   toml_global_var_write $TARG cache "false"
   toml_global_var_write $TARG cert_ignore_timestamp "true"
-  toml_global_var_write $TARG daemonize "true"
 
   read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
   toml_global_var_write $TARG log_level "$CHOSEN"
