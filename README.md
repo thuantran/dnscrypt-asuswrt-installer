@@ -76,6 +76,7 @@ I also need follwoing information:
 - Firmware and its version
 
 # How I made this:
-- Compiling and stripping dnscrypt-proxy and nonroot using firmware building toolchain from asuswrt-merlin
+- Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
+- Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
 - Write the installer script with stuffs inspired from entware-setup.sh from asuswrt-merlin
 - You can look at all the stuffs here https://github.com/thuantran/dnscrypt-asuswrt-installer
