@@ -398,6 +398,7 @@ setup_timezone () {
     return 1
   fi
 
+  echo -e "$INFO $TZ_FILE selected"
   rm -r $TMP/zoneinfo.zip
   end_op_message 0
 }
