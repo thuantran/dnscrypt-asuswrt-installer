@@ -305,17 +305,17 @@ inst_swap () {
     return 1
   fi
 
-  for MOUNT in /mnt/*/; do
+  for MOUNT in `ls -1p /mnt/|awk '/\/$/ {print "/mnt/"$0}'`; do
     MOUNT_FREE=`df -T "$MOUNT"|awk 'FNR==2 {print $5}'`
     if [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
       SWAP_OK=1
-      PARTITIONS="$PARTITIONS $MOUNT"
+      PARTITIONS="$PARTITIONS ${MOUNT%?}"
     fi
   done
 
   if [ -z SWAP_OK ]; then
     echo -e "$ERROR No suitable external USB storage found"
-    echo -e "$ERROR Please connect a USB storage with ext filesystem with enough free space"
+    echo -e "$ERROR Please connect a USB storage with enough free space"
     end_op_message
     return 1
   fi
