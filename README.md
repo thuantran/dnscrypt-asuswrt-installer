@@ -9,7 +9,7 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - No known issue
 
 # Current features:
-- dnscrypt-proxy version 2 with DoH and DNSCrypt version 2 protocol, multiple resolvers, and other features
+- [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with DoH and DNSCrypt version 2 protocols, multiple resolvers, and other features
 - Running as nobody through nonroot binary (using --user requires change to passwd)
 - Support ARM and MIPSEL based routers
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
@@ -76,6 +76,7 @@ I also need follwoing information:
 - Firmware and its version
 
 # How I made this:
-- Compiling and stripping dnscrypt-proxy and nonroot using firmware building toolchain from asuswrt-merlin
+- Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
+- Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
 - Write the installer script with stuffs inspired from entware-setup.sh from asuswrt-merlin
 - You can look at all the stuffs here https://github.com/thuantran/dnscrypt-asuswrt-installer
