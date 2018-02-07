@@ -9,22 +9,29 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - No known issue
 
 # Current features:
+- dnscrypt-proxy version 2 with DoH and DNSCrypt version 2 protocol, multiple resolvers, and other features
 - Running as nobody through nonroot binary (using --user requires change to passwd)
-- Support ARM and MIPSEL based routers through self built binaries with no dependencies apart from requirements above
+- Support ARM and MIPSEL based routers
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
-- Handling ntp update at router boot up by starting dnscrypt-proxy with --ignore-timestamps option and restarting it without this option after ntp update has completed
+- Handling ntp update at router boot up by starting dnscrypt-proxy with cert_ignore_timestamp option
 - Redirect all DNS queries on your network to dnscrypt if user chooses to
 - Install haveged/rngd for better speed with dnscrypt and other cryptographic applications
 - Support various HW RNG such as TrueRNG (tested with v3), TrueRNGpro, OneRNG, EntropyKey
-- Ability to run two dnscrypt-proxy instances for IPv6 or backup DNS
+- Ability to setup a swap file
+- Ability to setup timezone file (/etc/localtime) used by dnscrypt-proxy and other apps
+- Ability to reconfigure dnscrypt-proxy without reinstalling unlike previous installer for dnscrypt-proxy version 1.x.x
 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
 
 # Installation:
-Run this command from ssh shell and following the prompt:
+Run this command from ssh shell and following the prompt for dnscrypt-proxy version 2:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer && sh installer ; rm installer
+```
+For dnscrypt-proxy version 1 use:
+```
+curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
 # Update/Reconfig:
 Just run the installation script above again
