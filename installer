@@ -1,5 +1,7 @@
 #!/bin/sh
 
+DNSCRYPT_VER=2.0.0
+
 BOLD="\033[1m"
 NORM="\033[0m"
 INFO="$BOLD Info: $NORM"
@@ -31,56 +33,35 @@ check_jffs_enabled () {
   fi
 }
 
-choose_dnscrypt_server () {
-  if [ $1 -eq 1 ] && [ -z $2 ]; then
-    echo -e "$INFO Available DNS servers: "
-    INDEX=0
-    while read LINE; do
-      if [ $INDEX -eq 0 ]; then
-        INDEX=1
-        continue
-      fi
-      SERVER="`echo $LINE|cut -d',' -f1,2,3|sed 's/,/: /'`"
-      echo -e "  $INDEX) $SERVER"
-      SERVER="`echo $SERVER | cut -d':' -f1`"
-      eval "ITEM$INDEX=$SERVER"
-      INDEX=$((INDEX+1))
-    done < /jffs/dnscrypt/dnscrypt-resolvers.csv
-  fi
-  case $1 in
-    1)
-      echo -en "$INPUT Please choose DNS server\n$BOLD[1-`expr $INDEX - 1`]$NORM: "
-      ;;
-    2)
-      echo -en "$INPUT Please choose 2nd DNS server or press n to skip\n$BOLD[1-`expr $INDEX - 1`/n]$NORM: "
-      ;;
-  esac
-  read TMP
-  if [ $1 -eq 2 ] && [ "$TMP" == "$CHOSEN" ]; then
-    echo -e "$ERROR Duplicate selection! Retrying..."
-    choose_dnscrypt_server $1 x
-    return
-  fi
-  CHOSEN=$TMP
-  if [ $1 -eq 2 ] && [ $CHOSEN == "n" ]; then
-    write_conf DNS$1 ""
-    return
-  fi
-  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
-    echo -e "$ERROR Invalid character entered! Retrying..."
-    choose_dnscrypt_server $1 x
-    return
-  fi
-  if [ $CHOSEN -lt 1 ] || [ $CHOSEN -gt `expr $INDEX - 1` ] ; then
-    echo -e "$ERROR Chosen DNS server number is not in range! Retrying..."
-    choose_dnscrypt_server $1 x
+check_swap () {
+  SWAP_SIZE=`cat /proc/meminfo | grep SwapTotal | awk '{print $2}'`
+  if [ $SWAP_SIZE -gt 0 ]; then
+    echo -e "$INFO Swap file is already setup"
+    end_op_message 0
     return
   fi
 
-  eval ITEM="\$ITEM$CHOSEN"
-  write_conf DNS$1 "$ITEM"
+  inst_swap
+}
+
+choose_dnscrypt_server () {
+  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
+  if [ -z $1 ]; then
+    toml_array_clean $TARG server_names
+    echo -e "$INFO Available DNS servers: "
+    awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
+    INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
+    read_input_num "Please choose DNS server" 1 $INDEX
+  else
+    read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
+    [ $? -eq 1 ] && return 0
+  fi
+
+  ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  toml_array_write $TARG server_names $ITEM
+
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
-  [ $1 -eq 1 ] && choose_dnscrypt_server 2
+  choose_dnscrypt_server n
 }
 
 cleanup () {
@@ -91,8 +72,8 @@ cleanup () {
 create_dir () {
   mkdir -p "$1"
   if [ $? -ne 0 ]; then
-    echo -e "$ERROR Unable to create $1! Exiting..."
-    exit 1
+    echo -e "$ERROR Unable to create $1!"
+    return 1
   fi
 }
 
@@ -132,7 +113,7 @@ download_file () {
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
@@ -141,21 +122,52 @@ download_file () {
   done
 }
 
+end_op_message () {
+  [ "$1" == "0" ] && echo -e "$INFO Operation completed. You can quit or continue"
+  echo =====================================================
+  echo
+  echo
+  menu
+}
+
 inst_dnscrypt () {
+  local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
+  local RESOLVERS_URL_PREFIX="http://download.dnscrypt.info/resolvers-list/v2"
   local TARG=/jffs/dnscrypt
   create_dir $TARG
+  if [ $? -ne 0 ]; then
+    end_op_message
+    return 1
+  fi
 
-  download_file $TARG 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/dnscrypt-resolvers.csv
-  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/dnscrypt-proxy $URL_ARCH/nonroot
+  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/nonroot
+  download_file $TARG 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
+    $RESOLVERS_URL_PREFIX/public-resolvers.md \
+    $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig
+  tar xzv -C $TARG -f $TARG/$DNSCRYPT_TAR
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
+    end_op_message
+    return 1
+  fi
+  chown `nvram get http_username`:root $TARG/$DNSCRYPT_ARCH_TAR/*
+  mv $TARG/$DNSCRYPT_ARCH_TAR/* $TARG
+  rm -r $TARG/$DNSCRYPT_ARCH_TAR $TARG/$DNSCRYPT_TAR
+  chmod 755 $TARG/dnscrypt-proxy
 
-  write_jffs_script /jffs/scripts/dnsmasq.postconf $TARG/manager dnsmasq
-  write_jffs_script /jffs/scripts/wan-start $TARG/manager dnscrypt-start
-  choose_dnscrypt_server 1
-  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_jffs_script /jffs/scripts/firewall-start $TARG/manager fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+  write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+  write_manager_script /jffs/scripts/wan-start dnscrypt-start
+  setup_dnscrypt
+  if [ $? -ne 0 ]; then
+    end_op_message
+    return 1
+  fi
 
-  echo -e "$INFO Install a (P)RNG for better cryptographic operations"
-  inst_random
+  echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
+  echo -e "$INFO  - Add swap"
+  echo -e "$INFO  - Add a RNG"
+  echo -e "$INFO  - Set your timezone"
+  end_op_message 0
 }
 
 inst_ip_update () {
@@ -167,12 +179,14 @@ inst_ip_update () {
   echo -en "$INPUT Please enter OpenDNS username$NORM: "
   read -r USERNAME
   echo -en "$INPUT Please enter OpenDNS password$NORM: "
-  read -r PW1
+  read -rs PW1
+  echo
   echo -en "$INPUT Please reenter OpenDNS password$NORM: "
-  read -r PW2
+  read -rs PW2
+  echo
   if [ "$PW1" != "$PW2" ]; then
-    echo -e "$ERROR Password entered incorrectly! Exiting..."
-    exit 1
+    echo -e "$ERROR Password entered incorrectly!"
+    inst_ip_update $1
   fi
 
   write_conf OPENDNS_USER "\"$USERNAME\""
@@ -184,6 +198,7 @@ inst_random () {
   create_dir $TARG
 
   if [ -z $1 ]; then
+    echo -e "$INFO Install a (P)RNG for better cryptographic operations"
     echo -e "$INFO Available random number generator providers:"
     echo -e "  1) HAVEGED (Preferred if you do not have a HW RNG)"
     echo -e "  2) RNGD (Preferred if you have a HW RNG)"
@@ -201,8 +216,8 @@ inst_random () {
     2)
       rm -f haveged
       download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
-      write_conf RAN_PRV rngd
       inst_ran_dev || return
+      write_conf RAN_PRV rngd
       ;;
     *)
       echo -e "$ERROR Invalid character entered! Retrying..."
@@ -211,8 +226,9 @@ inst_random () {
       ;;
   esac
 
-  write_jffs_script /jffs/scripts/init-start $TARG/manager init-start
-  write_jffs_script /jffs/scripts/services-stop $TARG/manager services-stop
+  write_manager_script /jffs/scripts/init-start init-start
+  write_manager_script /jffs/scripts/services-stop services-stop
+  end_op_message 0
 }
 
 inst_ran_dev () {
@@ -244,6 +260,185 @@ inst_ran_dev () {
     return 1
   fi
   write_conf RNG_DEV "/dev/$RNG_DEV"
+}
+
+inst_swap () {
+  local PARTITIONS
+
+  SWAP_SIZE=524288
+  USB_COUNT=`find /tmp/mnt/ -maxdepth 1 -type d|wc -l`
+  if [ $USB_COUNT -le 1 ]; then
+    echo -e "$ERROR Unable to find any external USB storage"
+    end_op_message
+    return 1
+  fi
+
+  for MOUNT in /mnt/*/; do
+    MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
+    MOUNT_FREE=`df -T "$MOUNT"|awk 'FNR==2 {print $5}'`
+
+    if [ ${MOUNT_FS%?} == "ext" ] && [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
+      SWAP_OK=1
+      PARTITIONS="$PARTITIONS $MOUNT"
+    fi
+  done
+
+  if [ -z SWAP_OK ]; then
+    echo -e "$ERROR No suitable external USB storage found"
+    echo -e "$ERROR Please connect a USB storage with ext filesystem with enough free space"
+    end_op_message
+    return 1
+  fi
+
+  echo -e "$INFO Available partition to install swap file:$NORM"
+  INDEX=1
+  for MOUNT in $PARTITIONS; do
+    echo "$INDEX) $MOUNT"
+    eval "ITEM$INDEX=$MOUNT"
+    INDEX=$((INDEX+1))
+  done
+  echo -en "$INPUT Please select the partition to install swap file:$NORM "
+  read CHOSEN
+  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
+    echo -e "$ERROR Invalid character entered! Retrying..."
+    inst_swap
+    return
+  fi
+  if [ $CHOSEN -lt 1 ] || [ $CHOSEN -gt `expr $INDEX - 1` ] ; then
+    echo -e "$ERROR Chosen partition number is not in range! Retrying..."
+    inst_swap
+    return
+  fi
+
+  unset MOUNT
+  eval MOUNT="\$ITEM$CHOSEN"
+  if  [ -z $MOUNT ]; then
+    echo -e "$ERROR Unable to set partition to store swap file"
+    end_op_message
+    return 1
+  fi
+  echo -e "$INFO Please wait..."
+  dd if=/dev/zero of=$MOUNT/swap bs=1024 count=$SWAP_SIZE
+  chmod 600 $MOUNT/swap
+  mkswap $MOUNT/swap
+
+  write_command_script /jffs/scripts/post-mount '[ -f $1/swap ] && swapon $1/swap'
+  write_command_script /jffs/scripts/unmount '[ -f $1/swap ] && swapoff $1/swap'
+  end_op_message 0
+}
+
+read_input_num () {
+  if [ -z $4 ]; then
+    echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
+  else
+    echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
+  fi
+  read CHOSEN
+  if [ "$CHOSEN" == "n" ]; then
+    return 1
+  fi
+  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
+    echo -e "$ERROR Invalid character entered! Retrying..."
+    read_input_num "$@"
+    return
+  fi
+  if [ $CHOSEN -lt $2 ] || [ $CHOSEN -gt $3 ] ; then
+    echo -e "$ERROR Chosen number is not in range! Retrying..."
+    read_input_num "$@"
+    return
+  fi
+}
+
+setup_dnscrypt () {
+  local TARG_ORI=/jffs/dnscrypt/example-dnscrypt-proxy.toml
+  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
+  if [ ! -f $TARG ] && [ ! -f $TARG_ORI ] ; then
+    echo -e "$ERROR Unable to find $TARG. Aborting..."
+    return 1
+  fi
+  cp -f $TARG_ORI $TARG
+  echo -e "$INFO Configuring dnscrypt-proxy..."
+  echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
+  echo -e "$INFO and router services (e.g. ntp) at boot"
+  echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
+  read DNS_SERVER
+  [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
+  toml_global_var_write $TARG listen_addresses "['127.0.0.1:65053']"
+  toml_global_var_write $TARG require_nolog "false"
+  toml_global_var_write $TARG require_nofilter "false"
+  toml_global_var_write $TARG use_syslog "true"
+  toml_global_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
+  toml_global_var_write $TARG ignore_system_dns "true"
+  toml_global_var_write $TARG cache "false"
+  toml_global_var_write $TARG cert_ignore_timestamp "true"
+
+  read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
+  toml_global_var_write $TARG log_level "$CHOSEN"
+
+  choose_dnscrypt_server
+  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+}
+
+setup_timezone () {
+  local TARG=/jffs/dnscrypt
+  local TMP=/root
+
+  download_file $TMP 644 $URL_GEN/zoneinfo.zip
+  INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
+  echo -e "$INFO Available timezones/locations:"
+  unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk '{++i;print "  "i") "$0}'
+  read_input_num "Select your timezone/location" 1 $INDEX
+
+  TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
+  unzip -p zoneinfo.zip $TZ_FILE > $TARG/localtime
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to set your timezone file"
+    end_op_message
+    return 1
+  fi
+
+  echo -e "$INFO $TZ_FILE selected"
+  rm -r $TMP/zoneinfo.zip
+  end_op_message 0
+}
+
+toml_array_clean () {
+  sed -i "/$2 = /c\\$2 = []" $1
+}
+
+toml_array_write () {
+  local TARG=$1
+  local VAR=$2
+  local VALUE=$3
+
+  local LINE="`grep -F \"$VAR = \" \"$TARG\"`"
+  if [ "`echo $LINE | grep -F $VALUE`" ]; then
+    echo -e "$INFO $VALUE is already set"
+    return 0
+  fi
+
+  CHAR_BEF_INDEX=$((${#LINE}-2))
+  if [ "${LINE:$CHAR_BEF_INDEX:1}" == '[' ]; then
+    LINE="${LINE%?}'$VALUE']"
+  else
+    LINE="${LINE%?}, '$VALUE']"
+  fi
+
+  sed -i "/$VAR = /c\\$LINE" $TARG
+}
+
+toml_global_var_write () {
+  local TARG=$1
+  local VAR=$2
+  local VALUE=$3
+
+  if [ "`grep $VAR $TARG`" ]; then
+    sed -i "/$VAR = /c\\$VAR = $VALUE" $TARG
+  else
+    LINE_NUM=$((`grep -n "#.*Global settings.*" /jffs/dnscrypt/dnscrypt-proxy.toml | cut -d':' -f1` + 3))
+    sed -i "${LINE_NUM}i${VAR} = ${VALUE}\n" $TARG
+  fi
 }
 
 yesno_query () {
@@ -282,11 +477,30 @@ write_conf () {
   fi
 }
 
-write_jffs_script () {
+write_command_script () {
   local TARG=$1
+  local COMMAND=$2
   FILENAME="`basename \"$TARG\"`"
-  COMMAND=$2
-  OP=$3
+
+  if [ ! -f $TARG ]; then
+    echo -e "$INFO Creating $FILENAME file"
+    echo "#!/bin/sh" > $TARG
+  fi
+  chmod 755 $TARG
+
+  if [ `grep -c -F "$COMMAND" $TARG` -gt 0 ]; then
+    echo -e "$INFO $FILENAME file already configured"
+  else
+    echo -e "$INFO Configure $FILENAME file"
+    echo "$COMMAND" >> $TARG
+  fi
+}
+
+write_manager_script () {
+  local TARG=$1
+  local OP=$2
+  FILENAME="`basename \"$TARG\"`"
+  COMMAND=/jffs/dnscrypt/manager
 
   if [ ! -f $TARG ]; then
     echo -e "$INFO Creating $FILENAME file"
@@ -316,10 +530,20 @@ URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 case $(uname -m) in
   armv7l)
     URL_ARCH=$URL_ARCH/armv7
-    echo -e "$INFO Detected ARM architecture."
+    DNSCRYPT_ARCH=linux_arm
+    DNSCRYPT_ARCH_TAR=linux-arm
+    echo -e "$INFO Detected ARMv7 architecture."
+    ;;
+  aarch64)
+    URL_ARCH=$URL_ARCH/armv7
+    DNSCRYPT_ARCH=linux_arm64
+    DNSCRYPT_ARCH_TAR=linux-arm64
+    echo -e "$INFO Detected ARMv8 architecture."
     ;;
   mips)
     URL_ARCH=$URL_ARCH/mips
+    DNSCRYPT_ARCH=linux_mips
+    DNSCRYPT_ARCH_TAR=linux-mips
     echo -e "$INFO Detected MIPSEL architecture."
     ;;
   *)
@@ -331,30 +555,57 @@ esac
 check_jffs_enabled
 cleanup
 
-echo -e "$INFO Choose what you want to do:"
-echo -e "  1) Install dnscrypt and (P)RNG"
-echo -e "  2) Install (P)RNG only"
-echo -en "$INPUT Please enter the number designates your selection or any other key to exit$NORM: "
-read CHOSEN
-case $CHOSEN in
-  1)
-    echo -e "$INFO This operation will install dnscrypt-proxy and related files (<1MB)"
-    echo -e "$INFO to jffs, no other data will be changed."
-    echo -e "$INFO Also some start scripts will be installed/modified as required."
-    echo
-    yesno_query "Do you want to install dnscrypt-proxy to /jffs" inst_dnscrypt "exit 0"
-    ;;
-  2)
-    echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
-    echo -e "$INFO to jffs, no other data will be changed."
-    echo -e "$INFO Also some start scripts will be installed/modified as required."
-    echo
-    yesno_query "Do you want to install (P)RNG to /jffs" inst_random "exit 0"
-    ;;
-  *)
-    echo -e "$ERROR Invalid character entered! Exiting..."
-    exit 1
-    ;;
-esac
-echo -e "$INFO Setup completed!"
-echo -e "$INFO Please reboot your router for the changes to take effect!"
+menu () {
+  echo -e "$INFO Choose what you want to do:"
+  echo -e "  1) Install dnscrypt-proxy"
+  echo -e "  2) Configure dnscrypt-proxy"
+  echo -e "  3) Configure timezone"
+  echo -e "  4) Install (P)RNG"
+  echo -e "  5) Install swap file"
+  echo -e "  q) Quit"
+  echo -en "$INPUT Please enter the number designates your selection: $NORM"
+  read CHOSEN
+  case $CHOSEN in
+    1)
+      echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)"
+      echo -e "$INFO to jffs, no other data will be changed."
+      echo -e "$INFO Also some start scripts will be installed/modified as required."
+      echo
+      yesno_query "Do you want to install dnscrypt-proxy to /jffs" inst_dnscrypt "menu"
+      ;;
+    2)
+      echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
+      echo
+      yesno_query "Do you want to proceed?" "setup_dnscrypt ; end_op_message 0" "menu"
+      ;;
+    3)
+      echo -e "$INFO This operation allows you to configure your router"
+      echo -e "$INFO timezone for background services and processes"
+      echo
+      yesno_query "Do you want to proceed?" setup_timezone "menu"
+      ;;
+    4)
+      echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
+      echo -e "$INFO to jffs, no other data will be changed."
+      echo -e "$INFO Also some start scripts will be installed/modified as required."
+      echo
+      yesno_query "Do you want to install (P)RNG to /jffs" inst_random "menu"
+      ;;
+    5)
+      echo -e "$INFO This operation will install a swap file for your device"
+      echo -e "$INFO You need an external USB storage to host this file"
+      echo
+      yesno_query "Do you want to install a swap file (512MB on ext filesystem partition)?" check_swap "menu"
+      ;;
+    q|Q)
+      echo -e "$INFO Please reboot your router if you have made any change!"
+      exit 0
+      ;;
+    *)
+      echo -e "$ERROR Invalid character entered!"
+      menu
+      ;;
+  esac
+}
+
+menu

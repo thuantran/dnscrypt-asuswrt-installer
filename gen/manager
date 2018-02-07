@@ -12,18 +12,6 @@ append_on_demand () {
   done
 }
 
-clock_load () {
-  date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-  (
-  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
-  while true; do touch "$0"; sleep 900; done
-  )&
-}
-
-clock_save () {
-  touch "$0"
-}
-
 init_hwrng () {
   COUNT=0
   while [ ! -c $RNG_DEV ]; do
@@ -41,32 +29,16 @@ init_hwrng () {
 
 start_dnscrypt () {
   NONROOT="/jffs/dnscrypt/nonroot nobody"
-  DNSCRYPT_START1="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65053 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS1"
-  DNSCRYPT_START2="/jffs/dnscrypt/dnscrypt-proxy --local-address=127.0.0.1:65054 --daemonize --loglevel=4 -L /jffs/dnscrypt/dnscrypt-resolvers.csv -R $DNS2"
-  if [ -z "`pidof dnscrypt-proxy`" ]; then
-    BOOT=1
-    $NONROOT $DNSCRYPT_START1 -I
-    if [ $? -eq 0 ]; then
-      logger "dnscrypt-proxy started for boot services"
-    else
-      logger "ERROR: Unable to start dnscrypt-proxy for boot services"
-    fi
-  fi
-  update_opendns 0
-  [ -z $BOOT ] && exit 0
-  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall dnscrypt-proxy
-  logger "Start dnscrypt-proxy for normal operations"
-  $NONROOT $DNSCRYPT_START1
-  [ "$DNS2" ] && $NONROOT $DNSCRYPT_START2
+  logger "Start dnscrypt-proxy"
+  nohup $NONROOT $DNSCRYPT_START > /dev/null 2>&1 &
+  [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ] && update_opendns 0 &
 }
 
 update_opendns () {
-  if [ -z "$OPENDNS_USER" ] || [ -z "$OPENDNS_PASSWORD" ]; then
-    return
-  fi
-  ARG=$1
-  [ $ARG -gt 2 ] && return
+  [ $1 -gt 2 ] && return
+  sleep 5
   RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
   case "$RET" in
     good*)
@@ -77,26 +49,30 @@ update_opendns () {
       ;;
     *)
       logger "OpenDNS: Received error $RET"
-      sleep 1
-      update_opendns $((ARG+1))
+      update_opendns $(($1+1))
       ;;
   esac
 }
 
 case $1 in
   dnscrypt-start)
-    start_dnscrypt &
+    start_dnscrypt
     ;;
   dnsmasq)
-    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
-    [ "$DNS2" ] && append_on_demand /etc/dnsmasq.conf "server=127.0.0.1#65054"
+    sed -i "s/^\(resolv-file=\).*$/\1\/dev\/null/" /etc/dnsmasq.conf
+    append_on_demand /etc/dnsmasq.conf "resolv-file=/dev/null" "server=127.0.0.1#65053"
     ;;
   fw-rules)
-    iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
-    iptables -t nat -A PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
+    iptables -t nat -C  PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
+    [ $? -ne 0 ] && iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
+    iptables -t nat -C PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
+    [ $? -ne 0 ] && iptables -t nat -A PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
     ;;
   init-start)
-    clock_load
+    [ -f /jffs/dnscrypt/localtime ] && ln -s /jffs/dnscrypt/localtime /etc/localtime
+    date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+    (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+    while true; do touch "$0"; sleep 900; done)&
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1
@@ -107,6 +83,6 @@ case $1 in
     esac
     ;;
   services-stop)
-    clock_save
+    touch "$0"
     ;;
 esac
