@@ -45,9 +45,41 @@ check_swap () {
 }
 
 choose_dnscrypt_server () {
+  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_simple_var_write $TARG ipv6_servers true" "toml_simple_var_write $TARG ipv6_servers false"
+  echo -e "$INFO Choose how your DNS servers are selected:"
+  echo -e "  1) Automatically"
+  echo -e "  2) Manually"
+  read_input_num "Select your mode" 1 2
+  case $CHOSEN in
+    1)
+      choose_dnscrypt_server_auto
+      ;;
+    2)
+      choose_dnscrypt_server_manual
+      ;;
+  esac
+}
+
+choose_dnscrypt_server_auto () {
+  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
+
+  toml_var_disable $TARG server_names
+  yesno_query "Use servers support the DNSCrypt protocol" "toml_simple_var_write $TARG dnscrypt_servers true" "toml_simple_var_write $TARG dnscrypt_servers false"
+  yesno_query "Use servers support the DNS-over-HTTPS protocol" "toml_simple_var_write $TARG doh_servers true" "toml_simple_var_write $TARG doh_servers false"
+  yesno_query "Use only servers support DNSSEC" "toml_simple_var_write $TARG require_dnssec true" "toml_simple_var_write $TARG require_dnssec false"
+  yesno_query "Use only servers that do not log user's queries" "toml_simple_var_write $TARG require_nolog true" "toml_simple_var_write $TARG require_nolog false"
+  yesno_query "Use only servers that do not filter result" "toml_simple_var_write $TARG require_nofilter true" "toml_simple_var_write $TARG require_nofilter false"
+}
+
+choose_dnscrypt_server_manual () {
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
   if [ -z $1 ]; then
     toml_array_clean $TARG server_names
+    toml_simple_var_write $TARG dnscrypt_servers true
+    toml_simple_var_write $TARG doh_servers true
+    toml_simple_var_write $TARG require_dnssec false
+    toml_simple_var_write $TARG require_nolog "false"
+    toml_simple_var_write $TARG require_nofilter "false"
     echo -e "$INFO Available DNS servers: "
     awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
     INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
@@ -61,7 +93,7 @@ choose_dnscrypt_server () {
   toml_array_write $TARG server_names $ITEM
 
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
-  choose_dnscrypt_server n
+  choose_dnscrypt_server_manual n
 }
 
 cleanup () {
@@ -113,7 +145,7 @@ download_file () {
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ `echo -n $MD5SUM_CURR|wc -c` -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
@@ -266,26 +298,24 @@ inst_swap () {
   local PARTITIONS
 
   SWAP_SIZE=524288
-  USB_COUNT=`find /tmp/mnt/ -maxdepth 1 -type d|wc -l`
+  USB_COUNT=`ls -1p /mnt/|grep -c ".*/$"`
   if [ $USB_COUNT -le 1 ]; then
     echo -e "$ERROR Unable to find any external USB storage"
     end_op_message
     return 1
   fi
 
-  for MOUNT in /mnt/*/; do
-    MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
+  for MOUNT in `ls -1p /mnt/|awk '/\/$/ {print "/mnt/"$0}'`; do
     MOUNT_FREE=`df -T "$MOUNT"|awk 'FNR==2 {print $5}'`
-
-    if [ ${MOUNT_FS%?} == "ext" ] && [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
+    if [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
       SWAP_OK=1
-      PARTITIONS="$PARTITIONS $MOUNT"
+      PARTITIONS="$PARTITIONS ${MOUNT%?}"
     fi
   done
 
   if [ -z SWAP_OK ]; then
     echo -e "$ERROR No suitable external USB storage found"
-    echo -e "$ERROR Please connect a USB storage with ext filesystem with enough free space"
+    echo -e "$ERROR Please connect a USB storage with enough free space"
     end_op_message
     return 1
   fi
@@ -319,7 +349,8 @@ inst_swap () {
   fi
   echo -e "$INFO Please wait..."
   dd if=/dev/zero of=$MOUNT/swap bs=1024 count=$SWAP_SIZE
-  chmod 600 $MOUNT/swap
+  MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
+  [ ${MOUNT_FS%?} == "ext" ] && chmod 600 $MOUNT/swap
   mkswap $MOUNT/swap
 
   write_command_script /jffs/scripts/post-mount '[ -f $1/swap ] && swapon $1/swap'
@@ -357,26 +388,28 @@ setup_dnscrypt () {
     return 1
   fi
   cp -f $TARG_ORI $TARG
+
   echo -e "$INFO Configuring dnscrypt-proxy..."
+  choose_dnscrypt_server
+  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+
   echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
   echo -e "$INFO and router services (e.g. ntp) at boot"
   echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
   read DNS_SERVER
   [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
-  toml_global_var_write $TARG listen_addresses "['127.0.0.1:65053']"
-  toml_global_var_write $TARG require_nolog "false"
-  toml_global_var_write $TARG require_nofilter "false"
-  toml_global_var_write $TARG use_syslog "true"
-  toml_global_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
-  toml_global_var_write $TARG ignore_system_dns "true"
-  toml_global_var_write $TARG cache "false"
-  toml_global_var_write $TARG cert_ignore_timestamp "true"
+  toml_simple_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
+  toml_simple_var_write $TARG ignore_system_dns "true"
 
   read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-  toml_global_var_write $TARG log_level "$CHOSEN"
+  toml_simple_var_write $TARG log_level "$CHOSEN"
 
-  choose_dnscrypt_server
-  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+  toml_simple_var_write $TARG listen_addresses "['127.0.0.1:65053']"
+  toml_simple_var_write $TARG use_syslog "true"
+  toml_simple_var_write $TARG cache "false"
+  toml_simple_var_write $TARG cert_ignore_timestamp "true"
+  toml_simple_var_write $TARG daemonize "true"
+
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
 }
 
@@ -404,7 +437,17 @@ setup_timezone () {
 }
 
 toml_array_clean () {
-  sed -i "/$2 = /c\\$2 = []" $1
+  local TARG=$1
+  local VAR=$2
+
+  LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
+  IDX_LINE="`grep -n \"$VAR = \" $TARG`"
+  if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
+    sed -i "/${VAR} = /c\\${VAR} = []" $1
+  else
+    LINE_NUM=$((`grep -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
+    sed -i "${LINE_NUM}i${VAR} = []\n" $TARG
+  fi
 }
 
 toml_array_write () {
@@ -412,14 +455,13 @@ toml_array_write () {
   local VAR=$2
   local VALUE=$3
 
-  local LINE="`grep -F \"$VAR = \" \"$TARG\"`"
+  local LINE="`grep \"^$VAR = \" \"$TARG\"`"
   if [ "`echo $LINE | grep -F $VALUE`" ]; then
     echo -e "$INFO $VALUE is already set"
     return 0
   fi
 
-  CHAR_BEF_INDEX=$((${#LINE}-2))
-  if [ "${LINE:$CHAR_BEF_INDEX:1}" == '[' ]; then
+  if [ "`echo $LINE|grep '\[\]$'`" ]; then
     LINE="${LINE%?}'$VALUE']"
   else
     LINE="${LINE%?}, '$VALUE']"
@@ -428,16 +470,29 @@ toml_array_write () {
   sed -i "/$VAR = /c\\$LINE" $TARG
 }
 
-toml_global_var_write () {
+toml_simple_var_write () {
   local TARG=$1
   local VAR=$2
   local VALUE=$3
 
-  if [ "`grep $VAR $TARG`" ]; then
+  LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
+  IDX_LINE="`grep -n \"$VAR = \" $TARG`"
+  if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
     sed -i "/$VAR = /c\\$VAR = $VALUE" $TARG
   else
-    LINE_NUM=$((`grep -n "#.*Global settings.*" /jffs/dnscrypt/dnscrypt-proxy.toml | cut -d':' -f1` + 3))
+    LINE_NUM=$((`grep -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
     sed -i "${LINE_NUM}i${VAR} = ${VALUE}\n" $TARG
+  fi
+}
+
+toml_var_disable () {
+  local TARG=$1
+  local VAR=$2
+
+  LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
+  IDX_LINE="`grep -n \"^$VAR = \" $TARG`"
+  if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
+    sed -i "s/\(^$VAR = .*\)/# \1/" $TARG
   fi
 }
 
