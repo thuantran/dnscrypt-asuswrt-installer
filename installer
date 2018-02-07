@@ -145,7 +145,7 @@ download_file () {
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ "$MD5SUM_CURR" ] && [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
@@ -306,10 +306,8 @@ inst_swap () {
   fi
 
   for MOUNT in /mnt/*/; do
-    MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
     MOUNT_FREE=`df -T "$MOUNT"|awk 'FNR==2 {print $5}'`
-
-    if [ ${MOUNT_FS%?} == "ext" ] && [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
+    if [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
       SWAP_OK=1
       PARTITIONS="$PARTITIONS $MOUNT"
     fi
@@ -351,7 +349,8 @@ inst_swap () {
   fi
   echo -e "$INFO Please wait..."
   dd if=/dev/zero of=$MOUNT/swap bs=1024 count=$SWAP_SIZE
-  chmod 600 $MOUNT/swap
+  MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
+  [ ${MOUNT_FS%?} == "ext" ] && chmod 600 $MOUNT/swap
   mkswap $MOUNT/swap
 
   write_command_script /jffs/scripts/post-mount '[ -f $1/swap ] && swapon $1/swap'
