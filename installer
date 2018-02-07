@@ -145,7 +145,7 @@ download_file () {
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ `echo -n $MD5SUM_CURR|wc -c` -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
@@ -461,8 +461,7 @@ toml_array_write () {
     return 0
   fi
 
-  CHAR_BEF_INDEX=$((${#LINE}-2))
-  if [ "${LINE:$CHAR_BEF_INDEX:1}" == '[' ]; then
+  if [ "`echo $LINE|grep '\[\]$'`" ]; then
     LINE="${LINE%?}'$VALUE']"
   else
     LINE="${LINE%?}, '$VALUE']"
