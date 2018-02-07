@@ -145,7 +145,7 @@ download_file () {
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ "$MD5SUM_CURR" ] && [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ ${#MD5SUM_CURR} -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
@@ -298,7 +298,7 @@ inst_swap () {
   local PARTITIONS
 
   SWAP_SIZE=524288
-  USB_COUNT=`find /tmp/mnt/ -maxdepth 1 -type d|wc -l`
+  USB_COUNT=`ls -1p /mnt/|grep -c ".*/$"`
   if [ $USB_COUNT -le 1 ]; then
     echo -e "$ERROR Unable to find any external USB storage"
     end_op_message
