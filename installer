@@ -120,8 +120,7 @@ del_between_magic () {
 
 del_jffs_script () {
   local TARG=$1
-  local OP=$2
-  if [ "$3" == "x" ]; then
+  if [ "$2" == "x" ]; then
     LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep -v manager|cut -d':' -f1`
   else
     LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|cut -d':' -f1`
@@ -319,6 +318,10 @@ inst_swap () {
   [ ${MOUNT_FS%?} == "ext" ] && chmod 600 "$MOUNT/swap"
   mkswap "$MOUNT/swap"
 
+  LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/post-mount | cut -d':' -f1`
+  sed -i "${LINE_NUM}d" /jffs/scripts/post-mount
+  LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/unmount | cut -d':' -f1`
+  sed -i "${LINE_NUM}d" /jffs/scripts/unmount
   write_command_script /jffs/scripts/post-mount '[ -f "$1/swap" ] && swapon "$1/swap"'
   write_command_script /jffs/scripts/unmount '[ -f "$1/swap" ] && swapoff "$1/swap"'
   end_op_message 0
@@ -376,7 +379,7 @@ setup_dnscrypt () {
   toml_simple_var_write $TARG cert_ignore_timestamp "true"
   toml_simple_var_write $TARG daemonize "true"
 
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
 }
 
 setup_timezone () {
@@ -537,7 +540,7 @@ write_manager_script () {
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
-      del_jffs_script $TARG $OP x
+      del_jffs_script $TARG x
       [ `tail -1 $TARG|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
