@@ -120,8 +120,7 @@ del_between_magic () {
 
 del_jffs_script () {
   local TARG=$1
-  local OP=$2
-  if [ "$3" == "x" ]; then
+  if [ "$2" == "x" ]; then
     LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep -v manager|cut -d':' -f1`
   else
     LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|cut -d':' -f1`
@@ -298,63 +297,33 @@ inst_swap () {
   local PARTITIONS
 
   SWAP_SIZE=524288
-  USB_COUNT=`ls -1p /mnt/|grep -c ".*/$"`
+  USB_COUNT=`df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > 524288){print $6}}' | wc -l`
   if [ $USB_COUNT -le 1 ]; then
     echo -e "$ERROR Unable to find any external USB storage"
-    end_op_message
-    return 1
-  fi
-
-  for MOUNT in `ls -1p /mnt/|awk '/\/$/ {print "/mnt/"$0}'`; do
-    MOUNT_FREE=`df -T "$MOUNT"|awk 'FNR==2 {print $5}'`
-    if [ $MOUNT_FREE -gt $(($SWAP_SIZE * 2)) ]; then
-      SWAP_OK=1
-      PARTITIONS="$PARTITIONS ${MOUNT%?}"
-    fi
-  done
-
-  if [ -z SWAP_OK ]; then
-    echo -e "$ERROR No suitable external USB storage found"
-    echo -e "$ERROR Please connect a USB storage with enough free space"
+    echo -e "$ERROR Or no suitable external USB storage found"
+    echo -e "$ERROR Please connect a USB storage with at least"
+    echo -e "$ERROR $(($SWAP_SIZE * 2 / 1024))MB of free space"
     end_op_message
     return 1
   fi
 
   echo -e "$INFO Available partition to install swap file:$NORM"
-  INDEX=1
-  for MOUNT in $PARTITIONS; do
-    echo "$INDEX) $MOUNT"
-    eval "ITEM$INDEX=$MOUNT"
-    INDEX=$((INDEX+1))
-  done
-  echo -en "$INPUT Please select the partition to install swap file:$NORM "
-  read CHOSEN
-  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
-    echo -e "$ERROR Invalid character entered! Retrying..."
-    inst_swap
-    return
-  fi
-  if [ $CHOSEN -lt 1 ] || [ $CHOSEN -gt `expr $INDEX - 1` ] ; then
-    echo -e "$ERROR Chosen partition number is not in range! Retrying..."
-    inst_swap
-    return
-  fi
+  df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6}}'
+  read_input_num "Please select the partition to install swap file" 1 $USB_COUNT
+  MOUNT=`df | awk -v IDX=$CHOSEN -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}'`
 
-  unset MOUNT
-  eval MOUNT="\$ITEM$CHOSEN"
-  if  [ -z $MOUNT ]; then
-    echo -e "$ERROR Unable to set partition to store swap file"
-    end_op_message
-    return 1
-  fi
   echo -e "$INFO Please wait..."
-  dd if=/dev/zero of=$MOUNT/swap bs=1024 count=$SWAP_SIZE
+  dd if=/dev/zero of="$MOUNT/swap" bs=1024 count=$SWAP_SIZE
   MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
-  [ ${MOUNT_FS%?} == "ext" ] && chmod 600 $MOUNT/swap
-  mkswap $MOUNT/swap
+  [ ${MOUNT_FS%?} == "ext" ] && chmod 600 "$MOUNT/swap"
+  mkswap "$MOUNT/swap"
 
-  write_command_script /jffs/scripts/post-mount '[ -f $1/swap ] && swapon $1/swap'
-  write_command_script /jffs/scripts/unmount '[ -f $1/swap ] && swapoff $1/swap'
+  LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/post-mount | cut -d':' -f1`
+  sed -i "${LINE_NUM}d" /jffs/scripts/post-mount
+  LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/unmount | cut -d':' -f1`
+  sed -i "${LINE_NUM}d" /jffs/scripts/unmount
+  write_command_script /jffs/scripts/post-mount '[ -f "$1/swap" ] && swapon "$1/swap"'
+  write_command_script /jffs/scripts/unmount '[ -f "$1/swap" ] && swapoff "$1/swap"'
   end_op_message 0
 }
 
@@ -410,7 +379,7 @@ setup_dnscrypt () {
   toml_simple_var_write $TARG cert_ignore_timestamp "true"
   toml_simple_var_write $TARG daemonize "true"
 
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start fw-rules"
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
 }
 
 setup_timezone () {
@@ -571,7 +540,7 @@ write_manager_script () {
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
-      del_jffs_script $TARG $OP x
+      del_jffs_script $TARG x
       [ `tail -1 $TARG|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
