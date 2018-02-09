@@ -436,6 +436,7 @@ toml_array_write () {
     LINE="${LINE%?}, '$VALUE']"
   fi
 
+  LINE=$(_quote "$LINE")
   sed -i "/$VAR = /c\\$LINE" $TARG
 }
 
@@ -446,11 +447,12 @@ toml_simple_var_write () {
 
   LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
   IDX_LINE="`grep -n \"$VAR = \" $TARG`"
+  local TO=$(_quote "${VAR} = ${VALUE}")
   if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
-    sed -i "/$VAR = /c\\$VAR = $VALUE" $TARG
+    sed -i "/$VAR = /c\\$TO" $TARG
   else
     LINE_NUM=$((`grep -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
-    sed -i "${LINE_NUM}i${VAR} = ${VALUE}\n" $TARG
+    sed -i "${LINE_NUM}i$TO\n" $TARG
   fi
 }
 
