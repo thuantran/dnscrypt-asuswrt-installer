@@ -352,8 +352,8 @@ read_input_num () {
 setup_dnscrypt () {
   local TARG_ORI=/jffs/dnscrypt/example-dnscrypt-proxy.toml
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-  if [ ! -f $TARG ] && [ ! -f $TARG_ORI ] ; then
-    echo -e "$ERROR Unable to find $TARG. Aborting..."
+  if [ ! -f $TARG_ORI ] || [ ! -f /jffs/dnscrypt/dnscrypt-proxy ]; then
+    echo -e "$ERROR dnscrypt-proxy is not installed. Aborting..."
     return 1
   fi
   cp -f $TARG_ORI $TARG
@@ -487,6 +487,13 @@ yesno_query () {
   esac
 }
 
+uninst_dnscrypt () {
+  local $TARG=/jffs/dnscrypt
+  echo -e "$INFO Uninstalling dnscrpt-proxy..."
+  rm -f $TARG/dnscrypt-proxy $TARG/nonroot
+  echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
+}
+
 write_conf () {
   local TARG=/jffs/dnscrypt/.config
   KEY="$1"
@@ -583,11 +590,12 @@ cleanup
 
 menu () {
   echo -e "$INFO Choose what you want to do:"
-  echo -e "  1) Install dnscrypt-proxy"
-  echo -e "  2) Configure dnscrypt-proxy"
-  echo -e "  3) Configure timezone"
-  echo -e "  4) Install (P)RNG"
-  echo -e "  5) Install swap file"
+  echo -e "  1) Install/Update dnscrypt-proxy"
+  echo -e "  2) Uninstall dnscrypt-proxy"
+  echo -e "  3) Configure dnscrypt-proxy"
+  echo -e "  4) Configure timezone"
+  echo -e "  5) Install (P)RNG"
+  echo -e "  6) Install swap file"
   echo -e "  q) Quit"
   echo -en "$INPUT Please enter the number designates your selection: $NORM"
   read CHOSEN
@@ -600,24 +608,31 @@ menu () {
       yesno_query "Do you want to install dnscrypt-proxy to /jffs" inst_dnscrypt "menu"
       ;;
     2)
+      echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files"
+      echo -e "$INFO from jffs, no other data will be changed."
+      echo -e "$INFO Also some start scripts will be modified as required."
+      echo
+      yesno_query "Do you want to uninstall dnscrypt-proxy to /jffs" uninst_dnscrypt "menu"
+      ;;
+    3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
       echo
       yesno_query "Do you want to proceed?" "setup_dnscrypt ; end_op_message 0" "menu"
       ;;
-    3)
+    4)
       echo -e "$INFO This operation allows you to configure your router"
       echo -e "$INFO timezone for background services and processes"
       echo
       yesno_query "Do you want to proceed?" setup_timezone "menu"
       ;;
-    4)
+    5)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
       yesno_query "Do you want to install (P)RNG to /jffs" inst_random "menu"
       ;;
-    5)
+    6)
       echo -e "$INFO This operation will install a swap file for your device"
       echo -e "$INFO You need an external USB storage to host this file"
       echo
