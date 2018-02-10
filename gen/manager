@@ -73,6 +73,7 @@ case $1 in
     date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
     (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
     while true; do touch "$0"; sleep 900; done)&
+
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1
