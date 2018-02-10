@@ -56,16 +56,13 @@ update_opendns () {
 
 case $1 in
   dnscrypt-start)
-    [ -f /jffs/dnscrypt/dnscrypt-proxy ] || exit 1
     start_dnscrypt
     ;;
   dnsmasq)
-    [ -f /jffs/dnscrypt/dnscrypt-proxy ] || exit 1
     sed -i "s/^\(resolv-file=\).*$/\1\/dev\/null/" /etc/dnsmasq.conf
     append_on_demand /etc/dnsmasq.conf "resolv-file=/dev/null" "server=127.0.0.1#65053"
     ;;
   fw-rules)
-    [ -f /jffs/dnscrypt/dnscrypt-proxy ] || exit 1
     iptables -t nat -C  PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
     [ $? -ne 0 ] && iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
     iptables -t nat -C PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
@@ -76,6 +73,7 @@ case $1 in
     date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
     (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
     while true; do touch "$0"; sleep 900; done)&
+
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1

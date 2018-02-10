@@ -118,6 +118,13 @@ del_between_magic () {
   fi
 }
 
+del_conf () {
+  local TARG=/jffs/dnscrypt/.config
+  for KEY in "$@"; do
+    sed -i "/^$KEY=.*$/d" $TARG
+  done
+}
+
 del_jffs_script () {
   local TARG=$1
   if [ "$2" == "x" ]; then
@@ -204,8 +211,7 @@ inst_dnscrypt () {
 
 inst_ip_update () {
   if [ "$1" -eq 0 ]; then
-    write_conf OPENDNS_USER ""
-    write_conf OPENDNS_PASSWORD ""
+    del_conf OPENDNS_USER OPENDNS_PASSWORD
     return
   fi
   echo -en "$INPUT Please enter OpenDNS username$NORM: "
@@ -383,7 +389,7 @@ setup_dnscrypt () {
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
 }
 
-setup_timezone () {
+set_timezone () {
   local TARG=/jffs/dnscrypt
   local TMP=/root
 
@@ -402,6 +408,7 @@ setup_timezone () {
   fi
 
   echo -e "$INFO $TZ_FILE selected"
+  write_manager_script /jffs/scripts/init-start init-start
   rm -r $TMP/zoneinfo.zip
   end_op_message 0
 }
@@ -488,11 +495,41 @@ yesno_query () {
   esac
 }
 
+uninst_all () {
+  local TARG=/jffs/dnscrypt
+  rm -rf $TARG
+  del_jffs_script /jffs/scripts/dnsmasq.postconf
+  del_jffs_script /jffs/scripts/init-start
+  del_jffs_script /jffs/scripts/firewall-start
+  del_jffs_script /jffs/scripts/services-stop
+  del_jffs_script /jffs/scripts/wan-start
+  end_op_message 0
+}
+
 uninst_dnscrypt () {
   local TARG=/jffs/dnscrypt
   echo -e "$INFO Uninstalling dnscrpt-proxy..."
   rm -f $TARG/dnscrypt-proxy $TARG/nonroot
+  del_jffs_script /jffs/scripts/dnsmasq.postconf
+  del_jffs_script /jffs/scripts/firewall-start
+  del_jffs_script /jffs/scripts/wan-start
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
+  end_op_message 0
+}
+
+uninst_random () {
+  local TARG=/jffs/dnscrypt
+  echo -e "$INFO Uninstalling (P)RNG..."
+  rm -f $TARG/haveged $TARG/rngd $TARG/stty
+  del_conf RAN_PRV RNG_DEV
+  [ ! -f $TARG/localtime ] && [ ! -f $TARG/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
+  end_op_message 0
+}
+
+unset_timezone () {
+  local TARG=/jffs/dnscrypt
+  rm -f $TARG/localtime
+  [ -z "`grep \"^RAN_PRV=.*$\" $TARG/.config`" ] && [ ! -f $TARG/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
   end_op_message 0
 }
 
@@ -547,7 +584,7 @@ write_manager_script () {
   if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND $OP" $TARG` -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
-    echo -e "$INFO Configure $FILENAME file for dnscrypt"
+    echo -e "$INFO Configure $FILENAME file"
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
@@ -595,9 +632,12 @@ menu () {
   echo -e "  1) Install/Update dnscrypt-proxy"
   echo -e "  2) Uninstall dnscrypt-proxy"
   echo -e "  3) Configure dnscrypt-proxy"
-  echo -e "  4) Configure timezone"
-  echo -e "  5) Install (P)RNG"
-  echo -e "  6) Install swap file"
+  echo -e "  4) Set timezone"
+  echo -e "  5) Unset timezone"
+  echo -e "  6) Install (P)RNG"
+  echo -e "  7) Uninstall (P)RNG"
+  echo -e "  8) Install swap file"
+  echo -e "  9) Uninstall ALL"
   echo -e "  q) Quit"
   echo -en "$INPUT Please enter the number designates your selection: $NORM"
   read CHOSEN
@@ -622,23 +662,41 @@ menu () {
       yesno_query "Do you want to proceed?" "setup_dnscrypt ; end_op_message 0" "menu"
       ;;
     4)
-      echo -e "$INFO This operation allows you to configure your router"
+      echo -e "$INFO This operation allows you to set your router"
       echo -e "$INFO timezone for background services and processes"
       echo
-      yesno_query "Do you want to proceed?" setup_timezone "menu"
+      yesno_query "Do you want to proceed?" set_timezone "menu"
       ;;
     5)
+      echo -e "$INFO This operation allows you to unset your router"
+      echo -e "$INFO timezone for background services and processes"
+      echo
+      yesno_query "Do you want to proceed?" unset_timezone "menu"
+      ;;
+    6)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
       yesno_query "Do you want to install (P)RNG to /jffs" inst_random "menu"
       ;;
-    6)
+    7)
+      echo -e "$INFO This operation will uninstall (P)RNG"
+      echo -e "$INFO from jffs, no other data will be changed."
+      echo -e "$INFO Also some start scripts will be installed/modified as required."
+      echo
+      yesno_query "Do you want to uninstall (P)RNG from /jffs" uninst_random "menu"
+      ;;
+    8)
       echo -e "$INFO This operation will install a swap file for your device"
       echo -e "$INFO You need an external USB storage to host this file"
       echo
       yesno_query "Do you want to install a swap file (512MB on ext filesystem partition)?" check_swap "menu"
+      ;;
+    9)
+      echo -e "$INFO This operation will cleanup everything installed by this script (except swap)"
+      echo
+      yesno_query "Do you want to continue?" uninst_all "menu"
       ;;
     q|Q)
       echo -e "$INFO Please reboot your router if you have made any change!"
