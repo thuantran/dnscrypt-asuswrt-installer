@@ -33,11 +33,8 @@ For dnscrypt-proxy version 1 use:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
-# Update/Reconfig:
+# Update/Reconfig/Uninstall:
 Just run the installation script above again
-
-# Uninstall:
-Just remove /jffs/dnscrypt directory and restart your router
 
 # How to check if it works
 If you use OpenDNS, run this command on Windows cmd
