@@ -135,20 +135,20 @@ del_jffs_script () {
 }
 
 download_file () {
-  cd "$1"
+  local TARG="$1"
   shift
-  PERM="$1"
+  local PERM=$1
   shift
 
   for URL in "$@"; do
     FILENAME="`basename $URL`"
-    MD5SUM_OLD="`[ -f $FILENAME ] && md5sum $FILENAME|cut -d' ' -f1`"
+    MD5SUM_OLD="`[ -f $TARG/$FILENAME ] && md5sum $TARG/$FILENAME | cut -d' ' -f1`"
     MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
-    if [ `echo -n $MD5SUM_CURR|wc -c` -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
+    if [ `echo -n $MD5SUM_CURR | wc -c` -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
-      curl -L -k -s -O "$URL" && chmod $PERM $FILENAME
+      curl -L -k -s "$URL" -o $TARG/$FILENAME && chmod $PERM $TARG/$FILENAME
     fi
   done
 }
@@ -175,6 +175,7 @@ inst_dnscrypt () {
   download_file $TARG 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
     $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig
+  chown nobody:nobody $TARG/public-resolvers.md $TARG/public-resolvers.md.minisig
   tar xzv -C $TARG -f $TARG/$DNSCRYPT_TAR
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
@@ -488,10 +489,11 @@ yesno_query () {
 }
 
 uninst_dnscrypt () {
-  local $TARG=/jffs/dnscrypt
+  local TARG=/jffs/dnscrypt
   echo -e "$INFO Uninstalling dnscrpt-proxy..."
   rm -f $TARG/dnscrypt-proxy $TARG/nonroot
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
+  end_op_message 0
 }
 
 write_conf () {
