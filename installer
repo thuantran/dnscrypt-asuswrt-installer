@@ -46,6 +46,26 @@ check_swap () {
 
 choose_dnscrypt_server () {
   yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_simple_var_write $TARG ipv6_servers true" "toml_simple_var_write $TARG ipv6_servers false"
+  echo -e "$INFO Choose DNS resolving load balancing strategy:"
+  echo -e "  1) p2 (default)"
+  echo -e "  2) ph"
+  echo -e "  3) fastest"
+  echo -e "  4) random"
+  read_input_num "Select your mode" 1 4
+  case $CHOSEN in
+    1)
+      toml_simple_var_write $TARG lb_strategy p2
+      ;;
+    2)
+      toml_simple_var_write $TARG lb_strategy ph
+      ;;
+    3)
+      toml_simple_var_write $TARG lb_strategy fastest
+      ;;
+    4)
+      toml_simple_var_write $TARG lb_strategy random
+      ;;
+  esac
   echo -e "$INFO Choose how your DNS servers are selected:"
   echo -e "  1) Automatically"
   echo -e "  2) Manually"
@@ -654,7 +674,7 @@ menu () {
       echo -e "$INFO from jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be modified as required."
       echo
-      yesno_query "Do you want to uninstall dnscrypt-proxy to /jffs" uninst_dnscrypt "menu"
+      yesno_query "Do you want to uninstall dnscrypt-proxy from /jffs" uninst_dnscrypt "menu"
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
