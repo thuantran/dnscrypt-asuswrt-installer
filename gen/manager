@@ -59,8 +59,8 @@ case $1 in
     start_dnscrypt
     ;;
   dnsmasq)
-    sed -i "s/^\(resolv-file=\).*$/\1\/dev\/null/" /etc/dnsmasq.conf
-    append_on_demand /etc/dnsmasq.conf "resolv-file=/dev/null" "server=127.0.0.1#65053"
+    sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
+    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
     ;;
   fw-rules)
     iptables -t nat -C  PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
