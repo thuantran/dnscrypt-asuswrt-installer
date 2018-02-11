@@ -46,6 +46,26 @@ check_swap () {
 
 choose_dnscrypt_server () {
   yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_simple_var_write $TARG ipv6_servers true" "toml_simple_var_write $TARG ipv6_servers false"
+  echo -e "$INFO Choose DNS resolving load balancing strategy:"
+  echo -e "  1) p2 (default)"
+  echo -e "  2) ph"
+  echo -e "  3) fastest"
+  echo -e "  4) random"
+  read_input_num "Select your mode" 1 4
+  case $CHOSEN in
+    1)
+      toml_simple_var_write $TARG lb_strategy "'p2'"
+      ;;
+    2)
+      toml_simple_var_write $TARG lb_strategy "'ph'"
+      ;;
+    3)
+      toml_simple_var_write $TARG lb_strategy "'fastest'"
+      ;;
+    4)
+      toml_simple_var_write $TARG lb_strategy "'random'"
+      ;;
+  esac
   echo -e "$INFO Choose how your DNS servers are selected:"
   echo -e "  1) Automatically"
   echo -e "  2) Manually"
@@ -334,6 +354,28 @@ inst_swap () {
   end_op_message 0
 }
 
+migrate_dnscrypt () {
+  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
+  local TARG_OLD=/jffs/dnscrypt/dnscrypt-proxy.toml.bak
+  local TARG_ORI=/jffs/dnscrypt/example-dnscrypt-proxy.toml
+  local IDX_VAR
+  local INDEX
+  local VAR
+  local VALUE
+  echo -e "INFO Migrating your settings..."
+  echo -e "INFO Backup your old settings file..."
+  mv $TARG $TARG_OLD
+  cp -f $TARG_ORI $TARG
+  for IDX_VAR in `awk -F' = ' '!/(^\#|^  |^\[)/ {if (NF){print NR":"$1}}' $TARG_OLD`; do
+    INDEX=`echo $IDX_VAR | cut -d':' -f1`
+    VAR=`echo $IDX_VAR | cut -d':' -f2`
+    VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  |^\[)/ {if (NF){if (NR==IDX){print $2}}}' $TARG_OLD)
+    echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}"
+    toml_simple_var_write $TARG $VAR "$VALUE"
+  done
+  [ "`grep '^server_names = .*cisco.*' $TARG`" ] && CISCO_ENABLED=1
+}
+
 read_input_num () {
   if [ -z $4 ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
@@ -363,29 +405,34 @@ setup_dnscrypt () {
     echo -e "$ERROR dnscrypt-proxy is not installed. Aborting..."
     return 1
   fi
-  cp -f $TARG_ORI $TARG
 
+  unset CISCO_ENABLED
   echo -e "$INFO Configuring dnscrypt-proxy..."
-  choose_dnscrypt_server
+  if [ -z $1 ] && [ -f $TARG ]; then
+    echo -e "$INFO Found previous dnscrypt-proxy config file"
+    yesno_query "Do you want to migrate your previous settings" migrate_dnscrypt "setup_dnscrypt x; return"
+  else
+    cp -f $TARG_ORI $TARG
+    choose_dnscrypt_server
+
+    echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
+    echo -e "$INFO and router services (e.g. ntp) at boot"
+    echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
+    read DNS_SERVER
+    [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
+    toml_simple_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
+    toml_simple_var_write $TARG ignore_system_dns "true"
+
+    read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
+    toml_simple_var_write $TARG log_level "$CHOSEN"
+
+    toml_simple_var_write $TARG listen_addresses "['127.0.0.1:65053']"
+    toml_simple_var_write $TARG use_syslog "true"
+    toml_simple_var_write $TARG cache "false"
+    toml_simple_var_write $TARG cert_ignore_timestamp "true"
+    toml_simple_var_write $TARG daemonize "true"
+  fi
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-
-  echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
-  echo -e "$INFO and router services (e.g. ntp) at boot"
-  echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
-  read DNS_SERVER
-  [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
-  toml_simple_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
-  toml_simple_var_write $TARG ignore_system_dns "true"
-
-  read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-  toml_simple_var_write $TARG log_level "$CHOSEN"
-
-  toml_simple_var_write $TARG listen_addresses "['127.0.0.1:65053']"
-  toml_simple_var_write $TARG use_syslog "true"
-  toml_simple_var_write $TARG cache "false"
-  toml_simple_var_write $TARG cert_ignore_timestamp "true"
-  toml_simple_var_write $TARG daemonize "true"
-
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
 }
 
@@ -612,12 +659,6 @@ case $(uname -m) in
     DNSCRYPT_ARCH_TAR=linux-arm64
     echo -e "$INFO Detected ARMv8 architecture."
     ;;
-  mips)
-    URL_ARCH=$URL_ARCH/mips
-    DNSCRYPT_ARCH=linux_mips
-    DNSCRYPT_ARCH_TAR=linux-mips
-    echo -e "$INFO Detected MIPSEL architecture."
-    ;;
   *)
     echo "This is unsupported platform, sorry."
     exit 1
@@ -654,12 +695,12 @@ menu () {
       echo -e "$INFO from jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be modified as required."
       echo
-      yesno_query "Do you want to uninstall dnscrypt-proxy to /jffs" uninst_dnscrypt "menu"
+      yesno_query "Do you want to uninstall dnscrypt-proxy from /jffs" uninst_dnscrypt "menu"
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
       echo
-      yesno_query "Do you want to proceed?" "setup_dnscrypt ; end_op_message 0" "menu"
+      yesno_query "Do you want to proceed?" "setup_dnscrypt x; end_op_message 0" "menu"
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router"
