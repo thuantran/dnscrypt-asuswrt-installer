@@ -24,20 +24,15 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
 
-# Installation:
+# Install/Update/Reconfig/Uninstall:
 Run this command from ssh shell and following the prompt for dnscrypt-proxy version 2:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer && sh installer ; rm installer
 ```
-For dnscrypt-proxy version 1 use:
+User can safely update from dnscrypt-proxy version 1 to version 2. For dnscrypt-proxy version 1 use:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
-# Update/Reconfig:
-Just run the installation script above again
-
-# Uninstall:
-Just remove /jffs/dnscrypt directory and restart your router
 
 # How to check if it works
 If you use OpenDNS, run this command on Windows cmd
