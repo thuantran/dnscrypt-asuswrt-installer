@@ -54,16 +54,16 @@ choose_dnscrypt_server () {
   read_input_num "Select your mode" 1 4
   case $CHOSEN in
     1)
-      toml_simple_var_write $TARG lb_strategy p2
+      toml_simple_var_write $TARG lb_strategy "'p2'"
       ;;
     2)
-      toml_simple_var_write $TARG lb_strategy ph
+      toml_simple_var_write $TARG lb_strategy "'ph'"
       ;;
     3)
-      toml_simple_var_write $TARG lb_strategy fastest
+      toml_simple_var_write $TARG lb_strategy "'fastest'"
       ;;
     4)
-      toml_simple_var_write $TARG lb_strategy random
+      toml_simple_var_write $TARG lb_strategy "'random'"
       ;;
   esac
   echo -e "$INFO Choose how your DNS servers are selected:"
