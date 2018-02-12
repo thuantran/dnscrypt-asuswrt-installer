@@ -659,6 +659,12 @@ case $(uname -m) in
     DNSCRYPT_ARCH_TAR=linux-arm64
     echo -e "$INFO Detected ARMv8 architecture."
     ;;
+  mips)
+    URL_ARCH=$URL_ARCH/mips
+    DNSCRYPT_ARCH=linux_mipsle
+    DNSCRYPT_ARCH_TAR=linux-mipsle
+    echo -e "$INFO Detected MIPSEL architecture."
+    ;;
   *)
     echo "This is unsupported platform, sorry."
     exit 1
