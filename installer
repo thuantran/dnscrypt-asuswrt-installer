@@ -368,13 +368,13 @@ migrate_dnscrypt () {
   mv $TARG $TARG_OLD
   cp -f $TARG_ORI $TARG
   for IDX_VAR in `awk -F' = ' '!/(^\#|^  #)/ {if (NF){gsub(/^  /, "", $0);print NR":"$1}}' $TARG_OLD`; do
-    INDEX=`echo $IDX_VAR | cut -d':' -f1`
     VAR=`echo $IDX_VAR | cut -d':' -f2`
     if [ "${VAR:0:1}" == "[" ]; then
       GVAR=$VAR
       continue
     fi
 
+    INDEX=`echo $IDX_VAR | cut -d':' -f1`
     VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  #)/ {if (NF){if (NR==IDX){gsub(/^  /, "", $0); print $2}}}' $TARG_OLD)
     if [ $GVAR ]; then
       echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}${NORM} in group ${BOLD}${GVAR}"
