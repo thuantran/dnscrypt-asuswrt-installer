@@ -45,7 +45,7 @@ check_swap () {
 }
 
 choose_dnscrypt_server () {
-  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_simple_var_write $TARG ipv6_servers true" "toml_simple_var_write $TARG ipv6_servers false"
+  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_var_write $TARG ipv6_servers true" "toml_var_write $TARG ipv6_servers false"
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
@@ -54,16 +54,16 @@ choose_dnscrypt_server () {
   read_input_num "Select your mode" 1 4
   case $CHOSEN in
     1)
-      toml_simple_var_write $TARG lb_strategy "'p2'"
+      toml_var_write $TARG lb_strategy "'p2'"
       ;;
     2)
-      toml_simple_var_write $TARG lb_strategy "'ph'"
+      toml_var_write $TARG lb_strategy "'ph'"
       ;;
     3)
-      toml_simple_var_write $TARG lb_strategy "'fastest'"
+      toml_var_write $TARG lb_strategy "'fastest'"
       ;;
     4)
-      toml_simple_var_write $TARG lb_strategy "'random'"
+      toml_var_write $TARG lb_strategy "'random'"
       ;;
   esac
   echo -e "$INFO Choose how your DNS servers are selected:"
@@ -84,22 +84,22 @@ choose_dnscrypt_server_auto () {
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
 
   toml_var_disable $TARG server_names
-  yesno_query "Use servers support the DNSCrypt protocol" "toml_simple_var_write $TARG dnscrypt_servers true" "toml_simple_var_write $TARG dnscrypt_servers false"
-  yesno_query "Use servers support the DNS-over-HTTPS protocol" "toml_simple_var_write $TARG doh_servers true" "toml_simple_var_write $TARG doh_servers false"
-  yesno_query "Use only servers support DNSSEC" "toml_simple_var_write $TARG require_dnssec true" "toml_simple_var_write $TARG require_dnssec false"
-  yesno_query "Use only servers that do not log user's queries" "toml_simple_var_write $TARG require_nolog true" "toml_simple_var_write $TARG require_nolog false"
-  yesno_query "Use only servers that do not filter result" "toml_simple_var_write $TARG require_nofilter true" "toml_simple_var_write $TARG require_nofilter false"
+  yesno_query "Use servers support the DNSCrypt protocol" "toml_var_write $TARG dnscrypt_servers true" "toml_var_write $TARG dnscrypt_servers false"
+  yesno_query "Use servers support the DNS-over-HTTPS protocol" "toml_var_write $TARG doh_servers true" "toml_var_write $TARG doh_servers false"
+  yesno_query "Use only servers support DNSSEC" "toml_var_write $TARG require_dnssec true" "toml_var_write $TARG require_dnssec false"
+  yesno_query "Use only servers that do not log user's queries" "toml_var_write $TARG require_nolog true" "toml_var_write $TARG require_nolog false"
+  yesno_query "Use only servers that do not filter result" "toml_var_write $TARG require_nofilter true" "toml_var_write $TARG require_nofilter false"
 }
 
 choose_dnscrypt_server_manual () {
   local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
   if [ -z $1 ]; then
     toml_array_clean $TARG server_names
-    toml_simple_var_write $TARG dnscrypt_servers true
-    toml_simple_var_write $TARG doh_servers true
-    toml_simple_var_write $TARG require_dnssec false
-    toml_simple_var_write $TARG require_nolog "false"
-    toml_simple_var_write $TARG require_nofilter "false"
+    toml_var_write $TARG dnscrypt_servers true
+    toml_var_write $TARG doh_servers true
+    toml_var_write $TARG require_dnssec false
+    toml_var_write $TARG require_nolog "false"
+    toml_var_write $TARG require_nofilter "false"
     echo -e "$INFO Available DNS servers: "
     awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
     INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
@@ -362,16 +362,27 @@ migrate_dnscrypt () {
   local INDEX
   local VAR
   local VALUE
+  local GVAR
   echo -e "INFO Migrating your settings..."
   echo -e "INFO Backup your old settings file..."
   mv $TARG $TARG_OLD
   cp -f $TARG_ORI $TARG
-  for IDX_VAR in `awk -F' = ' '!/(^\#|^  |^\[)/ {if (NF){print NR":"$1}}' $TARG_OLD`; do
+  for IDX_VAR in `awk -F' = ' '!/(^\#|^  #)/ {if (NF){gsub(/^  /, "", $0);print NR":"$1}}' $TARG_OLD`; do
     INDEX=`echo $IDX_VAR | cut -d':' -f1`
     VAR=`echo $IDX_VAR | cut -d':' -f2`
-    VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  |^\[)/ {if (NF){if (NR==IDX){print $2}}}' $TARG_OLD)
-    echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}"
-    toml_simple_var_write $TARG $VAR "$VALUE"
+    if [ "${VAR:0:1}" == "[" ]; then
+      GVAR=$VAR
+      continue
+    fi
+
+    VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  #)/ {if (NF){if (NR==IDX){gsub(/^  /, "", $0); print $2}}}' $TARG_OLD)
+    if [ $GVAR ]; then
+      echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}${NORM} in group ${BOLD}${GVAR}"
+      toml_var_write $TARG "$VAR" "$VALUE" $GVAR
+    else
+      echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}"
+      toml_var_write $TARG "$VAR" "$VALUE"
+    fi
   done
   [ "`grep '^server_names = .*cisco.*' $TARG`" ] && CISCO_ENABLED=1
 }
@@ -420,17 +431,17 @@ setup_dnscrypt () {
     echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
     read DNS_SERVER
     [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
-    toml_simple_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
-    toml_simple_var_write $TARG ignore_system_dns "true"
+    toml_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
+    toml_var_write $TARG ignore_system_dns "true"
 
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_simple_var_write $TARG log_level "$CHOSEN"
+    toml_var_write $TARG log_level "$CHOSEN"
 
-    toml_simple_var_write $TARG listen_addresses "['127.0.0.1:65053']"
-    toml_simple_var_write $TARG use_syslog "true"
-    toml_simple_var_write $TARG cache "false"
-    toml_simple_var_write $TARG cert_ignore_timestamp "true"
-    toml_simple_var_write $TARG daemonize "true"
+    toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
+    toml_var_write $TARG use_syslog "true"
+    toml_var_write $TARG cache "false"
+    toml_var_write $TARG cert_ignore_timestamp "true"
+    toml_var_write $TARG daemonize "true"
   fi
   [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
   yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
@@ -495,19 +506,34 @@ toml_array_write () {
   sed -i "/$VAR = /c\\$LINE" $TARG
 }
 
-toml_simple_var_write () {
+toml_var_write () {
   local TARG=$1
   local VAR=$2
   local VALUE=$3
-
-  LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
-  IDX_LINE="`grep -n \"$VAR = \" $TARG`"
+  local TGVAR=$4
+  local INDEX
   local TO=$(_quote "${VAR} = ${VALUE}")
-  if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
-    sed -i "/$VAR = /c\\$TO" $TARG
+  if [ -z $4 ]; then
+    local LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
+    INDEX=`awk -v VAR="$VAR = " '($0 ~ VAR){print NR}' $TARG`
+    if [ "$INDEX" ] && [ $INDEX -lt $LINE_NUM_LAST ]; then
+      sed -i "$INDEX c\\$TO" $TARG
+    else
+      local LINE_NUM=$((`grep -m 1 -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
+      sed -i "${LINE_NUM}i$TO\n" $TARG
+    fi
   else
-    LINE_NUM=$((`grep -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
-    sed -i "${LINE_NUM}i$TO\n" $TARG
+    local IDX_GVAR
+    local GVAR
+    local NX_IDX
+    for IDX_GVAR in `awk -F' = ' '/^\[/ {if (NF){print NR":"$1}}' $TARG`; do
+      GVAR=`echo $IDX_GVAR | cut -d':' -f2`
+      [ "$GVAR" != "$TGVAR" ] && continue
+      INDEX=`echo $IDX_GVAR | cut -d':' -f1`
+      NX_IDX=`awk -v INDEX=$INDEX '/^\[/ {if (NF && NR>INDEX){print NR;exit}}' $TARG`
+      [ -z $NX_IDX ] && NX_IDX=`cat $TARG | wc -l`
+      sed -i "$INDEX,$NX_IDX{s/$VAR = .*$/$TO/}" $TARG
+    done
   fi
 }
 
@@ -664,6 +690,8 @@ case $(uname -m) in
     DNSCRYPT_ARCH=linux_mipsle
     DNSCRYPT_ARCH_TAR=linux-mipsle
     echo -e "$INFO Detected MIPSEL architecture."
+    echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
+    echo -e "$WARNING USE AT YOUR OWN RISK"
     ;;
   *)
     echo "This is unsupported platform, sorry."
