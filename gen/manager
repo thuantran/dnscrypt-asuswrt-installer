@@ -69,11 +69,12 @@ case $1 in
     [ $? -ne 0 ] && iptables -t nat -A PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
     ;;
   init-start)
-    [ -f /jffs/dnscrypt/localtime ] && ln -s /jffs/dnscrypt/localtime /etc/localtime
-    date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-    (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
-    while true; do touch "$0"; sleep 900; done)&
-
+    if [ -f /jffs/dnscrypt/localtime ]; then
+      ln -s /jffs/dnscrypt/localtime /etc/localtime
+      date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+      (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+      while true; do touch "$0"; sleep 900; done)&
+    fi
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1
@@ -84,6 +85,6 @@ case $1 in
     esac
     ;;
   services-stop)
-    touch "$0"
+    [ -f /jffs/dnscrypt/localtime ] && touch "$0"
     ;;
 esac

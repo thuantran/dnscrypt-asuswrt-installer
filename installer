@@ -9,6 +9,12 @@ ERROR="$BOLD *** Error: $NORM"
 WARNING="$BOLD * Warning: $NORM"
 INPUT="$BOLD => $NORM"
 
+readonly TARG_DIR=/jffs/dnscrypt
+readonly CONF_FILE=$TARG_DIR/.config
+readonly TOML_FILE=$TARG_DIR/dnscrypt-proxy.toml
+readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
+readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
+
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
 }
@@ -20,8 +26,8 @@ check_jffs_enabled () {
     exit 1
   fi
 
-  JFFS2_ENABLED=`nvram get jffs2_enable`
-  JFFS2_SCRIPTS=`nvram get jffs2_scripts`
+  local JFFS2_ENABLED=`nvram get jffs2_enable`
+  local JFFS2_SCRIPTS=`nvram get jffs2_scripts`
 
   if [ $JFFS2_ENABLED -ne 1 ] || [ $JFFS2_SCRIPTS -ne 1 ]; then
     echo -e "$INFO JFFS custom scripts and configs are not enabled. Enabling them"
@@ -34,7 +40,7 @@ check_jffs_enabled () {
 }
 
 check_swap () {
-  SWAP_SIZE=`cat /proc/meminfo | grep SwapTotal | awk '{print $2}'`
+  local SWAP_SIZE=`awk '/SwapTotal/ {print $2}' /proc/meminfo`
   if [ $SWAP_SIZE -gt 0 ]; then
     echo -e "$INFO Swap file is already setup"
     end_op_message 0
@@ -45,7 +51,7 @@ check_swap () {
 }
 
 choose_dnscrypt_server () {
-  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_var_write $TARG ipv6_servers true" "toml_var_write $TARG ipv6_servers false"
+  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_var_write ipv6_servers true" "toml_var_write ipv6_servers false"
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
@@ -54,16 +60,16 @@ choose_dnscrypt_server () {
   read_input_num "Select your mode" 1 4
   case $CHOSEN in
     1)
-      toml_var_write $TARG lb_strategy "'p2'"
+      toml_var_write lb_strategy "'p2'"
       ;;
     2)
-      toml_var_write $TARG lb_strategy "'ph'"
+      toml_var_write lb_strategy "'ph'"
       ;;
     3)
-      toml_var_write $TARG lb_strategy "'fastest'"
+      toml_var_write lb_strategy "'fastest'"
       ;;
     4)
-      toml_var_write $TARG lb_strategy "'random'"
+      toml_var_write lb_strategy "'random'"
       ;;
   esac
   echo -e "$INFO Choose how your DNS servers are selected:"
@@ -81,25 +87,23 @@ choose_dnscrypt_server () {
 }
 
 choose_dnscrypt_server_auto () {
-  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-
-  toml_var_disable $TARG server_names
-  yesno_query "Use servers support the DNSCrypt protocol" "toml_var_write $TARG dnscrypt_servers true" "toml_var_write $TARG dnscrypt_servers false"
-  yesno_query "Use servers support the DNS-over-HTTPS protocol" "toml_var_write $TARG doh_servers true" "toml_var_write $TARG doh_servers false"
-  yesno_query "Use only servers support DNSSEC" "toml_var_write $TARG require_dnssec true" "toml_var_write $TARG require_dnssec false"
-  yesno_query "Use only servers that do not log user's queries" "toml_var_write $TARG require_nolog true" "toml_var_write $TARG require_nolog false"
-  yesno_query "Use only servers that do not filter result" "toml_var_write $TARG require_nofilter true" "toml_var_write $TARG require_nofilter false"
+  toml_var_disable server_names
+  yesno_query "Use servers support the DNSCrypt protocol" "toml_var_write dnscrypt_servers true" "toml_var_write dnscrypt_servers false"
+  yesno_query "Use servers support the DNS-over-HTTPS protocol" "toml_var_write doh_servers true" "toml_var_write doh_servers false"
+  yesno_query "Use only servers support DNSSEC" "toml_var_write require_dnssec true" "toml_var_write require_dnssec false"
+  yesno_query "Use only servers that do not log user's queries" "toml_var_write require_nolog true" "toml_var_write require_nolog false"
+  yesno_query "Use only servers that do not filter result" "toml_var_write require_nofilter true" "toml_var_write require_nofilter false"
 }
 
 choose_dnscrypt_server_manual () {
-  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-  if [ -z $1 ]; then
-    toml_array_clean $TARG server_names
-    toml_var_write $TARG dnscrypt_servers true
-    toml_var_write $TARG doh_servers true
-    toml_var_write $TARG require_dnssec false
-    toml_var_write $TARG require_nolog "false"
-    toml_var_write $TARG require_nofilter "false"
+  local INDEX=$1
+  if [ -z $INDEX ]; then
+    toml_array_clean server_names
+    toml_var_write dnscrypt_servers true
+    toml_var_write doh_servers true
+    toml_var_write require_dnssec false
+    toml_var_write require_nolog "false"
+    toml_var_write require_nofilter "false"
     echo -e "$INFO Available DNS servers: "
     awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
     INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
@@ -110,15 +114,14 @@ choose_dnscrypt_server_manual () {
   fi
 
   ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
-  toml_array_write $TARG server_names $ITEM
+  toml_array_append server_names $ITEM
 
   [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
-  choose_dnscrypt_server_manual n
+  choose_dnscrypt_server_manual $INDEX
 }
 
 cleanup () {
-  local TARG=/jffs/dnscrypt
-  rm -f $TARG/dnscrypt-fw-rules $TARG/dnscrypt-start $TARG/dnsmasq-dnscrypt-reconfig $TARG/fake-hwclock* $TARG/init-start $TARG/services-stop
+  rm -f $TARG_DIR/dnscrypt-fw-rules $TARG_DIR/dnscrypt-start $TARG_DIR/dnsmasq-dnscrypt-reconfig $TARG_DIR/fake-hwclock* $TARG_DIR/init-start $TARG_DIR/services-stop
 }
 
 create_dir () {
@@ -131,23 +134,25 @@ create_dir () {
 
 del_between_magic () {
   local TARG=$1
-  MAGIC=$2
-  BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|tr '\n' ','`
+  local MAGIC=$2
+  local BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|tr '\n' ','`
   if [ "$BOUNDS" ]; then
     sed -i "${BOUNDS%,}d" $TARG
   fi
 }
 
 del_conf () {
-  local TARG=/jffs/dnscrypt/.config
-  [ ! -f $TARG ] && return
+  [ ! -f $CONF_FILE ] && return
+  local KEY
   for KEY in "$@"; do
-    sed -i "/^$KEY=.*$/d" $TARG
+    sed -i "/^$KEY=.*$/d" $CONF_FILE
   done
 }
 
 del_jffs_script () {
   local TARG=$1
+  local LINE_NUM
+  local LINE_ABOVE
   if [ "$2" == "x" ]; then
     LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep -v manager|cut -d':' -f1`
   else
@@ -167,7 +172,10 @@ download_file () {
   shift
   local PERM=$1
   shift
-
+  local URL
+  local FILENAME
+  local MD5SUM_OLD
+  local MD5SUM_CURR
   for URL in "$@"; do
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $TARG/$FILENAME ] && md5sum $TARG/$FILENAME | cut -d' ' -f1`"
@@ -192,28 +200,27 @@ end_op_message () {
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
   local RESOLVERS_URL_PREFIX="http://download.dnscrypt.info/resolvers-list/v2"
-  local TARG=/jffs/dnscrypt
-  create_dir $TARG
+  create_dir $TARG_DIR
   if [ $? -ne 0 ]; then
     end_op_message
     return 1
   fi
 
-  download_file $TARG 755 $URL_GEN/manager $URL_ARCH/nonroot
-  download_file $TARG 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
+  download_file $TARG_DIR 755 $URL_GEN/manager $URL_ARCH/nonroot
+  download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
     $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig
-  chown nobody:nobody $TARG/public-resolvers.md $TARG/public-resolvers.md.minisig
-  tar xzv -C $TARG -f $TARG/$DNSCRYPT_TAR
+  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig
+  tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
     end_op_message
     return 1
   fi
-  chown `nvram get http_username`:root $TARG/$DNSCRYPT_ARCH_TAR/*
-  mv $TARG/$DNSCRYPT_ARCH_TAR/* $TARG
-  rm -r $TARG/$DNSCRYPT_ARCH_TAR $TARG/$DNSCRYPT_TAR
-  chmod 755 $TARG/dnscrypt-proxy
+  chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
+  mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
+  rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+  chmod 755 $TARG_DIR/dnscrypt-proxy
 
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/wan-start dnscrypt-start
@@ -231,6 +238,9 @@ inst_dnscrypt () {
 }
 
 inst_ip_update () {
+  local USERNAME
+  local PW1
+  local PW2
   if [ "$1" -eq 0 ]; then
     del_conf OPENDNS_USER OPENDNS_PASSWORD
     return
@@ -243,7 +253,7 @@ inst_ip_update () {
   echo -en "$INPUT Please reenter OpenDNS password$NORM: "
   read -rs PW2
   echo
-  if [ "$PW1" != "$PW2" ]; then
+  if [ -z "$PW1" ] || [ -z "$PW2" ] || [ "$PW1" != "$PW2" ]; then
     echo -e "$ERROR Password entered incorrectly!"
     inst_ip_update $1
   fi
@@ -253,48 +263,39 @@ inst_ip_update () {
 }
 
 inst_random () {
-  local TARG=/jffs/dnscrypt
-  create_dir $TARG
+  create_dir $TARG_DIR
 
-  if [ -z $1 ]; then
-    echo -e "$INFO Install a (P)RNG for better cryptographic operations"
-    echo -e "$INFO Available random number generator providers:"
-    echo -e "  1) HAVEGED (Preferred if you do not have a HW RNG)"
-    echo -e "  2) RNGD (Preferred if you have a HW RNG)"
-  fi
+  echo -e "$INFO Install a (P)RNG for better cryptographic operations"
+  echo -e "$INFO Available random number generator providers:"
+  echo -e "  1) HAVEGED (Preferred if you do not have a HW RNG)"
+  echo -e "  2) RNGD (Preferred if you have a HW RNG)"
   echo -e "$INFO If you choose a HW RNG, please have it plugged in now before"
   echo -e "$INFO proceeding with your selection."
-  echo -en "$INPUT Please enter the number designates your selection$NORM: "
-  read CHOSEN
+  read_input_num "Please enter the number designates your selection" 1 2
   case $CHOSEN in
     1)
-      rm -f rngd stty
-      download_file $TARG 755 $URL_ARCH/haveged $URL_GEN/manager
+      rm -f $TARG_DIR/rngd $TARG_DIR/stty
+      download_file $TARG_DIR 755 $URL_ARCH/haveged $URL_GEN/manager
       write_conf RAN_PRV haveged
       ;;
     2)
-      rm -f haveged
-      download_file $TARG 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
+      rm -f $TARG_DIR/haveged
+      download_file $TARG_DIR 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
       inst_ran_dev || return
       write_conf RAN_PRV rngd
-      ;;
-    *)
-      echo -e "$ERROR Invalid character entered! Retrying..."
-      inst_random x
-      return
       ;;
   esac
 
   write_manager_script /jffs/scripts/init-start init-start
-  write_manager_script /jffs/scripts/services-stop services-stop
   end_op_message 0
 }
 
 inst_ran_dev () {
   if [ -c /dev/ttyACM0 ]; then
-    PRODSTR=`cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=`
-    VID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 1`
-    PID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 2`
+    local PRODSTR=`cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=`
+    local VID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 1`
+    local PID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 2`
+    local RNG_DEV
     if [ "$VID" == "4d8" ] && [ "$PID" == "f5fe" ]; then
       echo -e "$INFO Found TrueRNG USB HW RNG"
       RNG_DEV=ttyACM0
@@ -315,17 +316,15 @@ inst_ran_dev () {
 
   if [ -z $RNG_DEV ]; then
     echo -e "$ERROR Unable to find any HW RNG device! Retrying..."
-    inst_random x
+    inst_random
     return 1
   fi
   write_conf RNG_DEV "/dev/$RNG_DEV"
 }
 
 inst_swap () {
-  local PARTITIONS
-
-  SWAP_SIZE=524288
-  USB_COUNT=`df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > 524288){print $6}}' | wc -l`
+  local SWAP_SIZE=524288
+  local USB_COUNT=`df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > 524288){print $6}}' | wc -l`
   if [ $USB_COUNT -le 1 ]; then
     echo -e "$ERROR Unable to find any external USB storage"
     echo -e "$ERROR Or no suitable external USB storage found"
@@ -338,15 +337,15 @@ inst_swap () {
   echo -e "$INFO Available partition to install swap file:$NORM"
   df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6}}'
   read_input_num "Please select the partition to install swap file" 1 $USB_COUNT
-  MOUNT=`df | awk -v IDX=$CHOSEN -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}'`
+  local MOUNT=`df | awk -v IDX=$CHOSEN -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}'`
 
   echo -e "$INFO Please wait..."
   dd if=/dev/zero of="$MOUNT/swap" bs=1024 count=$SWAP_SIZE
-  MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
+  local MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
   [ ${MOUNT_FS%?} == "ext" ] && chmod 600 "$MOUNT/swap"
   mkswap "$MOUNT/swap"
 
-  LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/post-mount | cut -d':' -f1`
+  local LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/post-mount | cut -d':' -f1`
   sed -i "${LINE_NUM}d" /jffs/scripts/post-mount
   LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/unmount | cut -d':' -f1`
   sed -i "${LINE_NUM}d" /jffs/scripts/unmount
@@ -356,9 +355,6 @@ inst_swap () {
 }
 
 migrate_dnscrypt () {
-  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-  local TARG_OLD=/jffs/dnscrypt/dnscrypt-proxy.toml.bak
-  local TARG_ORI=/jffs/dnscrypt/example-dnscrypt-proxy.toml
   local IDX_VAR
   local INDEX
   local VAR
@@ -366,9 +362,9 @@ migrate_dnscrypt () {
   local GVAR
   echo -e "INFO Migrating your settings..."
   echo -e "INFO Backup your old settings file..."
-  mv $TARG $TARG_OLD
-  cp -f $TARG_ORI $TARG
-  for IDX_VAR in `awk -F' = ' '!/(^\#|^  #)/ {if (NF){gsub(/^  /, "", $0);print NR":"$1}}' $TARG_OLD`; do
+  mv $TOML_FILE $TOML_BAK
+  cp -f $TOML_ORI $TOML_FILE
+  for IDX_VAR in `awk -F' = ' '!/(^\#|^  #)/ {if (NF){gsub(/^  /, "", $0);print NR":"$1}}' $TOML_BAK`; do
     VAR=`echo $IDX_VAR | cut -d':' -f2`
     if [ "${VAR:0:1}" == "[" ]; then
       GVAR=$VAR
@@ -376,16 +372,16 @@ migrate_dnscrypt () {
     fi
 
     INDEX=`echo $IDX_VAR | cut -d':' -f1`
-    VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  #)/ {if (NF){if (NR==IDX){gsub(/^  /, "", $0); print $2}}}' $TARG_OLD)
+    VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  #)/ {if (NF){if (NR==IDX){gsub(/^  /, "", $0); print $2}}}' $TOML_BAK)
     if [ $GVAR ]; then
       echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}${NORM} in group ${BOLD}${GVAR}"
-      toml_var_write $TARG "$VAR" "$VALUE" $GVAR
+      toml_var_write $VAR "$VALUE" $GVAR
     else
       echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}"
-      toml_var_write $TARG "$VAR" "$VALUE"
+      toml_var_write $VAR "$VALUE"
     fi
   done
-  [ "`grep '^server_names = .*cisco.*' $TARG`" ] && CISCO_ENABLED=1
+  [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ] && CISCO_ENABLED=1
 }
 
 read_input_num () {
@@ -395,7 +391,7 @@ read_input_num () {
     echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
   fi
   read CHOSEN
-  if [ "$CHOSEN" == "n" ]; then
+  if [ "$CHOSEN" == "$4" ]; then
     return 1
   fi
   if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
@@ -411,57 +407,57 @@ read_input_num () {
 }
 
 setup_dnscrypt () {
-  local TARG_ORI=/jffs/dnscrypt/example-dnscrypt-proxy.toml
-  local TARG=/jffs/dnscrypt/dnscrypt-proxy.toml
-  if [ ! -f $TARG_ORI ] || [ ! -f /jffs/dnscrypt/dnscrypt-proxy ]; then
+  if [ ! -f $TOML_ORI ] || [ ! -f /jffs/dnscrypt/dnscrypt-proxy ]; then
     echo -e "$ERROR dnscrypt-proxy is not installed. Aborting..."
     return 1
   fi
 
   unset CISCO_ENABLED
   echo -e "$INFO Configuring dnscrypt-proxy..."
-  if [ -z $1 ] && [ -f $TARG ]; then
+  setup_dnscrypt_impl "$@"
+  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+}
+
+setup_dnscrypt_impl () {
+  if [ -z $1 ] && [ -f $TOML_FILE ]; then
     echo -e "$INFO Found previous dnscrypt-proxy config file"
-    yesno_query "Do you want to migrate your previous settings" migrate_dnscrypt "setup_dnscrypt x"
+    yesno_query "Do you want to migrate your previous settings" migrate_dnscrypt "setup_dnscrypt_impl x"
   else
-    cp -f $TARG_ORI $TARG
+    cp -f $TOML_ORI $TOML_FILE
     choose_dnscrypt_server
 
     echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
     echo -e "$INFO and router services (e.g. ntp) at boot"
     echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
+    local DNS_SERVER
     read DNS_SERVER
     [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
-    toml_var_write $TARG fallback_resolver "'$DNS_SERVER:53'"
-    toml_var_write $TARG ignore_system_dns "true"
+    toml_var_write fallback_resolver "'$DNS_SERVER:53'"
+    toml_var_write ignore_system_dns "true"
 
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_var_write $TARG log_level "$CHOSEN"
+    toml_var_write log_level "$CHOSEN"
 
-    toml_var_write $TARG listen_addresses "['127.0.0.1:65053']"
-    toml_var_write $TARG use_syslog "true"
-    toml_var_write $TARG cache "false"
-    toml_var_write $TARG cert_ignore_timestamp "true"
-    toml_var_write $TARG daemonize "true"
-  fi
-  if [ -z $1 ]; then
-    [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-    yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+    toml_var_write listen_addresses "['127.0.0.1:65053']"
+    toml_var_write use_syslog "true"
+    toml_var_write cache "false"
+    toml_var_write cert_ignore_timestamp "true"
+    toml_var_write daemonize "true"
   fi
 }
 
 set_timezone () {
-  local TARG=/jffs/dnscrypt
   local TMP=/root
 
   download_file $TMP 644 $URL_GEN/zoneinfo.zip
-  INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
+  local INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
   echo -e "$INFO Available timezones/locations:"
   unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk '{++i;print "  "i") "$0}'
   read_input_num "Select your timezone/location" 1 $INDEX
 
-  TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
-  unzip -p zoneinfo.zip $TZ_FILE > $TARG/localtime
+  local TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
+  unzip -p zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
@@ -470,30 +466,15 @@ set_timezone () {
 
   echo -e "$INFO $TZ_FILE selected"
   write_manager_script /jffs/scripts/init-start init-start
+  write_manager_script /jffs/scripts/services-stop services-stop
   rm -r $TMP/zoneinfo.zip
   end_op_message 0
 }
 
-toml_array_clean () {
-  local TARG=$1
-  local VAR=$2
-
-  LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
-  IDX_LINE="`grep -n \"$VAR = \" $TARG`"
-  if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
-    sed -i "/${VAR} = /c\\${VAR} = []" $1
-  else
-    LINE_NUM=$((`grep -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
-    sed -i "${LINE_NUM}i${VAR} = []\n" $TARG
-  fi
-}
-
-toml_array_write () {
-  local TARG=$1
-  local VAR=$2
-  local VALUE=$3
-
-  local LINE="`grep \"^$VAR = \" \"$TARG\"`"
+toml_array_append () {
+  local VAR=$1
+  local VALUE=$2
+  local LINE="`grep \"^$VAR = \" \"$TOML_FILE\"`"
   if [ "`echo $LINE | grep -F $VALUE`" ]; then
     echo -e "$INFO $VALUE is already set"
     return
@@ -506,55 +487,65 @@ toml_array_write () {
   fi
 
   LINE=$(_quote "$LINE")
-  sed -i "/$VAR = /c\\$LINE" $TARG
+  sed -i "/$VAR = /c\\$LINE" $TOML_FILE
+}
+
+toml_array_clean () {
+  local VAR=$1
+  local LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TOML_FILE`
+  local IDX_LINE="`grep -m 1 -n \"$VAR = \" $TOML_FILE | cut -d':' -f1`"
+  if [ "$IDX_LINE" ] && [ $IDX_LINE -lt $LINE_NUM_LAST ]; then
+    sed -i "/${VAR} = /c\\${VAR} = []" $TOML_FILE
+  else
+    LINE_NUM=$((`grep -n "#.*Global settings.*" $TOML_FILE | cut -d':' -f1` + 3))
+    sed -i "${LINE_NUM}i${VAR} = []\n" $TOML_FILE
+  fi
 }
 
 toml_var_write () {
-  local TARG=$1
-  local VAR=$2
-  local VALUE=$3
-  local TGVAR=$4
+  local VAR=$1
+  local VALUE=$2
+  local TGVAR=$3
   local INDEX
   local TO=$(_quote "${VAR} = ${VALUE}")
-  if [ -z $4 ]; then
-    local LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
-    INDEX=`awk -v VAR="$VAR = " '($0 ~ VAR){print NR}' $TARG`
+  if [ -z $TGVAR ]; then
+    local LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TOML_FILE`
+    INDEX=`awk -v VAR="$VAR = " '($0 ~ VAR){print NR}' $TOML_FILE`
     if [ "$INDEX" ] && [ $INDEX -lt $LINE_NUM_LAST ]; then
-      sed -i "$INDEX c\\$TO" $TARG
+      sed -i "$INDEX c\\$TO" $TOML_FILE
     else
-      local LINE_NUM=$((`grep -m 1 -n "#.*Global settings.*" $TARG | cut -d':' -f1` + 3))
-      sed -i "${LINE_NUM}i$TO\n" $TARG
+      local LINE_NUM=$((`grep -m 1 -n "#.*Global settings.*" $TOML_FILE | cut -d':' -f1` + 3))
+      sed -i "${LINE_NUM}i$TO\n" $TOML_FILE
     fi
   else
     local IDX_GVAR
     local GVAR
     local NX_IDX
-    for IDX_GVAR in `awk -F' = ' '/^\[/ {if (NF){print NR":"$1}}' $TARG`; do
+    for IDX_GVAR in `awk -F' = ' '/^\[/ {if (NF){print NR":"$1}}' $TOML_FILE`; do
       GVAR=`echo $IDX_GVAR | cut -d':' -f2`
       [ "$GVAR" != "$TGVAR" ] && continue
       INDEX=`echo $IDX_GVAR | cut -d':' -f1`
-      NX_IDX=`awk -v INDEX=$INDEX '/^\[/ {if (NF && NR>INDEX){print NR;exit}}' $TARG`
-      [ -z $NX_IDX ] && NX_IDX=`cat $TARG | wc -l`
-      sed -i "$INDEX,$NX_IDX{s/$VAR = .*$/$TO/}" $TARG
+      NX_IDX=`awk -v INDEX=$INDEX '/^\[/ {if (NF && NR>INDEX){print NR;exit}}' $TOML_FILE`
+      [ -z $NX_IDX ] && NX_IDX=`cat $TOML_FILE | wc -l`
+      sed -i "$INDEX,$NX_IDX{s/$VAR = .*$/$TO/}" $TOML_FILE
     done
   fi
 }
 
 toml_var_disable () {
-  local TARG=$1
-  local VAR=$2
-
-  LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TARG`
-  IDX_LINE="`grep -n \"^$VAR = \" $TARG`"
-  if [ "$IDX_LINE" ] && [ `echo $IDX_LINE|cut -d':' -f1` -lt $LINE_NUM_LAST ]; then
-    sed -i "s/\(^$VAR = .*\)/# \1/" $TARG
+  local VAR=$1
+  local LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TOML_FILE`
+  local IDX_LINE="`grep -m 1 -n \"^$VAR = \" $TOML_FILE | cut -d':' -f1`"
+  if [ "$IDX_LINE" ] && [ $IDX_LINE -lt $LINE_NUM_LAST ]; then
+    sed -i "s/\(^$VAR = .*\)/# \1/" $TOML_FILE
   fi
 }
 
 yesno_query () {
-  QUERY=$1
-  YES_FUNC=$2
-  NO_FUNC=$3
+  local QUERY=$1
+  local YES_FUNC=$2
+  local NO_FUNC=$3
+  local YESNO
   echo -en "$INPUT $QUERY $BOLD[y/n]$NORM: "
   read YESNO
   case $YESNO in
@@ -572,8 +563,7 @@ yesno_query () {
 }
 
 uninst_all () {
-  local TARG=/jffs/dnscrypt
-  rm -rf $TARG
+  rm -rf $TARG_DIR
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/init-start
   del_jffs_script /jffs/scripts/firewall-start
@@ -583,9 +573,8 @@ uninst_all () {
 }
 
 uninst_dnscrypt () {
-  local TARG=/jffs/dnscrypt
   echo -e "$INFO Uninstalling dnscrpt-proxy..."
-  rm -f $TARG/dnscrypt-proxy $TARG/nonroot
+  rm -f $TARG_DIR/dnscrypt-proxy $TARG_DIR/nonroot
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/wan-start
@@ -594,40 +583,37 @@ uninst_dnscrypt () {
 }
 
 uninst_random () {
-  local TARG=/jffs/dnscrypt
   echo -e "$INFO Uninstalling (P)RNG..."
-  rm -f $TARG/haveged $TARG/rngd $TARG/stty
+  rm -f $TARG_DIR/haveged $TARG_DIR/rngd $TARG_DIR/stty
   del_conf RAN_PRV RNG_DEV
-  [ ! -f $TARG/localtime ] && [ ! -f $TARG/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
+  [ ! -f $TARG_DIR/localtime ] && [ ! -f $TARG_DIR/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
   end_op_message 0
 }
 
 unset_timezone () {
-  local TARG=/jffs/dnscrypt
-  rm -f $TARG/localtime
-  [ -z "`grep \"^RAN_PRV=.*$\" $TARG/.config`" ] && [ ! -f $TARG/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
+  rm -f $TARG_DIR/localtime
+  [ -z "`grep \"^RAN_PRV=.*$\" $TARG_DIR/.config`" ] && [ ! -f $TARG_DIR/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
   end_op_message 0
 }
 
 write_conf () {
-  local TARG=/jffs/dnscrypt/.config
-  KEY="$1"
-  VALUE=$(_quote $2)
-  [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $TARG && chmod 644 $TARG
-  if [ ! -f $TARG ]; then
-    touch $TARG && chmod 644 $TARG
+  local VAR=$1
+  local VALUE=$(_quote $2)
+  [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $CONF_FILE && chmod 644 $CONF_FILE
+  if [ ! -f $CONF_FILE ]; then
+    touch $CONF_FILE && chmod 644 $CONF_FILE
   fi
-  if [ "`grep $KEY $TARG`" ]; then
-    sed -i "/^$KEY=/s/=.*/=$VALUE/" $TARG
+  if [ "`grep $VAR $CONF_FILE`" ]; then
+    sed -i "/^$VAR=/s/=.*/=$VALUE/" $CONF_FILE
   else
-    echo "$KEY=$VALUE" >> $TARG
+    echo "$VAR=$VALUE" >> $CONF_FILE
   fi
 }
 
 write_command_script () {
   local TARG=$1
   local COMMAND=$2
-  FILENAME="`basename \"$TARG\"`"
+  local FILENAME="`basename \"$TARG\"`"
 
   if [ ! -f $TARG ]; then
     echo -e "$INFO Creating $FILENAME file"
@@ -646,8 +632,8 @@ write_command_script () {
 write_manager_script () {
   local TARG=$1
   local OP=$2
-  FILENAME="`basename \"$TARG\"`"
-  COMMAND=/jffs/dnscrypt/manager
+  local FILENAME="`basename \"$TARG\"`"
+  local COMMAND=/jffs/dnscrypt/manager
 
   if [ ! -f $TARG ]; then
     echo -e "$INFO Creating $FILENAME file"
