@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. /jffs/dnscrypt/.config
+[ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
 append_on_demand () {
   TARGET="$1"
