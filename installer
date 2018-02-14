@@ -165,6 +165,7 @@ del_jffs_script () {
     LINE_ABOVE=`sed "$LINE_NUMq;d" $TARG`
     [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" $TARG
   fi
+  [ "`cat $TARG`" == "#!/bin/sh" ] && rm -f $TARG
 }
 
 download_file () {
@@ -457,7 +458,7 @@ set_timezone () {
   read_input_num "Select your timezone/location" 1 $INDEX
 
   local TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
-  unzip -p zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
+  unzip -p $TMP/zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
