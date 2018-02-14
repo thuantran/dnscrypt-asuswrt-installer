@@ -106,7 +106,7 @@ choose_dnscrypt_server_manual () {
     read_input_num "Please choose DNS server" 1 $INDEX
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
-    [ $? -eq 1 ] && return 0
+    [ $? -eq 1 ] && return
   fi
 
   ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
@@ -140,6 +140,7 @@ del_between_magic () {
 
 del_conf () {
   local TARG=/jffs/dnscrypt/.config
+  [ ! -f $TARG ] && return
   for KEY in "$@"; do
     sed -i "/^$KEY=.*$/d" $TARG
   done
@@ -421,7 +422,7 @@ setup_dnscrypt () {
   echo -e "$INFO Configuring dnscrypt-proxy..."
   if [ -z $1 ] && [ -f $TARG ]; then
     echo -e "$INFO Found previous dnscrypt-proxy config file"
-    yesno_query "Do you want to migrate your previous settings" migrate_dnscrypt "setup_dnscrypt x; return"
+    yesno_query "Do you want to migrate your previous settings" migrate_dnscrypt "setup_dnscrypt x"
   else
     cp -f $TARG_ORI $TARG
     choose_dnscrypt_server
@@ -443,8 +444,10 @@ setup_dnscrypt () {
     toml_var_write $TARG cert_ignore_timestamp "true"
     toml_var_write $TARG daemonize "true"
   fi
-  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+  if [ -z $1 ]; then
+    [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
+    yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+  fi
 }
 
 set_timezone () {
@@ -493,7 +496,7 @@ toml_array_write () {
   local LINE="`grep \"^$VAR = \" \"$TARG\"`"
   if [ "`echo $LINE | grep -F $VALUE`" ]; then
     echo -e "$INFO $VALUE is already set"
-    return 0
+    return
   fi
 
   if [ "`echo $LINE|grep '\[\]$'`" ]; then
@@ -609,13 +612,12 @@ unset_timezone () {
 write_conf () {
   local TARG=/jffs/dnscrypt/.config
   KEY="$1"
-  VALUE="$2"
+  VALUE=$(_quote $2)
   [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $TARG && chmod 644 $TARG
   if [ ! -f $TARG ]; then
     touch $TARG && chmod 644 $TARG
   fi
   if [ "`grep $KEY $TARG`" ]; then
-    VALUE=$(_quote $2)
     sed -i "/^$KEY=/s/=.*/=$VALUE/" $TARG
   else
     echo "$KEY=$VALUE" >> $TARG
@@ -775,7 +777,6 @@ menu () {
       ;;
     q|Q)
       echo -e "$INFO Please reboot your router if you have made any change!"
-      exit 0
       ;;
     *)
       echo -e "$ERROR Invalid character entered!"
