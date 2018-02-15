@@ -98,23 +98,35 @@ choose_dnscrypt_server_auto () {
 choose_dnscrypt_server_manual () {
   local INDEX=$1
   if [ -z $INDEX ]; then
-    toml_array_clean server_names
+    unset RESOLVERS
     toml_var_write dnscrypt_servers true
     toml_var_write doh_servers true
     toml_var_write require_dnssec false
-    toml_var_write require_nolog "false"
-    toml_var_write require_nofilter "false"
+    toml_var_write require_nolog false
+    toml_var_write require_nofilter false
     echo -e "$INFO Available DNS servers: "
-    awk '/^## /{printf "  ";printf ++i ") " $2": " ;getline;print}' /jffs/dnscrypt/public-resolvers.md
+    awk '/^## /{printf "  "; printf ++i") "$2": "; getline; print}' /jffs/dnscrypt/public-resolvers.md
     INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
     read_input_num "Please choose DNS server" 1 $INDEX
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
-    [ $? -eq 1 ] && return
+    if [ $? -eq 1 ]; then
+      toml_var_write server_names "$RESOLVERS"
+      return
+    fi
   fi
 
-  ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
-  toml_array_append server_names $ITEM
+  local ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
+    echo -e "$INFO $ITEM is already set"
+  else
+    if [ "$RESOLVERS" ]; then
+      RESOLVERS="${RESOLVERS%?}, '$ITEM']"
+    else
+      RESOLVERS="['$ITEM']"
+    fi
+  fi
+
   choose_dnscrypt_server_manual $INDEX
 }
 
@@ -359,6 +371,16 @@ inst_swap () {
   end_op_message 0
 }
 
+read_input_dns () {
+  echo -en "$INPUT $1 ${BOLD}$2: $NORM"
+  read DNS_SERVER
+  [ -z $DNS_SERVER ] && DNS_SERVER=$2
+  if [ "`echo $DNS_SERVER | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}'`" ]; then
+    echo -e "$ERROR Invalid DNS server address entered"
+    read_input_dns "$@"
+  fi
+}
+
 read_input_num () {
   if [ -z $4 ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
@@ -433,26 +455,23 @@ setup_dnscrypt_impl () {
       cp -f $TOML_ORI $TOML_FILE
     fi
 
-    yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+    yesno_query "Do you want to redirect all DNS resolutions on your network through this proxy?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
     choose_dnscrypt_server
 
     echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
     echo -e "$INFO and router services (e.g. ntp) at boot"
-    echo -en "$INPUT Default is ${BOLD}8.8.8.8: $NORM"
-    local DNS_SERVER
-    read DNS_SERVER
-    [ -z $DNS_SERVER ] && DNS_SERVER=8.8.8.8
+    read_input_dns "Default is" 8.8.8.8
     toml_var_write fallback_resolver "'$DNS_SERVER:53'"
-    toml_var_write ignore_system_dns "true"
+    toml_var_write ignore_system_dns true
 
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_var_write log_level "$CHOSEN"
+    toml_var_write log_level $CHOSEN
 
     toml_var_write listen_addresses "['127.0.0.1:65053']"
-    toml_var_write use_syslog "true"
-    toml_var_write cache "false"
-    toml_var_write cert_ignore_timestamp "true"
-    toml_var_write daemonize "true"
+    toml_var_write use_syslog true
+    toml_var_write cache false
+    toml_var_write cert_ignore_timestamp true
+    toml_var_write daemonize true
   fi
 }
 
@@ -478,37 +497,6 @@ set_timezone () {
   write_manager_script /jffs/scripts/services-stop services-stop
   rm -r $TMP/zoneinfo.zip
   end_op_message 0
-}
-
-toml_array_append () {
-  local VAR=$1
-  local VALUE=$2
-  local LINE="`grep \"^$VAR = \" \"$TOML_FILE\"`"
-  if [ "`echo $LINE | grep -F $VALUE`" ]; then
-    echo -e "$INFO $VALUE is already set"
-    return
-  fi
-
-  if [ "`echo $LINE|grep '\[\]$'`" ]; then
-    LINE="${LINE%?}'$VALUE']"
-  else
-    LINE="${LINE%?}, '$VALUE']"
-  fi
-
-  LINE=$(_quote "$LINE")
-  sed -i "/$VAR = /c\\$LINE" $TOML_FILE
-}
-
-toml_array_clean () {
-  local VAR=$1
-  local LINE_NUM_LAST=`awk '/^\[.*\]/ {print NR;exit}' $TOML_FILE`
-  local IDX_LINE="`grep -m 1 -n \"$VAR = \" $TOML_FILE | cut -d':' -f1`"
-  if [ "$IDX_LINE" ] && [ $IDX_LINE -lt $LINE_NUM_LAST ]; then
-    sed -i "/${VAR} = /c\\${VAR} = []" $TOML_FILE
-  else
-    LINE_NUM=$((`grep -n "#.*Global settings.*" $TOML_FILE | cut -d':' -f1` + 3))
-    sed -i "${LINE_NUM}i${VAR} = []\n" $TOML_FILE
-  fi
 }
 
 toml_var_write () {
