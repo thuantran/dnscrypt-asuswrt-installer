@@ -51,7 +51,7 @@ check_swap () {
 }
 
 choose_dnscrypt_server () {
-  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)" "toml_var_write ipv6_servers true" "toml_var_write ipv6_servers false"
+  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" "toml_var_write ipv6_servers true" "toml_var_write ipv6_servers false"
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
@@ -115,8 +115,6 @@ choose_dnscrypt_server_manual () {
 
   ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
   toml_array_append server_names $ITEM
-
-  [ "`echo $ITEM | grep cisco`" ] && CISCO_ENABLED=1
   choose_dnscrypt_server_manual $INDEX
 }
 
@@ -165,6 +163,7 @@ del_jffs_script () {
     LINE_ABOVE=`sed "$LINE_NUMq;d" $TARG`
     [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" $TARG
   fi
+  [ "`cat $TARG`" == "#!/bin/sh" ] && rm -f $TARG
 }
 
 download_file () {
@@ -184,7 +183,13 @@ download_file () {
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       echo -e "$INFO Downloading $FILENAME"
-      curl -L -k -s "$URL" -o $TARG/$FILENAME && chmod $PERM $TARG/$FILENAME
+      curl -L -k -s "$URL" -o $TARG/$FILENAME
+      if [ $? -eq 0 ]; then
+        chmod $PERM $TARG/$FILENAME
+      else
+        echo -e "$ERROR Unable to download ${BOLD}${URL}${NORM}"
+        return 1
+      fi
     fi
   done
 }
@@ -354,36 +359,6 @@ inst_swap () {
   end_op_message 0
 }
 
-migrate_dnscrypt () {
-  local IDX_VAR
-  local INDEX
-  local VAR
-  local VALUE
-  local GVAR
-  echo -e "INFO Migrating your settings..."
-  echo -e "INFO Backup your old settings file..."
-  mv $TOML_FILE $TOML_BAK
-  cp -f $TOML_ORI $TOML_FILE
-  for IDX_VAR in `awk -F' = ' '!/(^\#|^  #)/ {if (NF){gsub(/^  /, "", $0);print NR":"$1}}' $TOML_BAK`; do
-    VAR=`echo $IDX_VAR | cut -d':' -f2`
-    if [ "${VAR:0:1}" == "[" ]; then
-      GVAR=$VAR
-      continue
-    fi
-
-    INDEX=`echo $IDX_VAR | cut -d':' -f1`
-    VALUE=$(awk -v IDX=$INDEX -F' = ' '!/(^\#|^  #)/ {if (NF){if (NR==IDX){gsub(/^  /, "", $0); print $2}}}' $TOML_BAK)
-    if [ $GVAR ]; then
-      echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}${NORM} in group ${BOLD}${GVAR}"
-      toml_var_write $VAR "$VALUE" $GVAR
-    else
-      echo -e "$INFO Migrating ${BOLD}${VAR}${NORM} with value ${BOLD}${VALUE}"
-      toml_var_write $VAR "$VALUE"
-    fi
-  done
-  [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ] && CISCO_ENABLED=1
-}
-
 read_input_num () {
   if [ -z $4 ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
@@ -391,7 +366,7 @@ read_input_num () {
     echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
   fi
   read CHOSEN
-  if [ "$CHOSEN" == "$4" ]; then
+  if [ "$CHOSEN" ] && [ "$CHOSEN" == "$4" ]; then
     return 1
   fi
   if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
@@ -412,19 +387,53 @@ setup_dnscrypt () {
     return 1
   fi
 
-  unset CISCO_ENABLED
   echo -e "$INFO Configuring dnscrypt-proxy..."
   setup_dnscrypt_impl "$@"
-  [ "$CISCO_ENABLED" == "1" ] && yesno_query "Do you want to set up OpenDNS account ip update" "inst_ip_update 1" "inst_ip_update 0" || inst_ip_update 0
-  yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
+    if [ -f $CONF_FILE ]; then
+      local OPENDNS_USER=`awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE`
+      local OPENDNS_PASSWORD=`awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE`
+      if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
+        yesno_query "Found previous OpenDNS account. Do you want to use it?" \
+          "echo -e \"$INFO Use previous OpenDNS account\"" \
+          "yesno_query \"Setup new OpenDNS account?\" \"inst_ip_update 1\" \"inst_ip_update 0\""
+      else
+        yesno_query "Do you want to set up OpenDNS account ip update?" "inst_ip_update 1" "inst_ip_update 0"
+      fi
+    else
+      yesno_query "Do you want to set up OpenDNS account ip update?" "inst_ip_update 1" "inst_ip_update 0"
+    fi
+  else
+    inst_ip_update 0
+  fi
 }
 
 setup_dnscrypt_impl () {
   if [ -z $1 ] && [ -f $TOML_FILE ]; then
     echo -e "$INFO Found previous dnscrypt-proxy config file"
-    yesno_query "Do you want to migrate your previous settings" migrate_dnscrypt "setup_dnscrypt_impl x"
+    yesno_query "Do you want to use this file without reconfiguring?" "echo -e \"$INFO Use previous settings file\"" "setup_dnscrypt_impl x"
   else
-    cp -f $TOML_ORI $TOML_FILE
+    if [ -f $TOML_FILE ]; then
+      [ "$1" == "reconfig" ] && echo -e "$INFO Found previous dnscrypt-proxy config file"
+      echo -e "$INFO How do you want to reconfigure:"
+      echo -e "$INFO   1) Start from previous settings file"
+      echo -e "$INFO   2) Start from default config"
+      read_input_num "Your selection" 1 2
+      case $CHOSEN in
+        1)
+          echo -e "$INFO Use previous settings file"
+          ;;
+        2)
+          echo -e "$INFO Backing up previous settings file..."
+          mv $TOML_FILE $TOML_BAK
+          cp -f $TOML_ORI $TOML_FILE
+          ;;
+      esac
+    else
+      cp -f $TOML_ORI $TOML_FILE
+    fi
+
+    yesno_query "Do you want to redirect all DNS resolutions on your network through dnscrypt?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
     choose_dnscrypt_server
 
     echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
@@ -457,7 +466,7 @@ set_timezone () {
   read_input_num "Select your timezone/location" 1 $INDEX
 
   local TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
-  unzip -p zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
+  unzip -p $TMP/zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
@@ -515,7 +524,7 @@ toml_var_write () {
       sed -i "$INDEX c\\$TO" $TOML_FILE
     else
       local LINE_NUM=$((`grep -m 1 -n "#.*Global settings.*" $TOML_FILE | cut -d':' -f1` + 3))
-      sed -i "${LINE_NUM}i$TO\n" $TOML_FILE
+      sed -i "${LINE_NUM}i${TO}\n" $TOML_FILE
     fi
   else
     local IDX_GVAR
@@ -598,12 +607,13 @@ unset_timezone () {
 
 write_conf () {
   local VAR=$1
-  local VALUE=$(_quote $2)
+  local VALUE="$2"
   [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $CONF_FILE && chmod 644 $CONF_FILE
   if [ ! -f $CONF_FILE ]; then
     touch $CONF_FILE && chmod 644 $CONF_FILE
   fi
   if [ "`grep $VAR $CONF_FILE`" ]; then
+    VALUE="`_quote $VALUE`"
     sed -i "/^$VAR=/s/=.*/=$VALUE/" $CONF_FILE
   else
     echo "$VAR=$VALUE" >> $CONF_FILE
@@ -702,27 +712,26 @@ menu () {
   echo -e "  8) Install swap file"
   echo -e "  9) Uninstall ALL"
   echo -e "  q) Quit"
-  echo -en "$INPUT Please enter the number designates your selection: $NORM"
-  read CHOSEN
+  read_input_num "Please enter the number designates your selection:" 1 9 q
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)"
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
-      yesno_query "Do you want to install dnscrypt-proxy to /jffs" inst_dnscrypt "menu"
+      yesno_query "Do you want to install dnscrypt-proxy to /jffs?" inst_dnscrypt "menu"
       ;;
     2)
       echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files"
       echo -e "$INFO from jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be modified as required."
       echo
-      yesno_query "Do you want to uninstall dnscrypt-proxy from /jffs" uninst_dnscrypt "menu"
+      yesno_query "Do you want to uninstall dnscrypt-proxy from /jffs?" uninst_dnscrypt "menu"
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
       echo
-      yesno_query "Do you want to proceed?" "setup_dnscrypt x; end_op_message 0" "menu"
+      yesno_query "Do you want to proceed?" "setup_dnscrypt reconfig; end_op_message 0" "menu"
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router"
@@ -741,14 +750,14 @@ menu () {
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
-      yesno_query "Do you want to install (P)RNG to /jffs" inst_random "menu"
+      yesno_query "Do you want to install (P)RNG to /jffs?" inst_random "menu"
       ;;
     7)
       echo -e "$INFO This operation will uninstall (P)RNG"
       echo -e "$INFO from jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
-      yesno_query "Do you want to uninstall (P)RNG from /jffs" uninst_random "menu"
+      yesno_query "Do you want to uninstall (P)RNG from /jffs?" uninst_random "menu"
       ;;
     8)
       echo -e "$INFO This operation will install a swap file for your device"
@@ -763,10 +772,6 @@ menu () {
       ;;
     q|Q)
       echo -e "$INFO Please reboot your router if you have made any change!"
-      ;;
-    *)
-      echo -e "$ERROR Invalid character entered!"
-      menu
       ;;
   esac
 }
