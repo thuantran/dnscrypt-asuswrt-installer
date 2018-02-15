@@ -103,8 +103,13 @@ choose_dnscrypt_server_manual () {
     unset RESOLVERS
     GVARS_ARGS="${GVARS_ARGS} dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false"
     echo -e "$INFO Available DNS servers: "
-    awk '/^## /{printf "  "; printf ++i") "$2": "; getline; print}' /jffs/dnscrypt/public-resolvers.md
-    INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
+    if [ "$USE_IPV6" == "true" ]; then
+      INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
+      awk '/^## / {printf "  "; printf ++i") "$2": "; getline; print}' /jffs/dnscrypt/public-resolvers.md
+    else
+      INDEX=`awk '/^## / && !/ipv6/' /jffs/dnscrypt/public-resolvers.md | wc -l`
+      awk '/^## / && !/ipv6/ {printf "  "; printf ++i") "$2": "; getline; print}' /jffs/dnscrypt/public-resolvers.md
+    fi
     read_input_num "Please choose DNS server" 1 $INDEX
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
@@ -114,7 +119,12 @@ choose_dnscrypt_server_manual () {
     fi
   fi
 
-  local ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  local ITEM
+  if [ "$USE_IPV6" == "true" ]; then
+    ITEM=`awk -v INDEX=$CHOSEN '/^## /{i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  else
+    ITEM=`awk -v INDEX=$CHOSEN '/^## / && !/ipv6/ {i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  fi
   if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
     echo -e "$INFO $ITEM is already set"
   else
