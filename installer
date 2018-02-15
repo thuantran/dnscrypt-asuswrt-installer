@@ -143,7 +143,8 @@ create_dir () {
 del_between_magic () {
   local TARG=$1
   local MAGIC=$2
-  local BOUNDS=`grep -n -F "$MAGIC" $TARG|cut -d':' -f1|tr '\n' ','`
+  [ -f $TARG ] || return
+  local BOUNDS=`awk -v PATT=$MAGIC '($0 ~ PATT) {printf NR","}' $TARG`
   if [ "$BOUNDS" ]; then
     sed -i "${BOUNDS%,}d" $TARG
   fi
@@ -161,6 +162,7 @@ del_jffs_script () {
   local TARG=$1
   local LINE_NUM
   local LINE_ABOVE
+  [ -f $TARG ] || return
   if [ "$2" == "x" ]; then
     LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep -v manager|cut -d':' -f1`
   else
@@ -358,10 +360,8 @@ inst_swap () {
   [ ${MOUNT_FS%?} == "ext" ] && chmod 600 "$MOUNT/swap"
   mkswap "$MOUNT/swap"
 
-  local LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/post-mount | cut -d':' -f1`
-  sed -i "${LINE_NUM}d" /jffs/scripts/post-mount
-  LINE_NUM=`grep -n '[ -f $1/swap ] && swap.* $1/swap' /jffs/scripts/unmount | cut -d':' -f1`
-  sed -i "${LINE_NUM}d" /jffs/scripts/unmount
+  sed -i "/^$(_quote '[ -f $1/swap ] && swapon $1/swap')$/d" /jffs/scripts/post-mount
+  sed -i "/^$(_quote '[ -f $1/swap ] && swapoff $1/swap')$/d" /jffs/scripts/unmount
   write_command_script /jffs/scripts/post-mount '[ -f "$1/swap" ] && swapon "$1/swap"'
   write_command_script /jffs/scripts/unmount '[ -f "$1/swap" ] && swapoff "$1/swap"'
   end_op_message 0
