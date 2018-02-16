@@ -53,7 +53,7 @@ check_swap () {
 choose_dnscrypt_server () {
   local USE_IPV6
   read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
-  GVARS_ARGS="${GVARS_ARGS} ipv6_servers $USE_IPV6"
+  toml_gvars_prep ipv6_servers $USE_IPV6
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
@@ -62,16 +62,16 @@ choose_dnscrypt_server () {
   read_input_num "Select your mode" 1 4
   case $CHOSEN in
     1)
-      GVARS_ARGS="${GVARS_ARGS} lb_strategy \'p2\'"
+      toml_gvars_prep lb_strategy "\'p2\'"
       ;;
     2)
-      GVARS_ARGS="${GVARS_ARGS} lb_strategy \'ph\'"
+      toml_gvars_prep lb_strategy "\'ph\'"
       ;;
     3)
-      GVARS_ARGS="${GVARS_ARGS} lb_strategy \'fastest\'"
+      toml_gvars_prep lb_strategy "\'fastest\'"
       ;;
     4)
-      GVARS_ARGS="${GVARS_ARGS} lb_strategy \'random\'"
+      toml_gvars_prep lb_strategy "\'random\'"
       ;;
   esac
   echo -e "$INFO Choose how your DNS servers are selected:"
@@ -90,18 +90,18 @@ choose_dnscrypt_server () {
 
 choose_dnscrypt_server_auto () {
   toml_gvar_disable server_names
-  read_yesno "Use servers support the DNSCrypt protocol" && GVARS_ARGS="${GVARS_ARGS} dnscrypt_servers true" || GVARS_ARGS="${GVARS_ARGS} dnscrypt_servers false"
-  read_yesno "Use servers support the DNS-over-HTTPS protocol" && GVARS_ARGS="${GVARS_ARGS} doh_servers true" || GVARS_ARGS="${GVARS_ARGS} doh_servers false"
-  read_yesno "Use only servers support DNSSEC" && GVARS_ARGS="${GVARS_ARGS} require_dnssec true" || GVARS_ARGS="${GVARS_ARGS} require_dnssec false"
-  read_yesno "Use only servers that do not log user's queries" && GVARS_ARGS="${GVARS_ARGS} require_nolog true" || GVARS_ARGS="${GVARS_ARGS} require_nolog false"
-  read_yesno "Use only servers that do not filter result" && GVARS_ARGS="${GVARS_ARGS} require_nofilter true" || GVARS_ARGS="${GVARS_ARGS} require_nofilter false"
+  read_yesno "Use servers support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true || toml_gvars_prep dnscrypt_servers false
+  read_yesno "Use servers support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true || toml_gvars_prep doh_servers false
+  read_yesno "Use only servers support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
+  read_yesno "Use only servers that do not log user's queries" && toml_gvars_prep require_nolog true || toml_gvars_prep require_nolog false
+  read_yesno "Use only servers that do not filter result" && toml_gvars_prep require_nofilter true || toml_gvars_prep require_nofilter false
 }
 
 choose_dnscrypt_server_manual () {
   local INDEX=$1
   if [ -z $INDEX ]; then
     unset RESOLVERS
-    GVARS_ARGS="${GVARS_ARGS} dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false"
+    toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
     if [ "$USE_IPV6" == "true" ]; then
       INDEX=`grep -c "^## " /jffs/dnscrypt/public-resolvers.md`
@@ -114,7 +114,7 @@ choose_dnscrypt_server_manual () {
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
     if [ $? -eq 1 ]; then
-      GVARS_ARGS="${GVARS_ARGS} server_names \"$RESOLVERS\""
+      toml_gvars_prep server_names "\"$RESOLVERS\""
       return
     fi
   fi
@@ -504,7 +504,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    GVARS_ARGS="${GVARS_ARGS} fallback_resolver \'$DNS_SERVER:53\' log_level $CHOSEN ignore_system_dns true listen_addresses [\'127.0.0.1:65053\'] use_syslog true cache false cert_ignore_timestamp true daemonize true"
+    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" use_syslog true cache false cert_ignore_timestamp true daemonize true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
   fi
@@ -538,6 +538,10 @@ toml_gvar_disable () {
   local VAR=$1
   local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
   sed -i "1,$IDX_NX_GVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
+}
+
+toml_gvars_prep () {
+  GVARS_ARGS="$GVARS_ARGS $@"
 }
 
 toml_gvars_write () {
