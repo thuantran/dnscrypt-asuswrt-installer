@@ -52,7 +52,7 @@ check_swap () {
 
 choose_dnscrypt_server () {
   local USE_IPV6
-  yesno_query "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" "USE_IPV6=true" "USE_IPV6=false"
+  read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
   GVARS_ARGS="${GVARS_ARGS} ipv6_servers $USE_IPV6"
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
@@ -90,11 +90,11 @@ choose_dnscrypt_server () {
 
 choose_dnscrypt_server_auto () {
   toml_gvar_disable server_names
-  yesno_query "Use servers support the DNSCrypt protocol" "GVARS_ARGS=\"${GVARS_ARGS} dnscrypt_servers true\"" "GVARS_ARGS=\"${GVARS_ARGS} dnscrypt_servers false\""
-  yesno_query "Use servers support the DNS-over-HTTPS protocol" "GVARS_ARGS=\"${GVARS_ARGS} doh_servers true\"" "GVARS_ARGS=\"${GVARS_ARGS} doh_servers false\""
-  yesno_query "Use only servers support DNSSEC" "GVARS_ARGS=\"${GVARS_ARGS} require_dnssec true\"" "GVARS_ARGS=\"${GVARS_ARGS} require_dnssec false\""
-  yesno_query "Use only servers that do not log user's queries" "GVARS_ARGS=\"${GVARS_ARGS} require_nolog true\"" "GVARS_ARGS=\"${GVARS_ARGS} require_nolog false\""
-  yesno_query "Use only servers that do not filter result" "GVARS_ARGS=\"${GVARS_ARGS} require_nofilter true\"" "GVARS_ARGS=\"${GVARS_ARGS} require_nofilter false\""
+  read_yesno "Use servers support the DNSCrypt protocol" && GVARS_ARGS="${GVARS_ARGS} dnscrypt_servers true" || GVARS_ARGS="${GVARS_ARGS} dnscrypt_servers false"
+  read_yesno "Use servers support the DNS-over-HTTPS protocol" && GVARS_ARGS="${GVARS_ARGS} doh_servers true" || GVARS_ARGS="${GVARS_ARGS} doh_servers false"
+  read_yesno "Use only servers support DNSSEC" && GVARS_ARGS="${GVARS_ARGS} require_dnssec true" || GVARS_ARGS="${GVARS_ARGS} require_dnssec false"
+  read_yesno "Use only servers that do not log user's queries" && GVARS_ARGS="${GVARS_ARGS} require_nolog true" || GVARS_ARGS="${GVARS_ARGS} require_nolog false"
+  read_yesno "Use only servers that do not filter result" && GVARS_ARGS="${GVARS_ARGS} require_nofilter true" || GVARS_ARGS="${GVARS_ARGS} require_nofilter false"
 }
 
 choose_dnscrypt_server_manual () {
@@ -262,7 +262,7 @@ inst_dnscrypt () {
   end_op_message 0
 }
 
-inst_ip_update () {
+opendns_authen () {
   local USERNAME
   local PW1
   local PW2
@@ -280,11 +280,45 @@ inst_ip_update () {
   echo
   if [ -z "$PW1" ] || [ -z "$PW2" ] || [ "$PW1" != "$PW2" ]; then
     echo -e "$ERROR Password entered incorrectly!"
-    inst_ip_update $1
+    opendns_authen $1
   fi
 
   write_conf OPENDNS_USER "\"$USERNAME\""
   write_conf OPENDNS_PASSWORD "\"$PW1\""
+}
+
+opendns_check () {
+  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
+    if [ -f $CONF_FILE ]; then
+      local OPENDNS_USER=`awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE`
+      local OPENDNS_PASSWORD=`awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE`
+      if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
+        echo -e "$INFO Found OpenDNS account ${BOLD}${OPENDNS_USER}"
+        echo -e "$INFO What do you want to do:"
+        echo -e "  1) Use this account"
+        echo -e "  2) Setup new account"
+        echo -e "  3) Disable OpenDNS account authen"
+        read_input_num "Your choice" 1 3
+        case $CHOSEN in
+          1)
+            echo -e "$INFO Use previous account ${BOLD}${OPENDNS_USER}${NORM}"
+            ;;
+          2)
+            opendns_authen 1
+            ;;
+          3)
+            opendns_authen 0
+            ;;
+        esac
+      else
+        read_yesno "Do you want to set up OpenDNS account ip update?" && opendns_authen 1 || opendns_authen 0
+      fi
+    else
+      read_yesno "Do you want to set up OpenDNS account ip update?" && opendns_authen 1 || opendns_authen 0
+    fi
+  else
+    opendns_authen 0
+  fi
 }
 
 inst_random () {
@@ -409,6 +443,24 @@ read_input_num () {
   fi
 }
 
+read_yesno () {
+  echo -en "$INPUT $1 $BOLD[y/n]$NORM: "
+  local YESNO
+  read YESNO
+  case $YESNO in
+    y|Y)
+      return 0
+      ;;
+    n|N)
+      return 1
+      ;;
+    *)
+      echo -e "$ERROR Invalid input!"
+      read_yesno "$@"
+      ;;
+  esac
+}
+
 setup_dnscrypt () {
   if [ ! -f $TOML_ORI ] || [ ! -f /jffs/dnscrypt/dnscrypt-proxy ]; then
     echo -e "$ERROR dnscrypt-proxy is not installed. Aborting..."
@@ -417,29 +469,13 @@ setup_dnscrypt () {
 
   echo -e "$INFO Configuring dnscrypt-proxy..."
   setup_dnscrypt_impl "$@"
-  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
-    if [ -f $CONF_FILE ]; then
-      local OPENDNS_USER=`awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE`
-      local OPENDNS_PASSWORD=`awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE`
-      if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
-        yesno_query "Found previous OpenDNS account. Do you want to use it?" \
-          "echo -e \"$INFO Use previous OpenDNS account\"" \
-          "yesno_query \"Setup new OpenDNS account?\" \"inst_ip_update 1\" \"inst_ip_update 0\""
-      else
-        yesno_query "Do you want to set up OpenDNS account ip update?" "inst_ip_update 1" "inst_ip_update 0"
-      fi
-    else
-      yesno_query "Do you want to set up OpenDNS account ip update?" "inst_ip_update 1" "inst_ip_update 0"
-    fi
-  else
-    inst_ip_update 0
-  fi
+  opendns_check
 }
 
 setup_dnscrypt_impl () {
   if [ -z $1 ] && [ -f $TOML_FILE ]; then
     echo -e "$INFO Found previous dnscrypt-proxy config file"
-    yesno_query "Do you want to use this file without reconfiguring?" "echo -e \"$INFO Use previous settings file\"" "setup_dnscrypt_impl x"
+    read_yesno "Do you want to use this file without reconfiguring?" && echo -e "$INFO Use previous settings file" || setup_dnscrypt_impl x
   else
     if [ -f $TOML_FILE ]; then
       [ "$1" == "reconfig" ] && echo -e "$INFO Found previous dnscrypt-proxy config file"
@@ -461,7 +497,7 @@ setup_dnscrypt_impl () {
       cp -f $TOML_ORI $TOML_FILE
     fi
     local GVARS_ARGS
-    yesno_query "Do you want to redirect all DNS resolutions on your network through this proxy?" "write_manager_script /jffs/scripts/firewall-start fw-rules" "del_jffs_script /jffs/scripts/firewall-start"
+    read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && write_manager_script /jffs/scripts/firewall-start fw-rules || del_jffs_script /jffs/scripts/firewall-start
     choose_dnscrypt_server
 
     echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
@@ -522,27 +558,6 @@ toml_gvars_write () {
     fi
   done
   sed -i "${SED_CMD%;}" $TOML_FILE
-}
-
-yesno_query () {
-  local QUERY=$1
-  local YES_FUNC=$2
-  local NO_FUNC=$3
-  local YESNO
-  echo -en "$INPUT $QUERY $BOLD[y/n]$NORM: "
-  read YESNO
-  case $YESNO in
-    y|Y)
-      eval $YES_FUNC
-      ;;
-    n|N)
-      eval $NO_FUNC
-      ;;
-    *)
-      echo -e "$ERROR Invalid input!"
-      yesno_query "$@"
-      ;;
-  esac
 }
 
 uninst_all () {
@@ -693,56 +708,56 @@ menu () {
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
-      yesno_query "Do you want to install dnscrypt-proxy to /jffs?" inst_dnscrypt "menu"
+      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || menu
       ;;
     2)
       echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files"
       echo -e "$INFO from jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be modified as required."
       echo
-      yesno_query "Do you want to uninstall dnscrypt-proxy from /jffs?" uninst_dnscrypt "menu"
+      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || menu
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
       echo
-      yesno_query "Do you want to proceed?" "setup_dnscrypt reconfig; end_op_message 0" "menu"
+      read_yesno "Do you want to proceed?" && (setup_dnscrypt reconfig; end_op_message) || menu
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router"
       echo -e "$INFO timezone for background services and processes"
       echo
-      yesno_query "Do you want to proceed?" set_timezone "menu"
+      read_yesno "Do you want to proceed?" && set_timezone || menu
       ;;
     5)
       echo -e "$INFO This operation allows you to unset your router"
       echo -e "$INFO timezone for background services and processes"
       echo
-      yesno_query "Do you want to proceed?" unset_timezone "menu"
+      read_yesno "Do you want to proceed?" && unset_timezone || menu
       ;;
     6)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)"
       echo -e "$INFO to jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
-      yesno_query "Do you want to install (P)RNG to /jffs?" inst_random "menu"
+      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || menu
       ;;
     7)
       echo -e "$INFO This operation will uninstall (P)RNG"
       echo -e "$INFO from jffs, no other data will be changed."
       echo -e "$INFO Also some start scripts will be installed/modified as required."
       echo
-      yesno_query "Do you want to uninstall (P)RNG from /jffs?" uninst_random "menu"
+      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || menu
       ;;
     8)
       echo -e "$INFO This operation will install a swap file for your device"
       echo -e "$INFO You need an external USB storage to host this file"
       echo
-      yesno_query "Do you want to install a swap file (512MB on ext filesystem partition)?" check_swap "menu"
+      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || menu
       ;;
     9)
       echo -e "$INFO This operation will cleanup everything installed by this script (except swap)"
       echo
-      yesno_query "Do you want to continue?" uninst_all "menu"
+      read_yesno "Do you want to continue?" && uninst_all || menu
       ;;
     q|Q)
       echo -e "$INFO Please reboot your router if you have made any change!"
