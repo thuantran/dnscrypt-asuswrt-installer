@@ -470,6 +470,7 @@ setup_dnscrypt () {
   echo -e "$INFO Configuring dnscrypt-proxy..."
   setup_dnscrypt_impl "$@"
   opendns_check
+  [ "$1" == "reconfig" ] && end_op_message 0
 }
 
 setup_dnscrypt_impl () {
@@ -550,6 +551,7 @@ toml_gvars_write () {
   local VALUE
   local INDEX
   local SED_CMD
+  local HAS_NEW_KEY
   while [ $# -gt 0 ]; do
     VAR=$1; shift
     VALUE=$(_quote "$1"); shift
@@ -558,9 +560,11 @@ toml_gvars_write () {
       SED_CMD="1,${IDX_NX_GVAR}{s/.*\($VAR = \).*/\1$VALUE/};${SED_CMD}"
     else
       INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="#.*Global settings.*" '($0 ~ VAR) && (NR < IDX) {print NR + 3; exit}' $TOML_FILE`
-      SED_CMD="${SED_CMD}${INDEX}{s/^/$VAR = $VALUE\n\n/};"
+      [ "$HAS_NEW_KEY" ] && SED_CMD="${SED_CMD}$VAR = $VALUE\n" || SED_CMD="${SED_CMD}${INDEX}{s/^/$VAR = $VALUE\n"
+      HAS_NEW_KEY=1
     fi
   done
+  [ "$HAS_NEW_KEY" ] && SED_CMD="${SED_CMD}\n/}"
   sed -i "${SED_CMD%;}" $TOML_FILE
 }
 
@@ -724,7 +728,7 @@ menu () {
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy"
       echo
-      read_yesno "Do you want to proceed?" && (setup_dnscrypt reconfig; end_op_message) || menu
+      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || menu
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router"
