@@ -546,25 +546,32 @@ toml_gvars_prep () {
 }
 
 toml_gvars_write () {
-  local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  local IDX_NX_GVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
+  local IDX_GLB_INS=`awk -v VAR="#.*Global settings.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
   local VAR
   local VALUE
+  local TO
   local INDEX
+  local HAS_GLB_INS
   local SED_CMD
-  local HAS_NEW_KEY
   while [ $# -gt 0 ]; do
     VAR=$1; shift
-    VALUE=$(_quote "$1"); shift
-    INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    VALUE=$1; shift
+    TO=$(_quote "$VAR = $VALUE")
+    INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
     if [ "$INDEX" ]; then
-      SED_CMD="1,${IDX_NX_GVAR}{s/.*\($VAR = \).*/\1$VALUE/};${SED_CMD}"
-    else
-      INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="#.*Global settings.*" '($0 ~ VAR) && (NR < IDX) {print NR + 3; exit}' $TOML_FILE`
-      [ "$HAS_NEW_KEY" ] && SED_CMD="${SED_CMD}$VAR = $VALUE\n" || SED_CMD="${SED_CMD}${INDEX}{s/^/$VAR = $VALUE\n"
-      HAS_NEW_KEY=1
+      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
+      continue
     fi
+    INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    if [ "$INDEX" ]; then
+      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
+      continue
+    fi
+    [ -z $HAS_GLB_INS ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
+    HAS_GLB_INS=1
   done
-  [ "$HAS_NEW_KEY" ] && SED_CMD="${SED_CMD}\n/}"
+  [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
   sed -i "${SED_CMD%;}" $TOML_FILE
 }
 
