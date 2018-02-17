@@ -200,7 +200,7 @@ download_file () {
         chmod $PERM $TARG/$FILENAME
       else
         echo -e "$ERROR Unable to download ${BOLD}${URL}${NORM}"
-        return 1
+        return
       fi
     fi
   done
@@ -220,7 +220,7 @@ inst_dnscrypt () {
   create_dir $TARG_DIR
   if [ $? -ne 0 ]; then
     end_op_message
-    return 1
+    return
   fi
 
   download_file $TARG_DIR 755 $URL_GEN/manager $URL_ARCH/nonroot
@@ -232,7 +232,7 @@ inst_dnscrypt () {
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
     end_op_message
-    return 1
+    return
   fi
   chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
   mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
@@ -244,7 +244,7 @@ inst_dnscrypt () {
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message
-    return 1
+    return
   fi
 
   echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
@@ -375,14 +375,14 @@ inst_ran_dev () {
 
 inst_swap () {
   local SWAP_SIZE=524288
-  local USB_COUNT=`df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > 524288){print $6}}' | wc -l`
-  if [ $USB_COUNT -le 1 ]; then
+  local USB_COUNT=`df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){print $6}}' | wc -l`
+  if [ $USB_COUNT -lt 1 ]; then
     echo -e "$ERROR Unable to find any external USB storage"
     echo -e "$ERROR Or no suitable external USB storage found"
     echo -e "$ERROR Please connect a USB storage with at least"
     echo -e "$ERROR $(($SWAP_SIZE * 2 / 1024))MB of free space"
     end_op_message
-    return 1
+    return
   fi
 
   echo -e "$INFO Available partition to install swap file:$NORM"
@@ -456,7 +456,7 @@ read_yesno () {
 setup_dnscrypt () {
   if [ ! -f $TOML_ORI ] || [ ! -f /jffs/dnscrypt/dnscrypt-proxy ]; then
     echo -e "$ERROR dnscrypt-proxy is not installed. Aborting..."
-    return 1
+    return
   fi
 
   echo -e "$INFO Configuring dnscrypt-proxy..."
@@ -517,7 +517,7 @@ set_timezone () {
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
-    return 1
+    return
   fi
 
   echo -e "$INFO $TZ_FILE selected"
