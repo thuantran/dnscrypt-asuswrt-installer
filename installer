@@ -498,7 +498,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" use_syslog true cache false cert_ignore_timestamp true
+    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
   fi
