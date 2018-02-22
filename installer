@@ -240,6 +240,7 @@ inst_dnscrypt () {
   chmod 755 $TARG_DIR/dnscrypt-proxy
 
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+  write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/wan-start dnscrypt-start
   setup_dnscrypt
   if [ $? -ne 0 ]; then
@@ -497,7 +498,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" use_syslog true cache false cert_ignore_timestamp true daemonize true
+    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
   fi
@@ -506,6 +507,7 @@ setup_dnscrypt_impl () {
 set_timezone () {
   local TMP=/root
 
+  download_file $TARG_DIR 755 $URL_GEN/manager
   download_file $TMP 644 $URL_GEN/zoneinfo.zip
   local INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
   echo -e "$INFO Available timezones/locations:"

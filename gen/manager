@@ -13,7 +13,7 @@ append_on_demand () {
 }
 
 init_hwrng () {
-  COUNT=0
+  local COUNT=0
   while [ ! -c $RNG_DEV ]; do
     if [ $COUNT -gt 120 ]; then
       logger "ERROR: Unable to find HWRNG device. Aborting..."
@@ -29,15 +29,36 @@ init_hwrng () {
 
 start_dnscrypt () {
   NONROOT="/jffs/dnscrypt/nonroot nobody"
-  DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"
-  killall dnscrypt-proxy
+  DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
+  [ "`pidof dnscrypt-proxy`" ] && killall dnscrypt-proxy
   logger "Start dnscrypt-proxy"
-  $NONROOT $DNSCRYPT_START
-  [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ] && update_opendns 0 &
+  nohup $NONROOT $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
+  [ "$1" != "NO_OPENDNS_UPDATE" ] && update_opendns 0 &
+}
+
+start_monitor () {
+  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  local COUNT=0
+  while true; do
+    if [ -f /jffs/dnscrypt/localtime ]; then
+      if [ $COUNT -eq 90 ]; then
+        COUNT=0
+        touch "$0"
+      fi
+      COUNT=$((COUNT + 1))
+    fi
+    if [ -f /jffs/dnscrypt/dnscrypt-proxy ] && [ -z "`pidof dnscrypt-proxy`" ]; then
+      logger "Warning: dnscrypt-proxy is dead"
+      start_dnscrypt NO_OPENDNS_UPDATE
+    fi
+    sleep 10
+  done
 }
 
 update_opendns () {
-  [ $1 -gt 2 ] && return
+  if [ -z "$OPENDNS_USER" ] || [ -z  "$OPENDNS_PASSWORD" ] || [ $1 -gt 2 ]; then
+    return
+  fi
   sleep 5
   RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
   case "$RET" in
@@ -54,6 +75,7 @@ update_opendns () {
   esac
 }
 
+unset TZ
 case $1 in
   dnscrypt-start)
     start_dnscrypt
@@ -72,8 +94,6 @@ case $1 in
     if [ -f /jffs/dnscrypt/localtime ]; then
       ln -s /jffs/dnscrypt/localtime /etc/localtime
       date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-      (while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
-      while true; do touch "$0"; sleep 900; done)&
     fi
     case $RAN_PRV in
       haveged)
@@ -83,6 +103,7 @@ case $1 in
         init_hwrng &
         ;;
     esac
+    start_monitor &
     ;;
   services-stop)
     [ -f /jffs/dnscrypt/localtime ] && touch "$0"
