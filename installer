@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.2
+DNSCRYPT_VER=2.0.3
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -506,26 +506,26 @@ setup_dnscrypt_impl () {
 
 set_timezone () {
   local TMP=/root
+  local TZ_DATA=tzdata-2018c-1-any.pkg.tar.bz2
 
   download_file $TARG_DIR 755 $URL_GEN/manager
-  download_file $TMP 644 $URL_GEN/zoneinfo.zip
-  local INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
+  download_file $TMP 644 $URL_GEN/$TZ_DATA
+  local INDEX=`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l`
   echo -e "$INFO Available timezones/locations:"
-  unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk '{++i;print "  "i") "$0}'
+  tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
   read_input_num "Select your timezone/location" 1 $INDEX
-
-  local TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
-  unzip -p $TMP/zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
+  local TZ_FILE="`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`"
+  echo -e "$INFO `basename $TZ_FILE` selected"
+  tar xjOf $TMP/$TZ_DATA $TZ_FILE > $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
     return
   fi
 
-  echo -e "$INFO $TZ_FILE selected"
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
-  rm -r $TMP/zoneinfo.zip
+  rm -r $TMP/$TZ_DATA
   end_op_message 0
 }
 
