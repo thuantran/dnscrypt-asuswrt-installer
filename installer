@@ -547,7 +547,8 @@ set_timezone () {
   read_input_num "Select your timezone/location" 1 $INDEX
   local TZ_FILE="`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`"
   echo -e "$INFO `basename $TZ_FILE` selected"
-  tar xjOf $TMP/$TZ_DATA $TZ_FILE > $TARG_DIR/localtime
+  tar xjf $TMP/$TZ_DATA -C $TMP usr/share/zoneinfo/posix
+  mv "$TMP/$TZ_FILE" $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
@@ -556,7 +557,7 @@ set_timezone () {
 
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
-  rm -r $TMP/$TZ_DATA
+  rm -r $TMP/$TZ_DATA $TMP/usr
   end_op_message 0
 }
 
