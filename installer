@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.2
+DNSCRYPT_VER=2.0.3
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -13,10 +13,23 @@ readonly TARG_DIR=/jffs/dnscrypt
 readonly CONF_FILE=$TARG_DIR/.config
 readonly TOML_FILE=$TARG_DIR/dnscrypt-proxy.toml
 readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
+readonly TOML_ERR=$TARG_DIR/dnscrypt-proxy.toml.err
 readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
 
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
+}
+
+check_dnscrypt_toml () {
+  [ ! -f $TOML_FILE ] && return
+  echo -e "$INFO Checking dnscrpt-proxy configuration..."
+  $TARG_DIR/dnscrypt-proxy -check -config $TOML_FILE
+  if [ $? -ne 0 ]; then
+    echo -e "$INFO Move invalid configuration file to $TOML_ERR"
+    echo -e "$INFO Operation will continue with clean config file"
+    mv $TOML_FILE $TOML_ERR
+    return 1
+  fi
 }
 
 check_jffs_enabled () {
@@ -36,6 +49,40 @@ check_jffs_enabled () {
     nvram commit
   else
     echo -e "$INFO JFFS custom scripts and configs are already enabled"
+  fi
+}
+
+check_opendns () {
+  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
+    if [ -f $CONF_FILE ]; then
+      local OPENDNS_USER=`awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE`
+      local OPENDNS_PASSWORD=`awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE`
+      if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
+        echo -e "$INFO Found OpenDNS account ${BOLD}${OPENDNS_USER}"
+        echo -e "$INFO What do you want to do:"
+        echo -e "  1) Use this account"
+        echo -e "  2) Setup new account"
+        echo -e "  3) Disable OpenDNS account authen"
+        read_input_num "Your choice" 1 3
+        case $CHOSEN in
+          1)
+            echo -e "$INFO Use previous account ${BOLD}${OPENDNS_USER}${NORM}"
+            ;;
+          2)
+            opendns_authen 1
+            ;;
+          3)
+            opendns_authen 0
+            ;;
+        esac
+      else
+        read_yesno "Do you want to set up OpenDNS account ip update?" && opendns_authen 1 || opendns_authen 0
+      fi
+    else
+      read_yesno "Do you want to set up OpenDNS account ip update?" && opendns_authen 1 || opendns_authen 0
+    fi
+  else
+    opendns_authen 0
   fi
 }
 
@@ -280,40 +327,6 @@ opendns_authen () {
   write_conf OPENDNS_PASSWORD "\"$PW1\""
 }
 
-opendns_check () {
-  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
-    if [ -f $CONF_FILE ]; then
-      local OPENDNS_USER=`awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE`
-      local OPENDNS_PASSWORD=`awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE`
-      if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
-        echo -e "$INFO Found OpenDNS account ${BOLD}${OPENDNS_USER}"
-        echo -e "$INFO What do you want to do:"
-        echo -e "  1) Use this account"
-        echo -e "  2) Setup new account"
-        echo -e "  3) Disable OpenDNS account authen"
-        read_input_num "Your choice" 1 3
-        case $CHOSEN in
-          1)
-            echo -e "$INFO Use previous account ${BOLD}${OPENDNS_USER}${NORM}"
-            ;;
-          2)
-            opendns_authen 1
-            ;;
-          3)
-            opendns_authen 0
-            ;;
-        esac
-      else
-        read_yesno "Do you want to set up OpenDNS account ip update?" && opendns_authen 1 || opendns_authen 0
-      fi
-    else
-      read_yesno "Do you want to set up OpenDNS account ip update?" && opendns_authen 1 || opendns_authen 0
-    fi
-  else
-    opendns_authen 0
-  fi
-}
-
 inst_random () {
   create_dir $TARG_DIR
 
@@ -455,24 +468,36 @@ read_yesno () {
 }
 
 setup_dnscrypt () {
-  if [ ! -f $TOML_ORI ] || [ ! -f /jffs/dnscrypt/dnscrypt-proxy ]; then
+  if [ ! -f $TOML_ORI ] || [ ! -f $TARG_DIR/dnscrypt-proxy ]; then
     echo -e "$ERROR dnscrypt-proxy is not installed. Aborting..."
     return
   fi
 
   echo -e "$INFO Configuring dnscrypt-proxy..."
   setup_dnscrypt_impl "$@"
-  opendns_check
+  check_opendns
   [ "$1" == "reconfig" ] && end_op_message 0
 }
 
 setup_dnscrypt_impl () {
   if [ -z $1 ] && [ -f $TOML_FILE ]; then
+    check_dnscrypt_toml
+    if [ $? -ne 0 ]; then
+      setup_dnscrypt_impl x
+      return
+    fi
     echo -e "$INFO Found previous dnscrypt-proxy config file"
     read_yesno "Do you want to use this file without reconfiguring?" && echo -e "$INFO Use previous settings file" || setup_dnscrypt_impl x
   else
     if [ -f $TOML_FILE ]; then
-      [ "$1" == "reconfig" ] && echo -e "$INFO Found previous dnscrypt-proxy config file"
+      if [ "$1" == "reconfig" ]; then
+        check_dnscrypt_toml
+        if [ $? -ne 0 ]; then
+          setup_dnscrypt_impl x
+          return
+        fi
+        echo -e "$INFO Found previous dnscrypt-proxy config file"
+      fi
       echo -e "$INFO How do you want to reconfigure:"
       echo -e "$INFO   1) Start from previous settings file"
       echo -e "$INFO   2) Start from default config"
@@ -501,31 +526,38 @@ setup_dnscrypt_impl () {
     toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
+    check_dnscrypt_toml
+    if [ $? -ne 0 ]; then
+      echo -e "$INFO Writing dnscrypt-proxy configuration failed"
+      echo -e "$INFO Please send $TOML_ERR file and screen log of "
+      echo -e "$INFO all operations you have made to this script dev"
+    fi
   fi
 }
 
 set_timezone () {
   local TMP=/root
+  local TZ_DATA=tzdata-2018c-1-any.pkg.tar.bz2
 
   download_file $TARG_DIR 755 $URL_GEN/manager
-  download_file $TMP 644 $URL_GEN/zoneinfo.zip
-  local INDEX=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | wc -l`
+  download_file $TMP 644 $URL_GEN/$TZ_DATA
+  local INDEX=`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l`
   echo -e "$INFO Available timezones/locations:"
-  unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk '{++i;print "  "i") "$0}'
+  tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
   read_input_num "Select your timezone/location" 1 $INDEX
-
-  local TZ_FILE=`unzip -lq $TMP/zoneinfo.zip | awk '!/(Name|[-\/])$/{if ($4){print $4}}' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`
-  unzip -p $TMP/zoneinfo.zip $TZ_FILE > $TARG_DIR/localtime
+  local TZ_FILE="`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`"
+  echo -e "$INFO `basename $TZ_FILE` selected"
+  tar xjf $TMP/$TZ_DATA -C $TMP usr/share/zoneinfo/posix
+  mv "$TMP/$TZ_FILE" $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to set your timezone file"
     end_op_message
     return
   fi
 
-  echo -e "$INFO $TZ_FILE selected"
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
-  rm -r $TMP/zoneinfo.zip
+  rm -r $TMP/$TZ_DATA $TMP/usr
   end_op_message 0
 }
 
