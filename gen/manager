@@ -30,7 +30,7 @@ init_hwrng () {
 start_dnscrypt () {
   NONROOT="/jffs/dnscrypt/nonroot nobody"
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
-  [ "`pidof dnscrypt-proxy`" ] && killall dnscrypt-proxy
+  killall -q dnscrypt-proxy
   logger "Start dnscrypt-proxy"
   nohup $NONROOT $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
   [ "$1" != "NO_OPENDNS_UPDATE" ] && update_opendns 0 &
