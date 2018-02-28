@@ -104,7 +104,7 @@ case $1 in
         init_hwrng &
         ;;
     esac
-    start_monitor &
+    $0 monitor-start
     ;;
   monitor-start)
     start_monitor &
