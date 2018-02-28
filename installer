@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.3
+DNSCRYPT_VER=2.0.5
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -22,7 +22,7 @@ _quote() {
 
 check_dnscrypt_toml () {
   [ ! -f $TOML_FILE ] && return
-  echo -e "$INFO Checking dnscrpt-proxy configuration..."
+  echo -e "$INFO Checking dnscrypt-proxy configuration..."
   $TARG_DIR/dnscrypt-proxy -check -config $TOML_FILE
   if [ $? -ne 0 ]; then
     echo -e "$INFO Move invalid configuration file to $TOML_ERR"
@@ -151,8 +151,8 @@ choose_dnscrypt_server_manual () {
     local RESOLVERS
     toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' /jffs/dnscrypt/public-resolvers.md | wc -l`
-    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; print}' /jffs/dnscrypt/public-resolvers.md
+    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
+    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; print}' $TARG_DIR/public-resolvers.md
     read_input_num "Please choose DNS server" 1 $INDEX
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
@@ -163,7 +163,7 @@ choose_dnscrypt_server_manual () {
   fi
 
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' /jffs/dnscrypt/public-resolvers.md`
+  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md`
   if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
     echo -e "$INFO $ITEM is already set"
   else
@@ -213,9 +213,9 @@ del_jffs_script () {
   local LINE_ABOVE
   [ -f $TARG ] || return
   if [ "$2" == "x" ]; then
-    LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|grep -v manager|cut -d':' -f1`
+    LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|grep -v manager|cut -d':' -f1`
   else
-    LINE_NUM=`grep -n -F "[ -x /jffs/dnscrypt/" $TARG|cut -d':' -f1`
+    LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|cut -d':' -f1`
   fi
   [ -z $LINE_NUM ] && return
   sed -i "${LINE_NUM}d" $TARG
@@ -295,11 +295,36 @@ inst_dnscrypt () {
     return
   fi
 
+  echo -e "$INFO Staring dnscrypt-proxy..."
+  $TARG_DIR/manager dnscrypt-start
+  if [ -z "`pidof dnscrypt-proxy`" ]; then
+    echo -e "$ERROR Couldn't start dnscrypt-proxy"
+    echo -e "$ERROR Please send WebUI System Log to dev"
+    end_op_message
+    return
+  fi
+  service restart_dnsmasq
+  manager_monitor_restart
+
   echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
   echo -e "$INFO  - Add swap"
   echo -e "$INFO  - Add a RNG"
   echo -e "$INFO  - Set your timezone"
   end_op_message 0
+}
+
+manager_monitor_restart () {
+  local MAN_PID="`pidof manager`"
+  local PID
+  if [ "$MAN_PID" ]; then
+    for PID in $MAN_PID; do
+      if [ "`cat /proc/$PID/cmdline | grep dnscrypt`" ]; then
+        kill -9 $PID
+        break
+      fi
+    done
+  fi
+  $TARG_DIR/manager monitor-start
 }
 
 opendns_authen () {
@@ -342,12 +367,18 @@ inst_random () {
       rm -f $TARG_DIR/rngd $TARG_DIR/stty
       download_file $TARG_DIR 755 $URL_ARCH/haveged $URL_GEN/manager
       write_conf RAN_PRV haveged
+      killall -q -9 haveged
+      $TARG_DIR/haveged -w1024 -v1
       ;;
     2)
+      local RNG_DEV
       rm -f $TARG_DIR/haveged
       download_file $TARG_DIR 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
       inst_ran_dev || return
       write_conf RAN_PRV rngd
+      killall -q -9 rngd
+      $TARG_DIR/stty raw -echo -ixoff -F /dev/$RNG_DEV speed 115200
+      $TARG_DIR/rngd -r /dev/$RNG_DEV
       ;;
   esac
 
@@ -360,7 +391,6 @@ inst_ran_dev () {
     local PRODSTR=`cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=`
     local VID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 1`
     local PID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 2`
-    local RNG_DEV
     if [ "$VID" == "4d8" ] && [ "$PID" == "f5fe" ]; then
       echo -e "$INFO Found TrueRNG USB HW RNG"
       RNG_DEV=ttyACM0
@@ -475,8 +505,17 @@ setup_dnscrypt () {
 
   echo -e "$INFO Configuring dnscrypt-proxy..."
   setup_dnscrypt_impl "$@"
+  local RET=$?
   check_opendns
-  [ "$1" == "reconfig" ] && end_op_message 0
+  if [ "$1" == "reconfig" ]; then
+    if [ $RET -eq 0 ]; then
+      echo -e "$INFO Restarting dnscrypt-proxy with new config..."
+      $TARG_DIR/manager dnscrypt-start
+      end_op_message 0
+    else
+      end_op_message 0
+    fi
+  fi
 }
 
 setup_dnscrypt_impl () {
@@ -531,6 +570,7 @@ setup_dnscrypt_impl () {
       echo -e "$INFO Writing dnscrypt-proxy configuration failed"
       echo -e "$INFO Please send $TOML_ERR file and screen log of "
       echo -e "$INFO all operations you have made to this script dev"
+      return 1
     fi
   fi
 }
@@ -557,6 +597,8 @@ set_timezone () {
 
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
+  ln -sf $TARG_DIR/localtime /etc/localtime
+  [ "`pidof dnscrypt-proxy`" ] && $TARG_DIR/manager dnscrypt-start
   rm -r $TMP/$TZ_DATA $TMP/usr
   end_op_message 0
 }
@@ -608,15 +650,29 @@ uninst_all () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/services-stop
   del_jffs_script /jffs/scripts/wan-start
+  service restart_dnsmasq
+  killall -q -9 haveged rngd dnscrypt-proxy
+  local MAN_PID="`pidof manager`"
+  local PID
+  if [ "$MAN_PID" ]; then
+    for PID in $MAN_PID; do
+      if [ "`cat /proc/$PID/cmdline | grep dnscrypt`" ]; then
+        kill -9 $PID
+        break
+      fi
+    done
+  fi
   end_op_message 0
 }
 
 uninst_dnscrypt () {
-  echo -e "$INFO Uninstalling dnscrpt-proxy..."
+  echo -e "$INFO Uninstalling dnscrypt-proxy..."
   rm -f $TARG_DIR/dnscrypt-proxy $TARG_DIR/nonroot
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/wan-start
+  killall -q dnscrypt-proxy
+  service restart_dnsmasq
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
   end_op_message 0
 }
@@ -624,6 +680,7 @@ uninst_dnscrypt () {
 uninst_random () {
   echo -e "$INFO Uninstalling (P)RNG..."
   rm -f $TARG_DIR/haveged $TARG_DIR/rngd $TARG_DIR/stty
+  killall -q -9 haveged rngd
   del_conf RAN_PRV RNG_DEV
   [ ! -f $TARG_DIR/localtime ] && [ ! -f $TARG_DIR/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
   end_op_message 0
@@ -638,7 +695,7 @@ unset_timezone () {
 write_conf () {
   local VAR=$1
   local VALUE="$2"
-  [ -f /jffs/dnscrypt/.opendns-auth ] && mv /jffs/dnscrypt/.opendns-auth $CONF_FILE && chmod 644 $CONF_FILE
+  [ -f $TARG_DIR/.opendns-auth ] && mv $TARG_DIR/.opendns-auth $CONF_FILE && chmod 644 $CONF_FILE
   if [ ! -f $CONF_FILE ]; then
     touch $CONF_FILE && chmod 644 $CONF_FILE
   fi
@@ -673,7 +730,7 @@ write_manager_script () {
   local TARG=$1
   local OP=$2
   local FILENAME="`basename \"$TARG\"`"
-  local COMMAND=/jffs/dnscrypt/manager
+  local COMMAND=$TARG_DIR/manager
 
   if [ ! -f $TARG ]; then
     echo -e "$INFO Creating $FILENAME file"
@@ -801,7 +858,8 @@ menu () {
       read_yesno "Do you want to continue?" && uninst_all || menu
       ;;
     q|Q)
-      echo -e "$INFO Please reboot your router if you have made any change!"
+      echo -e "$INFO Operations have been applied if any has been made"
+      echo -e "$INFO In case of anomaly, please reboot your router!"
       ;;
   esac
 }
