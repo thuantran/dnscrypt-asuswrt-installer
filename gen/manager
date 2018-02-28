@@ -37,6 +37,7 @@ start_dnscrypt () {
 }
 
 start_monitor () {
+  trap "" 1
   while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
   local COUNT=0
   while true; do
@@ -103,10 +104,10 @@ case $1 in
         init_hwrng &
         ;;
     esac
-    nohup $0 monitor-start >/dev/null 2>&1 </dev/null &
+    start_monitor &
     ;;
   monitor-start)
-    start_monitor
+    start_monitor &
     ;;
   services-stop)
     [ -f /jffs/dnscrypt/localtime ] && touch "$0"
