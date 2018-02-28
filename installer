@@ -314,7 +314,7 @@ inst_dnscrypt () {
       fi
     done
   fi
-  $TARG_DIR/manager init-start
+  $TARG_DIR/manager monitor-start
 
   echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
   echo -e "$INFO  - Add swap"

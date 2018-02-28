@@ -103,7 +103,7 @@ case $1 in
         init_hwrng &
         ;;
     esac
-    nohup start_monitor >/dev/null 2>&1 </dev/null &
+    "$0" monitor-start
     ;;
   monitor-start)
     nohup start_monitor >/dev/null 2>&1 </dev/null &
