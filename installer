@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.3
+DNSCRYPT_VER=2.0.5
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -22,7 +22,7 @@ _quote() {
 
 check_dnscrypt_toml () {
   [ ! -f $TOML_FILE ] && return
-  echo -e "$INFO Checking dnscrpt-proxy configuration..."
+  echo -e "$INFO Checking dnscrypt-proxy configuration..."
   $TARG_DIR/dnscrypt-proxy -check -config $TOML_FILE
   if [ $? -ne 0 ]; then
     echo -e "$INFO Move invalid configuration file to $TOML_ERR"
@@ -295,6 +295,27 @@ inst_dnscrypt () {
     return
   fi
 
+  echo -e "$INFO Staring dnscrypt-proxy..."
+  $TARG_DIR/manager dnscrypt-start
+  if [ -z "`pidof dnscrypt-proxy`" ]; then
+    echo -e "$ERROR Couldn't start dnscrypt-proxy"
+    echo -e "$ERROR Please send WebUI System Log to dev"
+    end_op_message
+    return
+  fi
+  service restart_dnsmasq
+  local MAN_PID=`pidof manager`
+  local PID
+  if [ "$MAN_PID" ]; then
+    for PID in $MAN_PID; do
+      if [ "`cat /proc/$PID/cmdline | grep dnscrypt`" ]; then
+        kill -9 $PID
+        break
+      fi
+    done
+  fi
+  $TARG_DIR/manager init-start
+
   echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
   echo -e "$INFO  - Add swap"
   echo -e "$INFO  - Add a RNG"
@@ -476,7 +497,9 @@ setup_dnscrypt () {
   echo -e "$INFO Configuring dnscrypt-proxy..."
   setup_dnscrypt_impl "$@"
   check_opendns
-  [ "$1" == "reconfig" ] && end_op_message 0
+  if [ "$1" == "reconfig" ]; then
+    end_op_message 0
+  fi
 }
 
 setup_dnscrypt_impl () {
@@ -612,7 +635,7 @@ uninst_all () {
 }
 
 uninst_dnscrypt () {
-  echo -e "$INFO Uninstalling dnscrpt-proxy..."
+  echo -e "$INFO Uninstalling dnscrypt-proxy..."
   rm -f $TARG_DIR/dnscrypt-proxy $TARG_DIR/nonroot
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/firewall-start
