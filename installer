@@ -377,8 +377,8 @@ inst_random () {
       inst_ran_dev || return
       write_conf RAN_PRV rngd
       killall -q -9 rngd
-      $TARG_DIR/stty raw -echo -ixoff -F $RNG_DEV speed 115200
-      $TARG_DIR/rngd -r $RNG_DEV
+      $TARG_DIR/stty raw -echo -ixoff -F /dev/$RNG_DEV speed 115200
+      $TARG_DIR/rngd -r /dev/$RNG_DEV
       ;;
   esac
 
