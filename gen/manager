@@ -103,10 +103,10 @@ case $1 in
         init_hwrng &
         ;;
     esac
-    "$0" monitor-start
+    start_monitor &
     ;;
   monitor-start)
-    nohup start_monitor >/dev/null 2>&1 </dev/null &
+    start_monitor &
     ;;
   services-stop)
     [ -f /jffs/dnscrypt/localtime ] && touch "$0"
