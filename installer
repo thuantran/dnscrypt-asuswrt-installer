@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.5
+DNSCRYPT_VER=2.0.6
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -765,7 +765,7 @@ case $(uname -m) in
     echo -e "$INFO Detected ARMv7 architecture."
     ;;
   aarch64)
-    URL_ARCH=$URL_ARCH/armv7
+    URL_ARCH=$URL_ARCH/armv8
     DNSCRYPT_ARCH=linux_arm64
     DNSCRYPT_ARCH_TAR=linux-arm64
     echo -e "$INFO Detected ARMv8 architecture."
