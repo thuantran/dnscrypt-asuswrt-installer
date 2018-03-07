@@ -33,7 +33,6 @@ start_dnscrypt () {
   killall -q dnscrypt-proxy
   logger "Start dnscrypt-proxy"
   nohup $NONROOT $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
-  [ "$1" != "NO_OPENDNS_UPDATE" ] && update_opendns 0 &
 }
 
 start_monitor () {
@@ -50,7 +49,7 @@ start_monitor () {
     fi
     if [ -f /jffs/dnscrypt/dnscrypt-proxy ] && [ -z "`pidof dnscrypt-proxy`" ]; then
       logger "Warning: dnscrypt-proxy is dead"
-      start_dnscrypt NO_OPENDNS_UPDATE
+      start_dnscrypt
     fi
     sleep 10
   done
@@ -105,11 +104,15 @@ case $1 in
         ;;
     esac
     $0 monitor-start
+    start_dnscrypt
     ;;
   monitor-start)
     start_monitor &
     ;;
   services-stop)
     [ -f /jffs/dnscrypt/localtime ] && touch "$0"
+    ;;
+  wan-start)
+    update_opendns 0 &
     ;;
 esac

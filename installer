@@ -291,9 +291,10 @@ inst_dnscrypt () {
   rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
   chmod 755 $TARG_DIR/dnscrypt-proxy
 
+  del_jffs_script /jffs/scripts/wan-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
-  write_manager_script /jffs/scripts/wan-start dnscrypt-start
+  write_manager_script /jffs/scripts/wan-start wan-start
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message
@@ -302,6 +303,7 @@ inst_dnscrypt () {
 
   echo -e "$INFO Staring dnscrypt-proxy..."
   $TARG_DIR/manager dnscrypt-start
+  sleep 1
   if [ -z "`pidof dnscrypt-proxy`" ]; then
     echo -e "$ERROR Couldn't start dnscrypt-proxy"
     echo -e "$ERROR Please send WebUI System Log to dev"
