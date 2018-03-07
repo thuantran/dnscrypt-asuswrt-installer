@@ -212,8 +212,13 @@ del_jffs_script () {
   local LINE_NUM
   local LINE_ABOVE
   [ -f $TARG ] || return
-  if [ "$2" == "x" ]; then
-    LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|grep -v manager|cut -d':' -f1`
+  if [ "$2" ]; then
+    local OP=${2:0:1}
+    if [ "$OP" == "!" ]; then
+      LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|grep -v "$(_quote $2)"|cut -d':' -f1`
+    else
+      LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|grep "$(_quote $2)"|cut -d':' -f1`
+    fi
   else
     LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|cut -d':' -f1`
   fi
@@ -291,7 +296,7 @@ inst_dnscrypt () {
   rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
   chmod 755 $TARG_DIR/dnscrypt-proxy
 
-  del_jffs_script /jffs/scripts/wan-start
+  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/wan-start wan-start
@@ -753,7 +758,7 @@ write_manager_script () {
     if [ "`grep \"^$COMMAND\" $TARG`" ]; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
     else
-      del_jffs_script $TARG x
+      del_jffs_script $TARG !manager
       [ `tail -1 $TARG|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
     fi
