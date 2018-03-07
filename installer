@@ -241,13 +241,18 @@ download_file () {
     if [ `echo -n $MD5SUM_CURR | wc -c` -eq 32 ] && [ "$MD5SUM_CURR" ==  "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
-      echo -e "$INFO Downloading $FILENAME"
-      curl -L -k -s "$URL" -o $TARG/$FILENAME
-      if [ $? -eq 0 ]; then
-        chmod $PERM $TARG/$FILENAME
-      else
+      local COUNT=0
+      while [ $COUNT -lt 3 ]; do
+        echo -e "$INFO Downloading $FILENAME"
+        curl -L -k -s "$URL" -o $TARG/$FILENAME
+        if [ $? -eq 0 ]; then
+          chmod $PERM $TARG/$FILENAME
+          break
+        fi
+        COUNT=$((COUNT+1))
+      done
+      if [ $COUNT -eq 3 ]; then
         echo -e "$ERROR Unable to download ${BOLD}${URL}${NORM}"
-        return
       fi
     fi
   done
