@@ -377,18 +377,18 @@ inst_random () {
   case $CHOSEN in
     1)
       rm -f $TARG_DIR/rngd $TARG_DIR/stty
+      killall -q -9 haveged
       download_file $TARG_DIR 755 $URL_ARCH/haveged $URL_GEN/manager
       write_conf RAN_PRV haveged
-      killall -q -9 haveged
       $TARG_DIR/haveged -w1024 -v1
       ;;
     2)
       local RNG_DEV
       rm -f $TARG_DIR/haveged
+      killall -q -9 rngd
       download_file $TARG_DIR 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
       inst_ran_dev || return
       write_conf RAN_PRV rngd
-      killall -q -9 rngd
       $TARG_DIR/stty raw -echo -ixoff -F /dev/$RNG_DEV speed 115200
       $TARG_DIR/rngd -r /dev/$RNG_DEV
       ;;
