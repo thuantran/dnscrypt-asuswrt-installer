@@ -32,6 +32,7 @@ start_dnscrypt () {
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall -q dnscrypt-proxy
   logger "Start dnscrypt-proxy"
+  cd /jffs/dnscrypt
   nohup $NONROOT $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
 }
 
