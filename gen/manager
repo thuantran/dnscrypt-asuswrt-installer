@@ -39,6 +39,8 @@ start_dnscrypt () {
 start_monitor () {
   trap "" 1
   while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  local NW_STATE
+  local RES_STATE
   local COUNT=0
   while true; do
     if [ -f /jffs/dnscrypt/localtime ]; then
@@ -48,9 +50,18 @@ start_monitor () {
       fi
       COUNT=$((COUNT + 1))
     fi
-    if [ -f /jffs/dnscrypt/dnscrypt-proxy ] && [ -z "`pidof dnscrypt-proxy`" ]; then
-      logger "Warning: dnscrypt-proxy is dead"
-      start_dnscrypt
+    ping 8.8.8.8 -c1 -W2 >/dev/null 2>&1
+    NW_STATE=$?
+    nslookup google.com >/dev/null 2>&1
+    RES_STATE=$?
+    if [ -f /jffs/dnscrypt/dnscrypt-proxy ]; then
+      if [ -z "`pidof dnscrypt-proxy`" ]; then
+        logger "Warning: dnscrypt-proxy is dead"
+        start_dnscrypt
+      elif [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
+        logger "Warning: dnscrypt-proxy is not responding"
+        start_dnscrypt
+      fi
     fi
     sleep 10
   done
