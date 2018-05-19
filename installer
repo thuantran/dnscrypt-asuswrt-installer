@@ -442,7 +442,7 @@ inst_swap () {
   fi
 
   echo -e "$INFO Available partition to install swap file:$NORM"
-  df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6}}'
+  df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6 " (" $4/1024 "MB free)"}}'
   read_input_num "Please select the partition to install swap file" 1 $USB_COUNT
   local MOUNT=`df | awk -v IDX=$CHOSEN -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}'`
 
@@ -451,12 +451,17 @@ inst_swap () {
   local MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
   [ ${MOUNT_FS%?} == "ext" ] && chmod 600 "$MOUNT/swap"
   mkswap "$MOUNT/swap"
-
-  sed -i "/^$(_quote '[ -f $1/swap ] && swapon $1/swap')$/d" /jffs/scripts/post-mount
-  sed -i "/^$(_quote '[ -f $1/swap ] && swapoff $1/swap')$/d" /jffs/scripts/unmount
-  write_command_script /jffs/scripts/post-mount '[ -f "$1/swap" ] && swapon "$1/swap"'
-  write_command_script /jffs/scripts/unmount '[ -f "$1/swap" ] && swapoff "$1/swap"'
-  end_op_message 0
+  swapon "$MOUNT/swap"
+  if [ $? -ne 0 ]; then
+    sed -i "/^$(_quote '[ -f $1/swap ] && swapon $1/swap')$/d" /jffs/scripts/post-mount
+    sed -i "/^$(_quote '[ -f $1/swap ] && swapoff $1/swap')$/d" /jffs/scripts/unmount
+    write_command_script /jffs/scripts/post-mount '[ -f "$1/swap" ] && swapon "$1/swap"'
+    write_command_script /jffs/scripts/unmount '[ -f "$1/swap" ] && swapoff "$1/swap"'
+    end_op_message 0
+  else
+    echo -e "$ERROR Unable to create swap. Get the command log to dev"
+    end_op_message
+  fi
 }
 
 read_input_dns () {
