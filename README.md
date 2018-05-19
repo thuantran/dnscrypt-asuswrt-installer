@@ -29,7 +29,9 @@ Run this command from ssh shell and following the prompt for dnscrypt-proxy vers
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer && sh installer ; rm installer
 ```
-User can safely update from dnscrypt-proxy version 1 to version 2. For dnscrypt-proxy version 1 use:
+User can safely update from dnscrypt-proxy version 1 to version 2 with above command.
+
+If you want to use dnscrypt-proxy version 1, run this command:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
