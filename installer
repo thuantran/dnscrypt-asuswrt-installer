@@ -787,14 +787,14 @@ case $(uname -m) in
     DNSCRYPT_ARCH_TAR=linux-arm64
     echo -e "$INFO Detected ARMv8 architecture."
     ;;
-  mips)
-    URL_ARCH=$URL_ARCH/mips
-    DNSCRYPT_ARCH=linux_mipsle
-    DNSCRYPT_ARCH_TAR=linux-mipsle
-    echo -e "$INFO Detected MIPSEL architecture."
-    echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
-    echo -e "$WARNING USE AT YOUR OWN RISK"
-    ;;
+  # mips)
+    # URL_ARCH=$URL_ARCH/mips
+    # DNSCRYPT_ARCH=linux_mipsle
+    # DNSCRYPT_ARCH_TAR=linux-mipsle
+    # echo -e "$INFO Detected MIPSEL architecture."
+    # echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
+    # echo -e "$WARNING USE AT YOUR OWN RISK"
+    # ;;
   *)
     echo "This is unsupported platform, sorry."
     exit 1
