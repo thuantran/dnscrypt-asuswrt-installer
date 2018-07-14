@@ -152,7 +152,7 @@ choose_dnscrypt_server_manual () {
     toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
     INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
-    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; print}' $TARG_DIR/public-resolvers.md
+    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
     read_input_num "Please choose DNS server" 1 $INDEX
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
