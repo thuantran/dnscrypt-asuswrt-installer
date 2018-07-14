@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.15
+DNSCRYPT_VER=2.0.16
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -280,7 +280,7 @@ inst_dnscrypt () {
     return
   fi
 
-  download_file $TARG_DIR 755 $URL_GEN/manager $URL_ARCH/nonroot
+  download_file $TARG_DIR 755 $URL_GEN/manager
   download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
     $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig
@@ -579,7 +579,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true
+    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" daemonize true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
     check_dnscrypt_toml
