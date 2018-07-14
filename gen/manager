@@ -28,10 +28,11 @@ init_hwrng () {
 }
 
 start_dnscrypt () {
+  DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall -q dnscrypt-proxy
   logger "Start dnscrypt-proxy"
   cd /jffs/dnscrypt
-  /jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml
+  nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
 }
 
 start_monitor () {
