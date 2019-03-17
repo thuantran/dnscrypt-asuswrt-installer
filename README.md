@@ -1,7 +1,7 @@
 So to solve all the problems with installing dnscrypt with entware (or similar) then setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, I made my own installer for dnscrypt-proxy.
 
 # Requirements:
-- ARM or MIPSEL based ASUS routers
+- ARM based ASUS routers
 - asuswrt-merlin firmwares or compatible
 - jffs support and script enabled
 
