@@ -273,7 +273,7 @@ end_op_message () {
 
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
-  local RESOLVERS_URL_PREFIX="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2"
+  local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
   create_dir $TARG_DIR
   if [ $? -ne 0 ]; then
     end_op_message
