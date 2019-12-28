@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.23
+DNSCRYPT_VER=2.0.36
 
 BOLD="\033[1m"
 NORM="\033[0m"
