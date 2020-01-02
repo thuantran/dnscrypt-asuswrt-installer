@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.23
+DNSCRYPT_VER=2.0.36
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -283,8 +283,10 @@ inst_dnscrypt () {
   download_file $TARG_DIR 755 $URL_GEN/manager
   download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
     $RESOLVERS_URL_PREFIX/public-resolvers.md \
-    $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig
-  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig
+    $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
+    $RESOLVERS_URL_PREFIX/relays.md \
+    $RESOLVERS_URL_PREFIX/relays.md.minisig
+  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
   tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
   if [ $? -ne 0 ]; then
     echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
@@ -579,7 +581,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 1024 keepalive 120 netprobe_timeout 120
+    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
     check_dnscrypt_toml
