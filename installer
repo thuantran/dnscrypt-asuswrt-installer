@@ -52,12 +52,11 @@ check_jffs_enabled () {
   fi
 }
 
-check_anonymized_support () {
 if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ] && [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then
 echo -e "$INFO Cisco does not support anonymized DNS"
 echo -e "$INFO Continue without Relays Support"
 toml_avar_disable routes
-elif [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then   # Checking for Anonymized Support.
+elif [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then   # Checking for Anonymized Relays.
        echo -e "$INFO Found support for Anonymized Dnscrypt"
        echo -e "$INFO Users may specify Wild-card Relay Support"
        echo -e "$INFO What do you want to do:"
@@ -72,30 +71,10 @@ elif [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then   # Checking f
              ;;
            2)
              echo -e "$INFO Choose Relays for DNSCRYPT servers:"
-             VARSARGS="dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6v6 af-dnswarden-dc2-ipv6v6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6v6 quad9-dnscrypt-ip6-nofilter-altv6 geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6v6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-altv6 dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6v6 ads-dnswarden-dc1-ipv6-ecsv6 ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6v6 cs-usor dnscrypt.ca-1-ipv6v6 quad9-dnscrypt-ip6-filter-priv6 mrkaran scaleway-ams-ipv6v6 dnswarden-dc3-ipv6v6 dnswarden-dc2-ipv6v6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6v6 af-dnswarden-dc1-ipv6-ecsv6 af-dnswarden-dc2-ipv6-ecsv6 quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecsv6 cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6v6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6v6 publicarray-au ads-dnswarden-dc3-ipv6v6 cs-ch jp.tiar.app-ipv6v6 dnsforfamily dnsforfamily-v6v6 dnscrypt-jp-blahdns-ipv6v6 ads-dnswarden-dc1 id-gmail securedns-ipv6v6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6v6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-priv6 quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecsv6 dnscrypt.one-ipv6v6 opennic-luggs-ipv6v6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6v6 ads-dnswarden-dc1-ipv6v6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6v6 cs-usnc dnscrypt.uk-ipv6v6 dnscrypt.eu-dk-ipv6v6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6v6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6v6 cs-swe dnscrypt.ca-2-ipv6v6 ads-dnswarden-dc3-ipv6-ecsv6 ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6v6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6v6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6v6 cs-pl"
-             for DNSCRYPT in $VARSARGS; do
-                if [ "`grep '^server_names = .*${$DNSCRYPT}.*' $TOML_FILE`" ]; then   # Checking for Anonymized Relays.
-                   choose_relays_manual
-                   break
-                else
-                   echo -e "$INFO No supported DNSCRYPT servers found"
-                   toml_avar_disable routes
-                   break
-                fi
-             done
+             choose_relays_manual
              ;;
            3)
-             VARSARGS="dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6v6 af-dnswarden-dc2-ipv6v6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6v6 quad9-dnscrypt-ip6-nofilter-altv6 geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6v6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-altv6 dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6v6 ads-dnswarden-dc1-ipv6-ecsv6 ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6v6 cs-usor dnscrypt.ca-1-ipv6v6 quad9-dnscrypt-ip6-filter-priv6 mrkaran scaleway-ams-ipv6v6 dnswarden-dc3-ipv6v6 dnswarden-dc2-ipv6v6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6v6 af-dnswarden-dc1-ipv6-ecsv6 af-dnswarden-dc2-ipv6-ecsv6 quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecsv6 cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6v6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6v6 publicarray-au ads-dnswarden-dc3-ipv6v6 cs-ch jp.tiar.app-ipv6v6 dnsforfamily dnsforfamily-v6v6 dnscrypt-jp-blahdns-ipv6v6 ads-dnswarden-dc1 id-gmail securedns-ipv6v6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6v6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-priv6 quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecsv6 dnscrypt.one-ipv6v6 opennic-luggs-ipv6v6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6v6 ads-dnswarden-dc1-ipv6v6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6v6 cs-usnc dnscrypt.uk-ipv6v6 dnscrypt.eu-dk-ipv6v6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6v6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6v6 cs-swe dnscrypt.ca-2-ipv6v6 ads-dnswarden-dc3-ipv6-ecsv6 ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6v6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6v6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6v6 cs-pl"
-             for DNSCRYPT in $VARSARGS; do
-                if [ "`grep '^server_names = .*${$DNSCRYPT}.*' $TOML_FILE`" ]; then   # Checking for Anonymized Relays.
-                   echo -e "$INFO Continue with Previous Relays for DNSCRYPT servers:"
-                   break
-                else
-                   echo -e "$INFO No supported DNSCRYPT servers found"
-                   toml_avar_disable routes
-                   break
-                fi
-             done
+             echo -e "$INFO Continue with Previous Relays for DNSCRYPT servers:"
              ;;
       esac
   else
