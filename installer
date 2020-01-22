@@ -443,27 +443,10 @@ local SDNS
   local GVARS_ARGS
   toml_gvars_prep server_names "\"['NextDNS-Custom']\""
   eval toml_gvars_write $GVARS_ARGS
-  if [ "`grep '^stamp = .*$SDNS.*' $TOML_FILE`" ]; then
-     echo -e "$INFO NextDNS-Custom Configuration Detected!!"
-     echo -e "$INFO Choose What You Want to do:"
-     echo -e "  1) Continue with current Stamp"
-     echo -e "  2) Change Stamp"
-     read_input_num "Select your mode" 1 2
-     case $CHOSEN in
-         1)
-          return
-          ;;
-         2)
-          echo -en "$INPUT Please enter nsdns$NORM: "
-          read -r NSDNS
-          toml_nvars_delete "stamp = '$SDNS" $TOML_FILE
-          toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$NSDNS'" $TOML_FILE
-          ;;
-     esac
-  else
-     toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
-     toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$SDNS'" $TOML_FILE
-  fi
+  toml_nvars_delete "[static.'NextDNS-Custom']" $TOML_FILE
+  toml_nvars_delete "stamp = '$SDNS'" $TOML_FILE
+  toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
+  toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$SDNS'" $TOML_FILE
   return
 }
   
