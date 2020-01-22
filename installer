@@ -444,7 +444,7 @@ local SDNS
   toml_gvars_prep server_names "\"['NextDNS-Custom']\""
   eval toml_gvars_write $GVARS_ARGS
   toml_nvars_delete "[static.'NextDNS-Custom']" $TOML_FILE
-  toml_nvars_delete "stamp = '$SDNS'" $TOML_FILE
+  toml_nvars_delete "stamp =" $TOML_FILE
   toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
   toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$SDNS'" $TOML_FILE
   return
