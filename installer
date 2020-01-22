@@ -92,6 +92,7 @@ elif [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then   # Checking f
              local GVARS_ARGS
              read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
              eval toml_gvars_write $GVARS_ARGS
+             choose_relays_manual
              ;;
            3)
              echo -e "$INFO Continue with Previous Relays for DNSCRYPT servers"
