@@ -443,10 +443,8 @@ local SDNS
   local GVARS_ARGS
   toml_gvars_prep server_names "['NextDNS-Custom']"
   eval toml_gvars_write $GVARS_ARGS
-  local NVARS_ARGS
-  toml_nvars_prep stamp "'$SDNS'"
-  toml_nvars_print [static.'NextDNS-Custom']
-  eval toml_nvars_write $NVARS_ARGS
+  toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
+  toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = $SDNS" $TOML_FILE
   return
 }
   
@@ -815,50 +813,25 @@ toml_gvars_write () {
   sed -i "${SED_CMD%;}" $TOML_FILE
 }
 
-toml_nvars_disable () {
-  local VAR=$1
-  local IDX_NX_NVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
-  sed -i "1,$IDX_NX_NVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
+toml_nvars_insert () {
+  PATTERN=$(_quote "$1")
+  CONTENT=$(_quote "$2")
+  sed -i "/$PATTERN/a$CONTENT" $3
 }
 
-toml_nvars_prep () {
-  NVARS_ARGS="$NVARS_ARGS $@"
+toml_nvars_replace () {
+        PATTERN=$(_quote "$1")
+        CONTENT=$(_quote "$2")
+        sed -i "s/$PATTERN/$CONTENT/" $3
 }
 
-toml_nvars_print () {
-  local VAR=$1
-  local IDX_GLB_INS=`awk -v VAR="#.*# Optional, local, static list.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
-  sed '/^$IDX_GLB_INS.*/a $VAR' $TOML_FILE`
+toml_nvars_append () {
+        echo "$1" >> $2
 }
 
-toml_nvars_write () {
-  local IDX_NX_NVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
-  local IDX_GLB_INS=`awk -v VAR="#.*# Optional, local, static list.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
-  local VAR
-  local VALUE
-  local TO
-  local INDEX
-  local HAS_GLB_INS
-  local SED_CMD
-  while [ $# -gt 0 ]; do
-    VAR=$1; shift
-    VALUE=$1; shift
-    TO=$(_quote "$VAR = $VALUE")
-    INDEX=`awk -v IDX=$IDX_NX_NVAR -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
-    if [ "$INDEX" ]; then
-      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
-      continue
-    fi
-    INDEX=`awk -v IDX=$IDX_NX_NVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
-    if [ "$INDEX" ]; then
-      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
-      continue
-    fi
-    [ -z $HAS_GLB_INS ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
-    HAS_GLB_INS=1
-  done
-  [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
-  sed -i "${SED_CMD%;}" $TOML_FILE
+toml_nvars_delete() {
+        PATTERN=$(_quote "$1")
+        sed -i "/$PATTERN/d" $2
 }
 
 uninst_all () {
