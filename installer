@@ -434,18 +434,18 @@ manager_monitor_restart () {
 }
 
 nextdns_authen () {
-local NEXTDNS_SDNS
+local SDNS
   if [ "$1" -eq 0 ]; then
     return
   fi
-  echo -en "$INPUT Please enter nextdns_sdns$NORM: "
-  read -r NEXTDNS_SDNS
+  echo -en "$INPUT Please enter sdns$NORM: "
+  read -r SDNS
   local GVARS_ARGS
-  toml_gvars_prep server_names "\"NextDNS-Custom\""
+  toml_gvars_prep server_names "['NextDNS-Custom']"
   eval toml_gvars_write $GVARS_ARGS
   local NVARS_ARGS
-  toml_nvars_prep [static.'NextDNS-Custom']
-  toml_nvars_prep stamp '$NEXTDNS_SDNS'
+  toml_nvars_prep stamp "'$SDNS'"
+  toml_nvars_print [static.'NextDNS-Custom']
   eval toml_nvars_write $NVARS_ARGS
   return
 }
@@ -825,9 +825,15 @@ toml_nvars_prep () {
   NVARS_ARGS="$NVARS_ARGS $@"
 }
 
+toml_nvars_print () {
+  local VAR=$1
+  local IDX_GLB_INS=`awk -v VAR="#.*# Optional, local, static list.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  sed '/^$IDX_GLB_INS.*/a $VAR' $TOML_FILE`
+}
+
 toml_nvars_write () {
   local IDX_NX_NVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
-  local IDX_GLB_INS=`awk -v VAR="#.*[static.'myserver'].*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local IDX_GLB_INS=`awk -v VAR="#.*# Optional, local, static list.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
   local VAR
   local VALUE
   local TO
