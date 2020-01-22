@@ -57,6 +57,10 @@ if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ] && [ "`grep '^dnscrypt_se
 echo -e "$INFO Cisco does not support anonymized DNS"
 echo -e "$INFO Continue without Relays Support"
 toml_avar_disable routes
+elif [ "`grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE`" ] && [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then
+echo -e "$INFO NextDNS-Custom is defined"
+echo -e "$INFO Continue without Relays Support"
+toml_avar_disable routes
 elif [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then   # Checking for Anonymized Relays.
        echo -e "$INFO Found support for Anonymized Dnscrypt"
        echo -e "$INFO Users may specify Wild-card Relay Support"
@@ -115,6 +119,29 @@ check_opendns () {
     fi
   else
     opendns_authen 0
+  fi
+}
+
+check_nextdns () {
+  if [ "`grep '^server_names = .*nextdns.*' $TOML_FILE`" ]; then
+     echo -e "$INFO Found NextDNS Server"
+     echo -e "$INFO If you have been using Anonymized DNS before this! RECOMMEND to skip : Run Installer again and start from new config"
+     echo -e "$INFO Your (old)config will be saved in /jffs/dnscrypt folder to dnscrypt-proxy.toml.bak or dnscrypt-proxy.toml.old either way"
+     echo -e "$INFO If you have a NextDNS Account visit https://my.nextdns.io/login enter your setup and copy your DNS STAMP"
+     echo -e "$INFO What do you want to do:"
+     echo -e "  1) Setup Your SDNS STAMP"
+     echo -e "  2) Skip dont have account"
+     read_input_num "Your choice" 1 2
+     case $CHOSEN in
+       1)
+         echo -e "$INFO User has specified to define NextDNS-Custom"
+         nextdns_authen 1
+         ;;
+       2)
+         echo -e "$INFO User has chosen to skip NextDNS-Custom"
+         nextdns_authen 0
+         ;;
+     esac
   fi
 }
 
@@ -406,6 +433,23 @@ manager_monitor_restart () {
   $TARG_DIR/manager monitor-start
 }
 
+nextdns_authen () {
+local NEXTDNS_SDNS
+  if [ "$1" -eq 0 ]; then
+    return
+  fi
+  echo -en "$INPUT Please enter nextdns_sdns$NORM: "
+  read -r NEXTDNS_SDNS
+  local GVARS_ARGS
+  toml_gvars_prep server_names "\"NextDNS-Custom\""
+  eval toml_gvars_write $GVARS_ARGS
+  local NVARS_ARGS
+  toml_nvars_prep [static.'NextDNS-Custom']
+  toml_nvars_prep stamp '$NEXTDNS_SDNS'
+  eval toml_nvars_write $NVARS_ARGS
+  return
+}
+  
 opendns_authen () {
   local USERNAME
   local PW1
@@ -591,6 +635,7 @@ setup_dnscrypt () {
   setup_dnscrypt_impl "$@"
   local RET=$?
   check_opendns
+  check_nextdns
   local AVARS_ARGS
   check_anonymized_support
   eval toml_avars_write $AVARS_ARGS
@@ -759,6 +804,46 @@ toml_gvars_write () {
       continue
     fi
     INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    if [ "$INDEX" ]; then
+      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
+      continue
+    fi
+    [ -z $HAS_GLB_INS ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
+    HAS_GLB_INS=1
+  done
+  [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
+  sed -i "${SED_CMD%;}" $TOML_FILE
+}
+
+toml_nvars_disable () {
+  local VAR=$1
+  local IDX_NX_NVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  sed -i "1,$IDX_NX_NVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
+}
+
+toml_nvars_prep () {
+  NVARS_ARGS="$NVARS_ARGS $@"
+}
+
+toml_nvars_write () {
+  local IDX_NX_NVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
+  local IDX_GLB_INS=`awk -v VAR="#.*[static.'myserver'].*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local VAR
+  local VALUE
+  local TO
+  local INDEX
+  local HAS_GLB_INS
+  local SED_CMD
+  while [ $# -gt 0 ]; do
+    VAR=$1; shift
+    VALUE=$1; shift
+    TO=$(_quote "$VAR = $VALUE")
+    INDEX=`awk -v IDX=$IDX_NX_NVAR -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    if [ "$INDEX" ]; then
+      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
+      continue
+    fi
+    INDEX=`awk -v IDX=$IDX_NX_NVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
     if [ "$INDEX" ]; then
       SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
       continue
