@@ -141,9 +141,7 @@ check_opendns () {
 
 check_nextdns () {
   if [ "`grep '^server_names = .*nextdns.*' $TOML_FILE`" ]; then
-     echo -e "$INFO Found NextDNS Server"
-     echo -e "$INFO If you have been using Anonymized DNS before this! RECOMMEND to skip : Run Installer again and start from new config"
-     echo -e "$INFO Your (old)config will be saved in /jffs/dnscrypt folder to dnscrypt-proxy.toml.bak or dnscrypt-proxy.toml.old either way"
+     echo -e "$INFO Found NextDNS Server Selection"
      echo -e "$INFO If you have a NextDNS Account visit https://my.nextdns.io/login enter your setup and copy your DNS STAMP"
      echo -e "$INFO What do you want to do:"
      echo -e "  1) Setup Your SDNS STAMP"
