@@ -52,6 +52,58 @@ check_jffs_enabled () {
   fi
 }
 
+check_anonymized_support () {
+  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ] && [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then
+    echo -e "$INFO Cisco does not support anonymized DNS"
+    echo -e "$INFO Continue without Relays Support"
+    toml_nvars_delete "routes =" $TOML_FILE
+  elif [ "`grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE`" ] && [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then
+    echo -e "$INFO NextDNS-Custom is defined"
+    echo -e "$INFO Continue without Relays Support"
+    toml_nvars_delete "routes =" $TOML_FILE
+  elif [ "`grep '^dnscrypt_servers = .*true.*' $TOML_FILE`" ]; then   # Checking for Anonymized Relays.
+    echo -e "$INFO Checking for Anonymized Dnscrypt Support"
+    echo -e "$INFO Users may only specify Wild-card Relay Support"
+    echo -e "$INFO What do you want to do:"
+    echo -e "  1) Disable Relays for DNSCRYPT servers"
+    echo -e "  2) Pick Relays for DNSCRYPT servers"
+    echo -e "  3) Use Previous Relays for DNSCRYPT servers"
+    read_input_num "Your choice" 1 3
+    case $CHOSEN in
+      1)
+        echo -e "$INFO Continue without Relays Support"
+        toml_nvars_delete "routes =" $TOML_FILE
+        ;;
+      2)
+        toml_nvars_delete "routes =" $TOML_FILE
+        VARSARGS="dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6v6 af-dnswarden-dc2-ipv6v6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6v6 quad9-dnscrypt-ip6-nofilter-altv6 geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6v6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-altv6 dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6v6 ads-dnswarden-dc1-ipv6-ecsv6 ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6v6 cs-usor dnscrypt.ca-1-ipv6v6 quad9-dnscrypt-ip6-filter-priv6 mrkaran scaleway-ams-ipv6v6 dnswarden-dc3-ipv6v6 dnswarden-dc2-ipv6v6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6v6 af-dnswarden-dc1-ipv6-ecsv6 af-dnswarden-dc2-ipv6-ecsv6 quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecsv6 cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6v6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6v6 publicarray-au ads-dnswarden-dc3-ipv6v6 cs-ch jp.tiar.app-ipv6v6 dnsforfamily dnsforfamily-v6v6 dnscrypt-jp-blahdns-ipv6v6 ads-dnswarden-dc1 id-gmail securedns-ipv6v6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6v6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-priv6 quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecsv6 dnscrypt.one-ipv6v6 opennic-luggs-ipv6v6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6v6 ads-dnswarden-dc1-ipv6v6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6v6 cs-usnc dnscrypt.uk-ipv6v6 dnscrypt.eu-dk-ipv6v6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6v6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6v6 cs-swe dnscrypt.ca-2-ipv6v6 ads-dnswarden-dc3-ipv6-ecsv6 ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6v6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6v6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6v6 cs-pl"
+        for DNSCRYPT in $VARSARGS; do
+        SERVER=$(echo "$DNSCRYPT")
+          if [ "`grep '^server_names = .*'$SERVER'.*' $TOML_FILE`" ]; then
+            echo -e "$INFO Found Servers for Anonymized Dnscrypt Support"
+            echo -e "$INFO Choose Relays for DNSCRYPT servers"
+            choose_relays_manual
+            return
+          fi
+        done
+        echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
+        echo -e "$INFO Warning:Selecting Yes will disable defined servers"
+        echo -e "$INFO No will force installer continue as is."
+        local GVARS_ARGS
+        read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
+        eval toml_gvars_write $GVARS_ARGS
+        choose_relays_manual
+        ;;
+      3)
+        echo -e "$INFO Continue with Previous Relays for DNSCRYPT servers"
+        ;;
+    esac
+  else
+       echo -e "$INFO Continue without Relays Support"
+       toml_nvars_delete "routes =" $TOML_FILE
+  fi
+}
+
 check_opendns () {
   if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
     if [ -f $CONF_FILE ]; then
@@ -83,6 +135,27 @@ check_opendns () {
     fi
   else
     opendns_authen 0
+  fi
+}
+
+check_nextdns () {
+  if [ "`grep '^server_names = .*nextdns.*' $TOML_FILE`" ]; then
+     echo -e "$INFO Found NextDNS Server Selection"
+     echo -e "$INFO If you have a NextDNS Account visit https://my.nextdns.io/login enter your setup and copy your DNS STAMP"
+     echo -e "$INFO What do you want to do:"
+     echo -e "  1) Setup Your SDNS STAMP"
+     echo -e "  2) Skip dont have account"
+     read_input_num "Your choice" 1 2
+     case $CHOSEN in
+       1)
+         echo -e "$INFO User has specified to define NextDNS-Custom"
+         nextdns_authen 1
+         ;;
+       2)
+         echo -e "$INFO User has chosen to skip NextDNS-Custom"
+         nextdns_authen 0
+         ;;
+     esac
   fi
 }
 
@@ -175,6 +248,39 @@ choose_dnscrypt_server_manual () {
   fi
 
   choose_dnscrypt_server_manual $INDEX
+}
+
+choose_relays_manual () {
+ local INDEX=$1
+  if [ -z $INDEX ]; then
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    local RELAYS
+    echo -e "$INFO Available Relay servers: "
+    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l`
+    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/relays.md
+    read_input_num "Please choose RELAY server" 1 $INDEX
+  else
+    read_input_num "Please choose next RELAY server or press n to stop" 1 $INDEX n      
+    if [ $? -eq 1 ]; then
+       toml_avars_prep routes "\"[ { server_name='*', via=$RELAYS } ]\"" 
+      return
+    fi
+  fi
+
+  local ITEM
+  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md`
+ 
+  if [ "`echo $RELAYS | grep -F $ITEM`" ]; then
+    echo -e "$INFO $ITEM is already set"
+  else
+    if [ "$RELAYS" ]; then
+      RELAYS="${RELAYS%?}, '$ITEM']"
+    else
+      RELAYS="['$ITEM']"
+    fi
+  fi
+
+  choose_relays_manual $INDEX
 }
 
 cleanup () {
@@ -341,6 +447,22 @@ manager_monitor_restart () {
   $TARG_DIR/manager monitor-start
 }
 
+nextdns_authen () {
+local SDNS
+  if [ "$1" -eq 0 ]; then
+    return
+  fi
+  echo -en "$INPUT Please enter sdns$NORM: "
+  read -r SDNS
+  local GVARS_ARGS
+  toml_gvars_prep server_names "\"['NextDNS-Custom']\""
+  eval toml_gvars_write $GVARS_ARGS
+  toml_nvars_delete "[static.'NextDNS-Custom']" $TOML_FILE
+  toml_nvars_delete "stamp =" $TOML_FILE
+  toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
+  toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$SDNS'" $TOML_FILE
+}
+  
 opendns_authen () {
   local USERNAME
   local PW1
@@ -526,6 +648,10 @@ setup_dnscrypt () {
   setup_dnscrypt_impl "$@"
   local RET=$?
   check_opendns
+  check_nextdns
+  local AVARS_ARGS
+  check_anonymized_support
+  eval toml_avars_write $AVARS_ARGS
   if [ "$1" == "reconfig" ]; then
     if [ $RET -eq 0 ]; then
       echo -e "$INFO Restarting dnscrypt-proxy with new config..."
@@ -622,6 +748,46 @@ set_timezone () {
   end_op_message 0
 }
 
+toml_avar_disable () {
+  local VAR=$1
+  local IDX_NX_AVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  sed -i "1,$IDX_NX_AVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
+}
+
+toml_avars_prep () {
+  AVARS_ARGS="$AVARS_ARGS $@"
+}
+
+toml_avars_write () {
+  local IDX_NX_AVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
+  local IDX_GLB_INS=`awk -v VAR="#.*routes.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local VAR
+  local VALUE
+  local TO
+  local INDEX
+  local HAS_GLB_INS
+  local SED_CMD
+  while [ $# -gt 0 ]; do
+    VAR=$1; shift
+    VALUE=$1; shift
+    TO=$(_quote "$VAR = $VALUE")
+    INDEX=`awk -v IDX=$IDX_NX_AVAR -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    if [ "$INDEX" ]; then
+      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
+      continue
+    fi
+    INDEX=`awk -v IDX=$IDX_NX_AVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    if [ "$INDEX" ]; then
+      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
+      continue
+    fi
+    [ -z $HAS_GLB_INS ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
+    HAS_GLB_INS=1
+  done
+  [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
+  sed -i "${SED_CMD%;}" $TOML_FILE
+}
+
 toml_gvar_disable () {
   local VAR=$1
   local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
@@ -660,6 +826,27 @@ toml_gvars_write () {
   done
   [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
   sed -i "${SED_CMD%;}" $TOML_FILE
+}
+
+toml_nvars_insert () {
+  PATTERN=$(_quote "$1")
+  CONTENT=$(_quote "$2")
+  sed -i "/$PATTERN/a$CONTENT" $3
+}
+
+toml_nvars_replace () {
+  PATTERN=$(_quote "$1")
+  CONTENT=$(_quote "$2")
+  sed -i "s/$PATTERN/$CONTENT/" $3
+}
+
+toml_nvars_append () {
+  echo "$1" >> $2
+}
+
+toml_nvars_delete () {
+  PATTERN=$(_quote "$1")
+  sed -i "/$PATTERN/d" $2
 }
 
 uninst_all () {
