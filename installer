@@ -67,8 +67,7 @@ check_anonymized_support () {
     echo -e "$INFO What do you want to do:"
     echo -e "  1) Disable Relays for DNSCRYPT servers"
     echo -e "  2) Pick Relays for DNSCRYPT servers"
-    echo -e "  3) Use Previous Relays for DNSCRYPT servers"
-    read_input_num "Your choice" 1 3
+    read_input_num "Your choice" 1 2
     case $CHOSEN in
       1)
         echo -e "$INFO Continue without Relays Support"
@@ -93,9 +92,6 @@ check_anonymized_support () {
         read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
         eval toml_gvars_write $GVARS_ARGS
         choose_relays_manual
-        ;;
-      3)
-        echo -e "$INFO Continue with Previous Relays for DNSCRYPT servers"
         ;;
     esac
   else
@@ -650,7 +646,7 @@ setup_dnscrypt () {
   check_opendns
   check_nextdns
   local AVARS_ARGS
-  check_anonymized_support
+  read_yesno "Do you want to Add or Modify Relay Support for DNSCRYPT servers?" && check_anonymized_support || echo -e "$INFO Continue without Adding or Modifying Relays Support for DNSCRYPT servers."
   eval toml_avars_write $AVARS_ARGS
   if [ "$1" == "reconfig" ]; then
     if [ $RET -eq 0 ]; then
