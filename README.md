@@ -20,6 +20,8 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - Ability to setup a swap file
 - Ability to setup timezone file (/etc/localtime) used by dnscrypt-proxy and other apps
 - Ability to reconfigure dnscrypt-proxy without reinstalling unlike previous installer for dnscrypt-proxy version 1.x.x
+- Ability to configure anonymized relay support for Dnscrypt servers through menu option.
+- Support for NextDNS.io Account SDNS stamp as Static server.
 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
