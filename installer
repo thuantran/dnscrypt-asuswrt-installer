@@ -72,7 +72,7 @@ check_anonymized_support () {
     echo -e "$INFO What do you want to do:"
     echo -e "  1) Disable Relays for DNSCRYPT servers"
     echo -e "  2) Pick Relays for DNSCRYPT servers"
-    echo -e "  2) Skip Choosing Relays for DNSCRYPT servers"
+    echo -e "  3) Skip Choosing Relays for DNSCRYPT servers"
     read_input_num "Your choice" 1 3
     case $CHOSEN in
       1)
