@@ -692,6 +692,7 @@ static_chosen () {
           choose_dnscrypt_server_static
           ;;
       esac
+    return
   fi
   echo -e "$INFO Please enter Static Server SDNS stamp" 
   echo -en "$INPUT Please enter sdnsstamp$NORM: "
