@@ -1,6 +1,7 @@
 #!/bin/sh
 
 DNSCRYPT_VER=2.0.36
+DI_VERSION=2.0.0
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -182,7 +183,7 @@ choose_dnscrypt_server () {
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
-  echo -e "  3) fastest"
+  echo -e "  3) first"
   echo -e "  4) random"
   read_input_num "Select your mode" 1 4
   case $CHOSEN in
@@ -193,7 +194,7 @@ choose_dnscrypt_server () {
       toml_gvars_prep lb_strategy "\'ph\'"
       ;;
     3)
-      toml_gvars_prep lb_strategy "\'fastest\'"
+      toml_gvars_prep lb_strategy "\'first\'"
       ;;
     4)
       toml_gvars_prep lb_strategy "\'random\'"
@@ -202,13 +203,17 @@ choose_dnscrypt_server () {
   echo -e "$INFO Choose how your DNS servers are selected:"
   echo -e "  1) Automatically"
   echo -e "  2) Manually"
-  read_input_num "Select your mode" 1 2
+  echo -e "  3) Static"
+  read_input_num "Select your mode" 1 3
   case $CHOSEN in
     1)
       choose_dnscrypt_server_auto
       ;;
     2)
       choose_dnscrypt_server_manual
+      ;;
+    3)
+      choose_dnscrypt_server_static
       ;;
   esac
 }
@@ -255,8 +260,30 @@ choose_dnscrypt_server_manual () {
   choose_dnscrypt_server_manual $INDEX
 }
 
+choose_dnscrypt_server_static () {
+  echo -e "$INFO This feature allows the User to define a single server using the sdns stamp of the server."
+  echo -e "$INFO This assigns the server with a custom name specified by the user as a static option."
+  echo -e "$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option."
+  echo -e "$INFO If you do not want to continue down this path please select option 2 to return to server selection menu."
+  echo -e "$INFO What do you want to do:"
+  echo -e "  1) Setup Static Server."
+  echo -e "  2) Skip and Go back to server selection menu."
+  read_input_num "Your choice" 1 2
+    case $CHOSEN in
+      1)
+        echo -e "$INFO User has specified to define a Static Server."
+        static_chosen 1
+        ;;
+      2)
+        echo -e "$INFO User has chosen to go back to server selection menu."
+        static_chosen 0
+        ;;
+    esac
+}
+
+
 choose_relays_manual () {
- local INDEX=$1
+  local INDEX=$1
   if [ -z $INDEX ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RELAYS
@@ -453,7 +480,7 @@ manager_monitor_restart () {
 }
 
 nextdns_authen () {
-local SDNS
+  local SDNS
   if [ "$1" -eq 0 ]; then
     return
   fi
@@ -641,6 +668,44 @@ read_yesno () {
       read_yesno "$@"
       ;;
   esac
+}
+
+static_chosen () {
+  local SDNSSTAMP
+  local STATICNAME
+  if [ "$1" -eq 0 ]; then
+    toml_nvars_delete "[static.'" $TOML_FILE
+    toml_nvars_delete "stamp =" $TOML_FILE
+    echo -e "$INFO Choose how your DNS servers are selected:"
+    echo -e "  1) Automatically"
+    echo -e "  2) Manually"
+    echo -e "  3) Static"
+    read_input_num "Select your mode" 1 3
+      case $CHOSEN in
+        1)
+          choose_dnscrypt_server_auto
+          ;;
+        2)
+          choose_dnscrypt_server_manual
+          ;;
+        3)
+          choose_dnscrypt_server_static
+          ;;
+      esac
+    return
+  fi
+  echo -e "$INFO Please enter Static Server SDNS stamp" 
+  echo -en "$INPUT Please enter sdnsstamp$NORM: "
+  read -r SDNSSTAMP
+  echo -e "$INFO Please choose Static Server Name"
+  echo -en "$INPUT Please enter staticname$NORM: "
+  read -r STATICNAME
+  toml_gvars_prep server_names "\"['$STATICNAME']\""
+  toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
+  toml_nvars_delete "[static.'" $TOML_FILE
+  toml_nvars_delete "stamp =" $TOML_FILE
+  toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+  toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
 }
 
 setup_dnscrypt () {
