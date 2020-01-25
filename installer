@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DNSCRYPT_VER=2.0.36
-DI_VERSION=2.0.0
+DI_VERSION=v2.0.0
 
 BOLD="\033[1m"
 NORM="\033[0m"
