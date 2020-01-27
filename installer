@@ -35,11 +35,9 @@ check_dnscrypt_toml () {
 
 check_dns_environment () {
   local DNSPRIV=`nvram get dnspriv_enable`
-  local DNS_LOCAL=`nvram get dns_local_cache`
-  if [ $DNSPRIV -ne 0 ] || [ $DNS_LOCAL -ne 0 ]; then
+  if [ $DNSPRIV -ne 0 ]; then
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
-    nvram set dns_local_cache=0
     nvram commit
   else
     echo -e "$INFO DNS Environment is Ready."
