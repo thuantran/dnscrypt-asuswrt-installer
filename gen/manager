@@ -102,7 +102,8 @@ case $1 in
     DNS="$(nvram get "ipv6_dns$VAR")"
     [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
     done
-    sed -i "s/^servers-file=.*/servers-file=/jffs/dnscrypt/resolv.dnsmasq/" /etc/dnsmasq.conf
+    sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
+    append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
     ;;
   init-start)
     if [ -f /jffs/dnscrypt/localtime ]; then
