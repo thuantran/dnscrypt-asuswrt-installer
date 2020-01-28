@@ -94,7 +94,8 @@ case $1 in
   dnsmasq)
     append_on_demand /etc/dnsmasq.conf "no-resolv"
     append_on_demand /tmp/resolv.dnsmasq "server=127.0.0.1#65053"
-    for DNS in $(nvram get wan_dns) $(nvram get ipv6_get_dns); do
+    SERVERS="$(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns)"
+    for DNS in $SERVERS; do
     sed -i "/^server=$DNS.*$/d" /tmp/resolv.dnsmasq
     done
     for VAR in 1 2 3; do
@@ -126,6 +127,26 @@ case $1 in
     ;;
   monitor-start)
     start_monitor &
+    ;;
+  openvpn-event)
+    COUNTER="0"
+    for OPENVPN_CLIENT in 1 2 3 4 5; do
+    if [ "$(nvram get vpn_client${OPENVPN_CLIENT}_state)" -eq "2" ]; then
+	COUNTER=$((COUNTER + 1))
+    fi
+    done
+    if [ "$COUNTER" -gt "0" ]; then
+      append_on_demand /etc/dnsmasq.conf "no-resolv"
+      append_on_demand /tmp/resolv.dnsmasq "server=127.0.0.1#65053"
+      SERVERS="$(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns)"
+      for DNS in $SERVERS; do
+      sed -i "/^server=$DNS.*$/d" /tmp/resolv.dnsmasq
+      done
+      for VAR in 1 2 3; do
+      DNS="$(nvram get "ipv6_dns$VAR")"
+      [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /tmp/resolv.dnsmasq
+      done
+    fi
     ;;
   services-stop)
     [ -f /jffs/dnscrypt/localtime ] && touch "$0"
