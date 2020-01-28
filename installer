@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DNSCRYPT_VER=2.0.36
-DI_VERSION=v2.0.1
+DI_VERSION=v2.0.2
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -38,9 +38,52 @@ check_dns_environment () {
   if [ $DNSPRIV -ne 0 ]; then
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
+    nvram set dhcp_dns1_x=""
+    nvram set dhcp_dns2_x=""
     nvram commit
   else
     echo -e "$INFO DNS Environment is Ready."
+    nvram set dhcp_dns1_x=""
+    nvram set dhcp_dns2_x=""
+    nvram commit
+  fi
+}
+
+check_dns_filter () {
+  del_jffs_script /jffs/scripts/firewall-start
+  local DNSFIL=`nvram get dnsfilter_enable_x`
+  if [ "$1" -eq 1 ] && [ $DNSFIL -ne 1 ]; then
+    nvram set dnsfilter_custom1=""
+    nvram set dnsfilter_custom2=""
+    nvram set dnsfilter_custom3=""
+    nvram set dnsfilter_enable_x="1"
+    nvram set dnsfilter_mode="11"
+    nvram set dnsfilter_rulelist=""
+    nvram set dnsfilter_rulelist1=""
+    nvram set dnsfilter_rulelist2=""
+    nvram set dnsfilter_rulelist3=""
+    nvram set dnsfilter_rulelist4=""
+    nvram set dnsfilter_rulelist5=""
+    nvram commit
+    echo -e "$INFO Set DNSFilter to Control DNS."
+  elif [ "$1" -eq 1 ] && [ $DNSFIL -ne 0 ]; then
+    nvram set dnsfilter_custom1=""
+    nvram set dnsfilter_custom2=""
+    nvram set dnsfilter_custom3=""
+    nvram set dnsfilter_mode="11"
+    nvram set dnsfilter_rulelist=""
+    nvram set dnsfilter_rulelist1=""
+    nvram set dnsfilter_rulelist2=""
+    nvram set dnsfilter_rulelist3=""
+    nvram set dnsfilter_rulelist4=""
+    nvram set dnsfilter_rulelist5=""
+    nvram commit
+    echo -e "$INFO DNSFilter is on. Setting proper values."
+  fi
+  if [ "$1" -eq 0 ] && [ $DNSFIL -ne 0 ]; then
+    nvram set dnsfilter_enable_x="0"
+    nvram commit
+    echo -e "$INFO User chose to not force DNS. "
   fi
 }
 
@@ -452,6 +495,7 @@ inst_dnscrypt () {
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/wan-start wan-start
+  write_manager_script /jffs/scripts/openvpn-event openvpn-event
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message
@@ -777,7 +821,7 @@ setup_dnscrypt_impl () {
       cp -f $TOML_ORI $TOML_FILE
     fi
     local GVARS_ARGS
-    read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && write_manager_script /jffs/scripts/firewall-start fw-rules || del_jffs_script /jffs/scripts/firewall-start
+    read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
     choose_dnscrypt_server
 
     echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
@@ -939,6 +983,7 @@ uninst_all () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/services-stop
   del_jffs_script /jffs/scripts/wan-start
+  del_jffs_script /jffs/scripts/openvpn-event
   service restart_dnsmasq
   killall -q -9 haveged rngd dnscrypt-proxy
   local MAN_PID="`pidof manager`"
@@ -960,6 +1005,7 @@ uninst_dnscrypt () {
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/wan-start
+  del_jffs_script /jffs/scripts/openvpn-event
   killall -q dnscrypt-proxy
   service restart_dnsmasq
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
