@@ -452,6 +452,7 @@ inst_dnscrypt () {
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/wan-start wan-start
+  write_manager_script /jffs/scripts/openvpn-event openvpn-event
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message
@@ -939,6 +940,7 @@ uninst_all () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/services-stop
   del_jffs_script /jffs/scripts/wan-start
+  del_jffs_script /jffs/scripts/openvpn-event
   service restart_dnsmasq
   killall -q -9 haveged rngd dnscrypt-proxy
   local MAN_PID="`pidof manager`"
@@ -960,6 +962,7 @@ uninst_dnscrypt () {
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/wan-start
+  del_jffs_script /jffs/scripts/openvpn-event
   killall -q dnscrypt-proxy
   service restart_dnsmasq
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
