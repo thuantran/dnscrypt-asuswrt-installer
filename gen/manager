@@ -94,8 +94,7 @@ case $1 in
   dnsmasq)
     append_on_demand /etc/dnsmasq.conf "no-resolv"
     append_on_demand /tmp/resolv.dnsmasq "server=127.0.0.1#65053"
-    SERVERS="$(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns)"
-    for DNS in $SERVERS; do
+    for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
     sed -i "/^server=$DNS.*$/d" /tmp/resolv.dnsmasq
     done
     for VAR in 1 2 3; do
@@ -132,8 +131,7 @@ case $1 in
     if [ "$COUNTER" -gt "0" ]; then
       append_on_demand /etc/dnsmasq.conf "no-resolv"
       append_on_demand /tmp/resolv.dnsmasq "server=127.0.0.1#65053"
-      SERVERS="$(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns)"
-      for DNS in $SERVERS; do
+      for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
       sed -i "/^server=$DNS.*$/d" /tmp/resolv.dnsmasq
       done
       for VAR in 1 2 3; do
