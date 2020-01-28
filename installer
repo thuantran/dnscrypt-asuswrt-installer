@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DNSCRYPT_VER=2.0.36
-DI_VERSION=v2.0.1
+DI_VERSION=v2.0.2
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -85,7 +85,7 @@ check_dns_filter () {
     nvram commit
     echo -e "$INFO User chose to not force DNS. "
   fi
-  }
+}
 
 check_jffs_enabled () {
   if [ "`nvram get jffs2_format`" == "1" ]; then
