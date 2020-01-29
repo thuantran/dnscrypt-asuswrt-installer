@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DNSCRYPT_VER=2.0.36
-DI_VERSION=v2.0.2
+DI_VERSION=v2.0.3
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -38,20 +38,21 @@ check_dns_environment () {
   if [ $DNSPRIV -ne 0 ]; then
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
-    nvram set dhcp_dns1_x=""
-    nvram set dhcp_dns2_x=""
     nvram commit
+    echo -e "$INFO DNS Environment is Ready."
   else
     echo -e "$INFO DNS Environment is Ready."
-    nvram set dhcp_dns1_x=""
-    nvram set dhcp_dns2_x=""
-    nvram commit
   fi
 }
 
 check_dns_filter () {
-  del_jffs_script /jffs/scripts/firewall-start
   local DNSFIL=`nvram get dnsfilter_enable_x`
+  if [ "$1" -eq 0 ] && [ $DNSFIL -ne 0 ]; then
+    nvram set dnsfilter_enable_x="0"
+    nvram commit
+    echo -e "$INFO User chose to not force DNS through this proxy."
+    return
+  fi
   if [ "$1" -eq 1 ] && [ $DNSFIL -ne 1 ]; then
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
@@ -64,9 +65,14 @@ check_dns_filter () {
     nvram set dnsfilter_rulelist3=""
     nvram set dnsfilter_rulelist4=""
     nvram set dnsfilter_rulelist5=""
+    nvram set dhcp_dns1_x=""
+    nvram set dhcp_dns2_x=""
     nvram commit
     echo -e "$INFO Set DNSFilter to Control DNS."
   elif [ "$1" -eq 1 ] && [ $DNSFIL -ne 0 ]; then
+    echo -e "$INFO DNSFilter is Already on."
+    echo -e "$INFO User can choose to keep any custom dnsfilter values and only redirect non-custom traffic."
+    read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && check_dns_filter_some || echo -e "$INFO User chose to continue redirecting All DNS resolutions instead."
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
     nvram set dnsfilter_custom3=""
@@ -77,14 +83,19 @@ check_dns_filter () {
     nvram set dnsfilter_rulelist3=""
     nvram set dnsfilter_rulelist4=""
     nvram set dnsfilter_rulelist5=""
+    nvram set dhcp_dns1_x=""
+    nvram set dhcp_dns2_x=""
     nvram commit
-    echo -e "$INFO DNSFilter is on. Setting proper values."
   fi
-  if [ "$1" -eq 0 ] && [ $DNSFIL -ne 0 ]; then
-    nvram set dnsfilter_enable_x="0"
-    nvram commit
-    echo -e "$INFO User chose to not force DNS. "
-  fi
+}
+
+check_dns_filter_some () {
+  nvram set dnsfilter_mode="11"
+  nvram set dhcp_dns1_x=""
+  nvram set dhcp_dns2_x=""
+  nvram commit
+  echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
+  return
 }
 
 check_jffs_enabled () {
@@ -493,6 +504,7 @@ inst_dnscrypt () {
 
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
+  del_jffs_script /jffs/scripts/firewall-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/wan-start wan-start
@@ -828,7 +840,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.0.1:65053\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
     check_dnscrypt_toml
