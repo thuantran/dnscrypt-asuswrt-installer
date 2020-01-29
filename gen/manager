@@ -94,7 +94,9 @@ case $1 in
   dnsmasq)
     cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
     append_on_demand /etc/dnsmasq.conf "no-resolv"
-    append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.0.1#65053"
+    append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
+    append_on_demand /tmp/resolv.conf "nameserver 127.0.1.1"
+    append_on_demand /etc/resolv.conf "nameserver 127.0.1.1"
     for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
     sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
     done
