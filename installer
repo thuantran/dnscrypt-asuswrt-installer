@@ -249,12 +249,6 @@ check_version () {
       [ -z "$LVERSION" ] && exit 1
       [ -z "$RMERSION" ] && exit 1
 
-      echo locally installed
-      echo -e "$INFO $LVERSION"
-
-      echo remote git version
-      echo -e "$INFO $RMERSION"
-
       if [ "$RMERSION" != "$LVERSION" ]; then
         echo -e "$INFO New DNSCRYPT_VER=$RMERSION Available!"
         echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Proxy."
@@ -266,13 +260,7 @@ check_version () {
     local RMNSTALL=v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
       [ -z "$LINSTALL" ] && exit 1
       [ -z "$RMNSTALL" ] && exit 1
-     
-      echo locally installed
-      echo -e "$INFO $LINSTALL"
 
-      echo remote git version
-      echo -e "$INFO $RMNSTALL"
-     
       if [ "$RMNSTALL" != "$LINSTALL" ]; then
         echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
         echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
@@ -528,13 +516,7 @@ inst_dnscrypt () {
     local LINSTALL=v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
     local RMNSTALL=v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
      [ -z "$LINSTALL" ] && exit 1
-     [ -z "$RMNSTALL" ] && exit 1
-     
-     echo locally installed
-     echo -e "$INFO $LINSTALL"
-
-     echo remote git version
-     echo -e "$INFO $RMNSTALL"
+     [ -z "$RMNSTALL" ] && exit 1     
      
     if [ "$RMNSTALL" != "$LINSTALL" ]; then
        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
@@ -554,12 +536,6 @@ inst_dnscrypt () {
     local RMERSION_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${RMERSION}.tar.gz
     [ -z "$LVERSION" ] && exit 1
     [ -z "$RMERSION" ] && exit 1
-
-    echo locally installed
-    echo -e "$INFO $LVERSION"
-
-    echo remote git version
-    echo -e "$INFO $RMERSION"
 
     if [ "$RMERSION" != "$LVERSION" ]; then
        echo -e "$INFO New DNSCRYPT_VER=$RMERSION Available!"
