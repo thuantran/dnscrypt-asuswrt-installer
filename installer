@@ -521,14 +521,14 @@ inst_dnscrypt () {
     if [ "$RMNSTALL" != "$LINSTALL" ]; then
        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
        echo -e "$INFO Updating DI_VERSION=$LINSTALL to $RMNSTALL ."
-       curl "$RURL" -o "${TARG_DIR}installer" && chmod 0755 ${TARG_DIR}/installer
+       download_file $TARG_DIR 755 $RURL
        inst_dnscrypt
        return
     else
        echo -e "$INFO DI_VERSION=$LINSTALL is current, no new DNScrypt Asuswrt Installer Version Available."
     fi
   else
-    curl "$RURL" -o "${TARG_DIR}/installer" && chmod 0755 ${TARG_DIR}/installer
+    download_file $TARG_DIR 755 $RURL
   fi
   download_file $TARG_DIR 755 $URL_GEN/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
