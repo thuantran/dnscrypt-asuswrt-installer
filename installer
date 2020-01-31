@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DNSCRYPT_VER=2.0.36
-DI_VERSION=v2.0.3
+DI_VERSION=v2.0.4
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -241,6 +241,35 @@ check_swap () {
   inst_swap
 }
 
+check_version () {
+  if [ -f ${TARG_DIR}/installer ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
+    local LVERSION=$("${TARG_DIR}/dnscrypt-proxy" -version)
+    local LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+    local RMERSION=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
+      [ -z "$LVERSION" ] && exit 1
+      [ -z "$RMERSION" ] && exit 1
+
+      if [ "$RMERSION" != "$LVERSION" ]; then
+        echo -e "$INFO New DNSCRYPT_VER=$RMERSION Available!"
+        echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Proxy."
+      else
+        echo -e "$INFO DNSCRYPT_VER=$LVERSION"
+      fi
+    local RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+    local LINSTALL=v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
+    local RMNSTALL=v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
+      [ -z "$LINSTALL" ] && exit 1
+      [ -z "$RMNSTALL" ] && exit 1
+
+      if [ "$RMNSTALL" != "$LINSTALL" ]; then
+        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
+        echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
+      else
+        echo -e "$INFO DI_VERSION=$LINSTALL"
+      fi
+  fi
+}
+
 choose_dnscrypt_server () {
   local USE_IPV6
   read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
@@ -346,7 +375,6 @@ choose_dnscrypt_server_static () {
         ;;
     esac
 }
-
 
 choose_relays_manual () {
   local INDEX=$1
@@ -483,25 +511,72 @@ inst_dnscrypt () {
     end_op_message
     return
   fi
-
+  if [ -f ${TARG_DIR}/installer ]; then
+    local RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+    local LINSTALL=v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
+    local RMNSTALL=v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
+     [ -z "$LINSTALL" ] && exit 1
+     [ -z "$RMNSTALL" ] && exit 1     
+     
+    if [ "$RMNSTALL" != "$LINSTALL" ]; then
+       echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
+       echo -e "$INFO Updating DI_VERSION=$LINSTALL to $RMNSTALL ."
+       curl -L -s -k -O $RURL && chmod 0755 installer && installer inst_dnscrypt; mv installer ${TARG_DIR}/installer
+    else
+       echo -e "$INFO DI_VERSION=$LINSTALL is current, no new DNScrypt Asuswrt Installer Version Available."
+    fi
+  else
+    curl -L -s -k -O $RURL && chmod 0755 installer; mv installer ${TARG_DIR}/installer
+  fi
   download_file $TARG_DIR 755 $URL_GEN/manager
-  download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
-    $RESOLVERS_URL_PREFIX/public-resolvers.md \
+  if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
+    local LVERSION=$("${TARG_DIR}/dnscrypt-proxy" -version)
+    local LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+    local RMERSION=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
+    local RMERSION_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${RMERSION}.tar.gz
+    [ -z "$LVERSION" ] && exit 1
+    [ -z "$RMERSION" ] && exit 1
+
+    if [ "$RMERSION" != "$LVERSION" ]; then
+       echo -e "$INFO New DNSCRYPT_VER=$RMERSION Available!"
+       echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $RMERSION ."
+       if [ -f ${TARG_DIR}/installer ]; then
+          toml_nvars_replace "DNSCRYPT_VER=$LVERSION" "DNSCRYPT_VER=$RMERSION" ${TARG_DIR}/installer
+       fi
+       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${RMERSION}/${RMERSION_TAR}
+       tar xzv -C $TARG_DIR -f $TARG_DIR/$RMERSION_TAR
+       if [ $? -ne 0 ]; then
+          echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
+          end_op_message
+          return
+       fi
+       chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
+       mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
+       rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$RMERSION_TAR
+       chmod 755 $TARG_DIR/dnscrypt-proxy
+    else
+      echo -e "$INFO No New DNScrypt-Proxy Version Available."
+      toml_nvars_replace "DNSCRYPT_VER=$LVERSION" "DNSCRYPT_VER=$RMERSION" ${TARG_DIR}/installer
+    fi
+  else
+    download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
+    tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+    if [ $? -ne 0 ]; then
+      echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
+      end_op_message
+      return
+    fi
+    chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
+    mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
+    rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+    chmod 755 $TARG_DIR/dnscrypt-proxy
+  fi
+  download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
     $RESOLVERS_URL_PREFIX/relays.md \
     $RESOLVERS_URL_PREFIX/relays.md.minisig
   chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
-  tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
-  if [ $? -ne 0 ]; then
-    echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
-    end_op_message
-    return
-  fi
-  chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
-  mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-  rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
-  chmod 755 $TARG_DIR/dnscrypt-proxy
-
+  
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
   del_jffs_script /jffs/scripts/firewall-start
@@ -1129,6 +1204,7 @@ case $(uname -m) in
     ;;
 esac
 
+check_version
 check_dns_environment
 check_jffs_enabled
 cleanup
