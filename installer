@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.38
+DNSCRYPT_VER=2.0.39
 DI_VERSION=v2.0.4
 
 BOLD="\033[1m"
