@@ -23,6 +23,7 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - Ability to configure anonymized relay support for Dnscrypt servers through menu option.
 - Support for NextDNS.io Account SDNS stamp as Static server.
 - Support for a single Static Server using SDNS Stamp.
+- Improved Installer/Update Functions.
 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master

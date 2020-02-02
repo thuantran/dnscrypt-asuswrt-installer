@@ -1,7 +1,8 @@
 #!/bin/sh
 
-DNSCRYPT_VER=2.0.39
-DI_VERSION=v2.0.4
+DI_VERSION=v2.0.5
+LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+DNSCRYPT_VER=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -244,13 +245,11 @@ check_swap () {
 check_version () {
   if [ -f ${TARG_DIR}/installer ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION=$("${TARG_DIR}/dnscrypt-proxy" -version)
-    local LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-    local RMERSION=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
       [ -z "$LVERSION" ] && exit 1
-      [ -z "$RMERSION" ] && exit 1
+      [ -z "$DNSCRYPT_VER" ] && exit 1
 
-      if [ "$RMERSION" != "$LVERSION" ]; then
-        echo -e "$INFO New DNSCRYPT_VER=$RMERSION Available!"
+      if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
+        echo -e "$INFO New DNSCRYPT_VER=$DNSCRYPT_VER Available!"
         echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Proxy."
       else
         echo -e "$INFO DNSCRYPT_VER=$LVERSION"
@@ -525,7 +524,7 @@ inst_dnscrypt () {
        inst_dnscrypt
        return
     else
-       echo -e "$INFO DI_VERSION=$LINSTALL is current, no new DNScrypt Asuswrt Installer Version Available."
+       echo -e "$INFO No New DNScrypt Asuswrt Installer Version Available."
     fi
   else
     download_file $TARG_DIR 755 $RURL
@@ -533,20 +532,14 @@ inst_dnscrypt () {
   download_file $TARG_DIR 755 $URL_GEN/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION=$("${TARG_DIR}/dnscrypt-proxy" -version)
-    local LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-    local RMERSION=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
-    local RMERSION_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${RMERSION}.tar.gz
     [ -z "$LVERSION" ] && exit 1
-    [ -z "$RMERSION" ] && exit 1
+    [ -z "$DNSCRYPT_VER" ] && exit 1
 
-    if [ "$RMERSION" != "$LVERSION" ]; then
-       echo -e "$INFO New DNSCRYPT_VER=$RMERSION Available!"
-       echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $RMERSION ."
-       if [ -f ${TARG_DIR}/installer ]; then
-          toml_nvars_replace "DNSCRYPT_VER=$LVERSION" "DNSCRYPT_VER=$RMERSION" ${TARG_DIR}/installer
-       fi
-       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${RMERSION}/${RMERSION_TAR}
-       tar xzv -C $TARG_DIR -f $TARG_DIR/$RMERSION_TAR
+    if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
+       echo -e "$INFO New DNSCRYPT_VER=$DNSCRYPT_VER Available!"
+       echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $DNSCRYPT_VER ."
+      download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
+      tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
        if [ $? -ne 0 ]; then
           echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
           end_op_message
@@ -554,11 +547,10 @@ inst_dnscrypt () {
        fi
        chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
        mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-       rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$RMERSION_TAR
+       rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
        chmod 755 $TARG_DIR/dnscrypt-proxy
     else
       echo -e "$INFO No New DNScrypt-Proxy Version Available."
-      toml_nvars_replace "DNSCRYPT_VER=$LVERSION" "DNSCRYPT_VER=$RMERSION" ${TARG_DIR}/installer
     fi
   else
     download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
@@ -1223,7 +1215,7 @@ menu () {
   echo -e "  8) Install swap file"
   echo -e "  9) Uninstall ALL"
   echo -e "  q) Quit"
-  read_input_num "Please enter the number designates your selection:" 1 9 q
+  read_input_num "Please enter the number that designates your selection:" 1 9 q
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)"
