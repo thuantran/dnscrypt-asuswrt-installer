@@ -574,9 +574,9 @@ inst_dnscrypt () {
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
   del_jffs_script /jffs/scripts/firewall-start
+  del_jffs_script /jffs/scripts/wan-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
-  write_manager_script /jffs/scripts/wan-start wan-start
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message
