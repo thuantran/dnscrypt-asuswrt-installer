@@ -11,7 +11,7 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 # Current features:
 - [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with DoH and DNSCrypt version 2 protocols, multiple resolvers, and other features
 - Running as nobody through nonroot binary (using --user requires change to passwd)
-- Support ARM and MIPSEL based routers
+- Support ARM based routers
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
 - Handling ntp update at router boot up by starting dnscrypt-proxy with cert_ignore_timestamp option
 - Redirect all DNS queries on your network to dnscrypt if user chooses to
