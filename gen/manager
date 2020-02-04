@@ -90,7 +90,7 @@ start_monitor () {
 }
 
 timezone () {
-  SANITY=$(date -u -r \"$0\" '+%s')
+  SANITY=$(date -u -r $0 '+%s')
   NOW=$(date -u '+%s')
   TIMEZONE=/jffs/dnscrypt/localtime
   TARGET=/etc/localtime
