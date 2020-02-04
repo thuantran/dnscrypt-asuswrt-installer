@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION=v2.0.6
+DI_VERSION=v2.0.5
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
 
@@ -524,7 +524,7 @@ inst_dnscrypt () {
        inst_dnscrypt
        return
     else
-       echo -e "$INFO DI_VERSION=$LINSTALL"
+       echo -e "$INFO No New DNScrypt Asuswrt Installer Version Available."
     fi
   else
     download_file $TARG_DIR 755 $RURL
@@ -550,7 +550,7 @@ inst_dnscrypt () {
        rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
        chmod 755 $TARG_DIR/dnscrypt-proxy
     else
-      echo -e "$INFO DNSCRYPT_VER=$LVERSION"
+      echo -e "$INFO No New DNScrypt-Proxy Version Available."
     fi
   else
     download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
@@ -574,9 +574,9 @@ inst_dnscrypt () {
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
   del_jffs_script /jffs/scripts/firewall-start
-  del_jffs_script /jffs/scripts/wan-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
+  write_manager_script /jffs/scripts/wan-start wan-start
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message

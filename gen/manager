@@ -12,23 +12,6 @@ append_on_demand () {
   done
 }
 
-dnsmasq_params () {
-  cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
-  append_on_demand /etc/dnsmasq.conf "no-resolv"
-  append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
-  append_on_demand /tmp/resolv.conf "nameserver 127.0.1.1"
-  append_on_demand /etc/resolv.conf "nameserver 127.0.1.1"
-  for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
-  sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
-  done
-  for VAR in 1 2 3; do
-  DNS="$(nvram get "ipv6_dns$VAR")"
-  [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
-  done
-  sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
-  append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
-}
-
 init_hwrng () {
   local COUNT=0
   while [ ! -c $RNG_DEV ]; do
@@ -62,7 +45,7 @@ start_monitor () {
     if [ -f /jffs/dnscrypt/localtime ]; then
       if [ $COUNT -eq 90 ]; then
         COUNT=0
-        timezone
+        touch "$0"
       fi
       COUNT=$((COUNT + 1))
     fi
@@ -77,33 +60,10 @@ start_monitor () {
       elif [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
         logger "Warning: dnscrypt-proxy is not responding"
         start_dnscrypt
-      elif [ $NW_STATE -ne 0 ] && [ $RES_STATE -eq 0 ]; then
-        if [ $COUNT -eq 90 ]; then
-          COUNT=0
-          update_opendns 0 &
-        fi
-        COUNT=$((COUNT + 1))
       fi
     fi
     sleep 10
   done
-}
-
-timezone () {
-  SANITY=$(date -u -r \"$0\" '+%s')
-  NOW=$(date -u '+%s')
-  TIMEZONE=/jffs/dnscrypt/localtime
-  TARGET=/etc/localtime
-  if [ -f $TIMEZONE ] && [ "$(readlink $TARGET)" = "$TIMEZONE" ]; then
-      if [ $NOW -ge $SANITY ]; then
-        touch "$0"
-      fi
-  elif [ -f $TIMEZONE ]; then
-    ln -sf /jffs/dnscrypt/localtime /etc/localtime
-    if [ $NOW -le $SANITY ]; then
-      date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-    fi
-  fi
 }
 
 update_opendns () {
@@ -132,10 +92,26 @@ case $1 in
     start_dnscrypt
     ;;
   dnsmasq)
-    dnsmasq_params
+    cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
+    append_on_demand /etc/dnsmasq.conf "no-resolv"
+    append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
+    append_on_demand /tmp/resolv.conf "nameserver 127.0.1.1"
+    append_on_demand /etc/resolv.conf "nameserver 127.0.1.1"
+    for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
+    sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+    done
+    for VAR in 1 2 3; do
+    DNS="$(nvram get "ipv6_dns$VAR")"
+    [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+    done
+    sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
+    append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
     ;;
   init-start)
-    timezone
+    if [ -f /jffs/dnscrypt/localtime ]; then
+      ln -s /jffs/dnscrypt/localtime /etc/localtime
+      date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+    fi
     case $RAN_PRV in
       haveged)
         /jffs/dnscrypt/haveged -w1024 -v1
@@ -151,6 +127,9 @@ case $1 in
     start_monitor &
     ;;
   services-stop)
-    timezone
+    [ -f /jffs/dnscrypt/localtime ] && touch "$0"
+    ;;
+  wan-start)
+    update_opendns 0 &
     ;;
 esac
