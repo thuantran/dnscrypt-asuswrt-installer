@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION=v2.0.6
+DI_VERSION=v2.0.7
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
 
@@ -766,6 +766,16 @@ read_input_dns () {
   fi
 }
 
+read_input_dns2 () {
+  echo -en "$INPUT $1 ${BOLD}$2: $NORM"
+  read 2ND_SERVER
+  [ -z $2ND_SERVER ] && 2ND_SERVER=$2
+  if [ "`echo $2ND_SERVER | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}'`" ]; then
+    echo -e "$ERROR Invalid DNS server address entered"
+    read_input_dns "$@"
+  fi
+}
+
 read_input_num () {
   if [ -z $4 ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
@@ -905,11 +915,13 @@ setup_dnscrypt_impl () {
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
     choose_dnscrypt_server
 
-    echo -e "$INFO Set a DNS server for initializing dnscrypt-proxy"
+    echo -e "$INFO Set the DNS server(s) for initializing dnscrypt-proxy"
     echo -e "$INFO and router services (e.g. ntp) at boot"
-    read_input_dns "Default is" 8.8.8.8
+    read_input_dns "Default is" 9.9.9.9
+    read_input_dns2 "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_gvars_prep fallback_resolver "\'$DNS_SERVER:53\'" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_nvars_append "fallback_resolver =" "fallback_resolvers = ['$DNS_SERVER:53', '$2ND_SERVER:53']" $TOML_FILE
+    toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$2ND_SERVER:53']\"" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
     check_dnscrypt_toml
