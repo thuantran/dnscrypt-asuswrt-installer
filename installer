@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION=v2.0.5
+DI_VERSION=v2.0.6
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
 
@@ -574,9 +574,9 @@ inst_dnscrypt () {
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
   del_jffs_script /jffs/scripts/firewall-start
+  del_jffs_script /jffs/scripts/wan-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
-  write_manager_script /jffs/scripts/wan-start wan-start
   setup_dnscrypt
   if [ $? -ne 0 ]; then
     end_op_message
