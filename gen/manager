@@ -66,6 +66,23 @@ start_monitor () {
   done
 }
 
+timezone () {
+  SANITY=$(date -u -r $0 '+%s')
+  NOW=$(date -u '+%s')
+  TIMEZONE=/jffs/dnscrypt/localtime
+  TARGET=/etc/localtime
+  if [ -f $TIMEZONE ] && [ "$(readlink $TARGET)" = "$TIMEZONE" ]; then
+      if [ $NOW -ge $SANITY ]; then
+        touch "$0"
+      fi
+  elif [ -f $TIMEZONE ]; then
+    ln -sf /jffs/dnscrypt/localtime /etc/localtime
+    if [ $NOW -le $SANITY ]; then
+      date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+    fi
+  fi
+}
+
 update_opendns () {
   if [ -z "$OPENDNS_USER" ] || [ -z  "$OPENDNS_PASSWORD" ] || [ $1 -gt 2 ]; then
     return
