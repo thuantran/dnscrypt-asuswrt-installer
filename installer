@@ -524,7 +524,7 @@ inst_dnscrypt () {
        inst_dnscrypt
        return
     else
-       echo -e "$INFO No New DNScrypt Asuswrt Installer Version Available."
+       echo -e "$INFO DI_VERSION=$LINSTALL"
     fi
   else
     download_file $TARG_DIR 755 $RURL
@@ -550,7 +550,7 @@ inst_dnscrypt () {
        rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
        chmod 755 $TARG_DIR/dnscrypt-proxy
     else
-      echo -e "$INFO No New DNScrypt-Proxy Version Available."
+      echo -e "$INFO DNSCRYPT_VER=$LVERSION"
     fi
   else
     download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
