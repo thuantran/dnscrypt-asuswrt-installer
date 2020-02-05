@@ -77,13 +77,11 @@ start_monitor () {
       elif [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
         logger "Warning: dnscrypt-proxy is not responding"
         start_dnscrypt
-      elif [ $NW_STATE -ne 0 ] && [ $RES_STATE -eq 0 ]; then
-        if [ $COUNT -eq 90 ]; then
-          COUNT=0
-          update_opendns 0 &
-        fi
-        COUNT=$((COUNT + 1))
+      elif [ $COUNT -eq 90 ]; then
+        COUNT=0
+        update_opendns 0 &
       fi
+      COUNT=$((COUNT + 1))
     fi
     sleep 10
   done
