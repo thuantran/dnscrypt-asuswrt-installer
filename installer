@@ -1,8 +1,6 @@
 #!/bin/sh
 
-DI_VERSION=v2.0.7
-LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-DNSCRYPT_VER=$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)
+readonly DI_VERSION="v2.0.8"
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -17,6 +15,20 @@ readonly TOML_FILE=$TARG_DIR/dnscrypt-proxy.toml
 readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
 readonly TOML_ERR=$TARG_DIR/dnscrypt-proxy.toml.err
 readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
+
+readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
+readonly LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
+readonly RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+readonly LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
+readonly RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
+readonly MD5SUM_L="`[ -f $TARG_DIR/installer ] && md5sum $TARG_DIR/installer | cut -d' ' -f1`"
+readonly MD5SUM_RURL="`curl -L -k -s \"${RURL}.md5sum\"`"
+readonly MD5SUM_R="`echo -n $MD5SUM_RURL | wc -c` -eq 32"
+readonly MD5SUM_LM="`[ -f $TARG_DIR/manager ] && md5sum $TARG_DIR/manager | cut -d' ' -f1`"
+readonly MURL="$URL_GEN/manager"
+readonly MD5SUM_MURL="`curl -L -k -s \"${MURL}.md5sum\"`"
+readonly MD5SUM_M="`echo -n $MD5SUM_MURL | wc -c` -eq 32"
 
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
@@ -244,7 +256,22 @@ check_swap () {
 
 check_version () {
   if [ -f ${TARG_DIR}/installer ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
-    local LVERSION=$("${TARG_DIR}/dnscrypt-proxy" -version)
+      [ -z "$LINSTALL" ] && exit 1
+      [ -z "$RMNSTALL" ] && exit 1
+      [ -z "$MD5SUM_L" ] && exit 1
+      [ -z "$MD5SUM_R" ] && exit 1
+
+      if [ "$RMNSTALL" != "$LINSTALL" ]; then
+        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
+        echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
+      elif [ "$MD5SUM_R" != "$MD5SUM_L" ]; then
+        echo -e "$INFO DI_VERSION=$LINSTALL"
+        echo -e "$INFO New Minor Update Available!"
+        echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
+      else
+        echo -e "$INFO DI_VERSION=$LINSTALL"
+      fi
+      
       [ -z "$LVERSION" ] && exit 1
       [ -z "$DNSCRYPT_VER" ] && exit 1
 
@@ -254,18 +281,14 @@ check_version () {
       else
         echo -e "$INFO DNSCRYPT_VER=$LVERSION"
       fi
-    local RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-    local LINSTALL=v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
-    local RMNSTALL=v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
-      [ -z "$LINSTALL" ] && exit 1
-      [ -z "$RMNSTALL" ] && exit 1
-
-      if [ "$RMNSTALL" != "$LINSTALL" ]; then
-        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
-        echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
-      else
-        echo -e "$INFO DI_VERSION=$LINSTALL"
-      fi
+  fi
+  if [ -f ${TARG_DIR}/manager ]
+      [ -z "$MD5SUM_LM" ] && exit 1
+      [ -z "$MD5SUM_M" ] && exit 1
+      
+      if [ "$MD5SUM_M" != "$MD5SUM_LM" ]; then
+      echo -e "$INFO New Manager file Available!"
+      echo -e "$INFO Run Option 1 of the Installer to upgrade the Manager File."
   fi
 }
 
@@ -313,9 +336,9 @@ choose_dnscrypt_server () {
 
 choose_dnscrypt_server_auto () {
   toml_gvar_disable server_names
-  read_yesno "Use servers support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true || toml_gvars_prep dnscrypt_servers false
-  read_yesno "Use servers support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true || toml_gvars_prep doh_servers false
-  read_yesno "Use only servers support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
+  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true || toml_gvars_prep dnscrypt_servers false
+  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true || toml_gvars_prep doh_servers false
+  read_yesno "Use only servers that support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
   read_yesno "Use only servers that do not log user's queries" && toml_gvars_prep require_nolog true || toml_gvars_prep require_nolog false
   read_yesno "Use only servers that do not filter result" && toml_gvars_prep require_nofilter true || toml_gvars_prep require_nofilter false
 }
@@ -511,18 +534,18 @@ inst_dnscrypt () {
     return
   fi
   if [ -f ${TARG_DIR}/installer ]; then
-    local RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-    local LINSTALL=v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
-    local RMNSTALL=v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')
-     [ -z "$LINSTALL" ] && exit 1
-     [ -z "$RMNSTALL" ] && exit 1     
-     
+    [ -z "$LINSTALL" ] && exit 1
+    [ -z "$RMNSTALL" ] && exit 1
+    [ -z "$MD5SUM_L" ] && exit 1
+    [ -z "$MD5SUM_R" ] && exit 1
+
     if [ "$RMNSTALL" != "$LINSTALL" ]; then
        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
-       echo -e "$INFO Updating DI_VERSION=$LINSTALL to $RMNSTALL ."
+       echo -e "$INFO Updating DI_VERSION=$LINSTALL to $RMNSTALL"
        download_file $TARG_DIR 755 $RURL
-       inst_dnscrypt
-       return
+    elif [ "$MD5SUM_R" != "$MD5SUM_L" ]; then
+       echo -e "$INFO New Minor Update Available!"
+       download_file $TARG_DIR 755 $RURL
     else
        echo -e "$INFO DI_VERSION=$LINSTALL"
     fi
@@ -530,16 +553,14 @@ inst_dnscrypt () {
     download_file $TARG_DIR 755 $RURL
   fi
   download_file $TARG_DIR 755 $URL_GEN/manager
-  if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
-    local LVERSION=$("${TARG_DIR}/dnscrypt-proxy" -version)
+  if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then 
     [ -z "$LVERSION" ] && exit 1
     [ -z "$DNSCRYPT_VER" ] && exit 1
-
     if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
        echo -e "$INFO New DNSCRYPT_VER=$DNSCRYPT_VER Available!"
        echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $DNSCRYPT_VER ."
-      download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
-      tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
+       tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
        if [ $? -ne 0 ]; then
           echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
           end_op_message
