@@ -287,8 +287,9 @@ check_version () {
       [ -z "$MD5SUM_M" ] && exit 1
       
       if [ "$MD5SUM_M" != "$MD5SUM_LM" ]; then
-      echo -e "$INFO New Manager file Available!"
-      echo -e "$INFO Run Option 1 of the Installer to upgrade the Manager File."
+        echo -e "$INFO New Manager file Available!"
+        echo -e "$INFO Run Option 1 of the Installer to upgrade the Manager File."
+      fi
   fi
 }
 
