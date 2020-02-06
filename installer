@@ -25,7 +25,7 @@ readonly RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-
 readonly MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
 readonly MD5SUM_R="$(curl -L -k -s "${RURL}.md5sum")"
 readonly MD5SUM_LM="$(md5sum ${TARG_DIR}/manager | cut -d' ' -f1)"
-readonly MURL="${URL_GEN}/manager"
+readonly MURL="$URL_GEN/manager"
 readonly MD5SUM_M="$(curl -L -k -s "${MURL}.md5sum")"
 
 _quote() {
