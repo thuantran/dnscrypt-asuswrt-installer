@@ -536,7 +536,7 @@ inst_dnscrypt () {
        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
        echo -e "$INFO Updating DI_VERSION=$LINSTALL to $RMNSTALL"
        download_file $TARG_DIR 755 $RURL
-    elif [ `echo -n $MD5SUM_RURL | wc -c` -eq 32 ] && [ "$MD5SUM_RURL" == "$MD5SUM_L" ]; then
+    elif [ `echo -n $MD5SUM_R | wc -c` -eq 32 ] && [ "$MD5SUM_R" == "$MD5SUM_L" ]; then
        echo -e "$INFO DI_VERSION=$LINSTALL"
     else
        echo -e "$INFO New Minor Update Available!"
