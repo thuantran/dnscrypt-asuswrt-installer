@@ -360,7 +360,7 @@ choose_dnscrypt_server_manual () {
 }
 
 choose_dnscrypt_server_static () {
-  echo -e "$INFO This feature allows the User to define a single server using the sdns stamp of the server."
+  echo -e "$INFO This feature allows the User to define a single server or multiple servers using the sdns stamp of the server."
   echo -e "$INFO This assigns the server with a custom name specified by the user as a static option."
   echo -e "$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option."
   echo -e "$INFO If you do not want to continue down this path please select option 2 to return to server selection menu."
@@ -840,16 +840,42 @@ static_chosen () {
       esac
     return
   fi
-  echo -e "$INFO Please enter Static Server SDNS stamp" 
-  echo -en "$INPUT Please enter sdnsstamp$NORM: "
-  read -r SDNSSTAMP
-  echo -e "$INFO Please choose Static Server Name"
-  echo -en "$INPUT Please enter staticname$NORM: "
-  read -r STATICNAME
-  toml_gvars_prep server_names "\"['$STATICNAME']\""
-  toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
-  toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-  toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+  local INDEX=$1
+  if [ -z $INDEX ]; then
+    local RESOLVERS
+    toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
+    echo -e "$INFO Please choose Static Server Name"
+    echo -en "$INPUT Please enter staticname$NORM: "
+    read -r STATICNAME
+    echo -e "$INFO Please enter Static Server SDNS stamp"
+    echo -en "$INPUT Please enter sdnsstamp$NORM: "
+    read -r SDNSSTAMP
+    toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+    toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+  else
+    read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
+    read -r STATICNAME
+    echo -e "$INFO Please enter Static Server SDNS stamp"
+    echo -en "$INPUT Please enter sdnsstamp$NORM: "
+    read -r SDNSSTAMP
+    toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+    toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+  fi
+
+  local ITEM
+  ITEM=$STATICNAME
+  if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
+    echo -e "$INFO $ITEM is already set"
+  else
+    if [ "$RESOLVERS" ]; then
+      RESOLVERS="${RESOLVERS%?}, '$ITEM']"
+    else
+      RESOLVERS="['$ITEM']"
+    fi
+  fi
+
+  static_chosen $INDEX
+  toml_gvars_prep server_names "\"$RESOLVERS\""
 }
 
 setup_dnscrypt () {
