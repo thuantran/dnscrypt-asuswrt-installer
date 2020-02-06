@@ -23,10 +23,10 @@ readonly RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-inst
 readonly LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
 readonly RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
 readonly MD5SUM_L="`[ -f $TARG_DIR/installer ] && md5sum $TARG_DIR/installer | cut -d' ' -f1`"
-readonly MD5SUM_RURL="`curl -L -k -s \"${RURL}.md5sum\"`"
+readonly MD5SUM_R="`curl -L -k -s \"${RURL}.md5sum\"`"
 readonly MD5SUM_LM="`[ -f $TARG_DIR/manager ] && md5sum $TARG_DIR/manager | cut -d' ' -f1`"
 readonly MURL="$URL_GEN/manager"
-readonly MD5SUM_MURL="`curl -L -k -s \"${MURL}.md5sum\"`"
+readonly MD5SUM_M="`curl -L -k -s \"${MURL}.md5sum\"`"
 
 _quote() {
   echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
@@ -260,7 +260,7 @@ check_version () {
       if [ "$RMNSTALL" != "$LINSTALL" ]; then
         echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
         echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
-      elif [ `echo -n $MD5SUM_RURL | wc -c` -eq 32 ] && [ "$MD5SUM_RURL" == "$MD5SUM_L" ]; then
+      elif [ `echo -n $MD5SUM_R | wc -c` -eq 32 ] && [ "$MD5SUM_R" == "$MD5SUM_L" ]; then
         echo -e "$INFO DI_VERSION=$LINSTALL"
       else
         echo -e "$INFO New Minor Update Available!"
@@ -278,7 +278,7 @@ check_version () {
       fi
   fi
   if [ -f ${TARG_DIR}/manager ]; then
-      if [ `echo -n $MD5SUM_MURL | wc -c` -eq 32 ] && [ "$MD5SUM_MURL" == "$MD5SUM_LM" ]; then
+      if [ `echo -n $MD5SUM_M | wc -c` -eq 32 ] && [ "$MD5SUM_M" == "$MD5SUM_LM" ]; then
         echo -e "$INFO Manager file is up-to-date!"
       else
         echo -e "$INFO New Manager file Available!"
@@ -537,10 +537,10 @@ inst_dnscrypt () {
        echo -e "$INFO Updating DI_VERSION=$LINSTALL to $RMNSTALL"
        download_file $TARG_DIR 755 $RURL
     elif [ `echo -n $MD5SUM_RURL | wc -c` -eq 32 ] && [ "$MD5SUM_RURL" == "$MD5SUM_L" ]; then
+       echo -e "$INFO DI_VERSION=$LINSTALL"
+    else
        echo -e "$INFO New Minor Update Available!"
        download_file $TARG_DIR 755 $RURL
-    else
-       echo -e "$INFO DI_VERSION=$LINSTALL"
     fi
   else
     download_file $TARG_DIR 755 $RURL
