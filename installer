@@ -256,6 +256,8 @@ check_version () {
   if [ -f ${TARG_DIR}/installer ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
       [ -z "$LINSTALL" ] && exit 1
       [ -z "$RMNSTALL" ] && exit 1
+      [ -z "$MD5SUM_L" ] && exit 1
+      [ -z "$MD5SUM_R" ] && exit 1
       
       if [ "$RMNSTALL" != "$LINSTALL" ]; then
         echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
@@ -278,6 +280,9 @@ check_version () {
       fi
   fi
   if [ -f ${TARG_DIR}/manager ]; then
+      [ -z "$MD5SUM_LM" ] && exit 1
+      [ -z "$MD5SUM_M" ] && exit 1
+      
       if [ "$MD5SUM_M" == "$MD5SUM_LM" ]; then
         echo -e "$INFO Manager file is up-to-date!"
       else
@@ -531,6 +536,8 @@ inst_dnscrypt () {
   if [ -f ${TARG_DIR}/installer ]; then
     [ -z "$LINSTALL" ] && exit 1
     [ -z "$RMNSTALL" ] && exit 1
+    [ -z "$MD5SUM_L" ] && exit 1
+    [ -z "$MD5SUM_R" ] && exit 1
 
     if [ "$RMNSTALL" != "$LINSTALL" ]; then
        echo -e "$INFO New DI_VERSION=$RMNSTALL Available!"
