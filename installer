@@ -251,7 +251,7 @@ check_version () {
       elif [ "$MD5SUM_R" == "$MD5SUM_L" ]; then
         echo -e "$INFO DI_VERSION=$LINSTALL"
       else
-        echo -e "$INFO New Minor Update Available!"
+        echo -e "$INFO DI_VERSION=$LINSTALL, but a New Minor Update is Available!"
         echo -e "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
       fi
       
@@ -267,9 +267,9 @@ check_version () {
   fi
   if [ -f ${TARG_DIR}/manager ]; then
       if [ "$MD5SUM_M" == "$MD5SUM_LM" ]; then
-        echo -e "$INFO Manager file is up-to-date!"
+        echo -e "$INFO Manager file is Up-To-Date!"
       else
-        echo -e "$INFO New Manager file Available!"
+        echo -e "$INFO New Manager file is Available!"
         echo -e "$INFO Run Option 1 of the Installer to upgrade the Manager File."
       fi
   fi
@@ -527,7 +527,7 @@ inst_dnscrypt () {
     elif [ "$MD5SUM_R" == "$MD5SUM_L" ]; then
        echo -e "$INFO DI_VERSION=$LINSTALL"
     else
-       echo -e "$INFO New Minor Update Available!"
+       echo -e "$INFO DI_VERSION=$LINSTALL, but a New Minor Update is Available!"
        download_file $TARG_DIR 755 $RURL
     fi
   else
