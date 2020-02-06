@@ -282,7 +282,7 @@ check_version () {
         echo -e "$INFO DNSCRYPT_VER=$LVERSION"
       fi
   fi
-  if [ -f ${TARG_DIR}/manager ]
+  if [ -f ${TARG_DIR}/manager ]; then
       [ -z "$MD5SUM_LM" ] && exit 1
       [ -z "$MD5SUM_M" ] && exit 1
       
