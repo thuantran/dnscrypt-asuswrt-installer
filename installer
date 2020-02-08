@@ -285,8 +285,10 @@ check_version () {
       local MD5SUM_LM
       local MURL
       local MD5SUM_M
+      local L_GEN
       MD5SUM_LM="$(md5sum ${TARG_DIR}/manager | cut -d' ' -f1)"
-      MURL="${URL_GEN}/manager"
+      L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen"
+      MURL="${L_GEN}/manager"
       MD5SUM_M="$(curl -L -k -s "${MURL}.md5sum")"
       
       if [ "$MD5SUM_M" == "$MD5SUM_LM" ]; then
