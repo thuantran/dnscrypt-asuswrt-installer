@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.0.9"
+DI_VERSION="v2.0.10"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -253,7 +253,7 @@ check_version () {
       LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
       RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
       MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
-      MD5SUM_R="$(curl -L -k -s "${RURL}.md5sum")"
+      MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
       
       [ -z "$LINSTALL" ] && exit 1
       [ -z "$RMNSTALL" ] && exit 1
@@ -289,7 +289,7 @@ check_version () {
       MD5SUM_LM="$(md5sum ${TARG_DIR}/manager | cut -d' ' -f1)"
       L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen"
       MURL="${L_GEN}/manager"
-      MD5SUM_M="$(curl -L -k -s "${MURL}.md5sum")"
+      MD5SUM_M="$(curl -fsL "$MURL" | md5sum | awk '{print $1}')"
       
       if [ "$MD5SUM_M" == "$MD5SUM_LM" ]; then
         echo -e "$INFO Manager file is Up-To-Date!"
@@ -504,7 +504,7 @@ download_file () {
   for URL in "$@"; do
     FILENAME="`basename $URL`"
     MD5SUM_OLD="`[ -f $TARG/$FILENAME ] && md5sum $TARG/$FILENAME | cut -d' ' -f1`"
-    MD5SUM_CURR="`curl -L -k -s \"${URL}.md5sum\"`"
+    MD5SUM_CURR="$(curl -fsL "$URL" | md5sum | awk '{print $1}')"
     if [ `echo -n $MD5SUM_CURR | wc -c` -eq 32 ] && [ "$MD5SUM_CURR" == "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
@@ -551,7 +551,7 @@ inst_dnscrypt () {
     LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
-    MD5SUM_R="$(curl -L -k -s "${RURL}.md5sum")"
+    MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
     
     [ -z "$LINSTALL" ] && exit 1
     [ -z "$RMNSTALL" ] && exit 1
