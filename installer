@@ -244,16 +244,16 @@ check_swap () {
 
 check_version () {
   if [ -f ${TARG_DIR}/installer ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
-      local LINSTALL
       local RURL
       local RMNSTALL
+      local LINSTALL
       local MD5SUM_L
       local MD5SUM_R
+      RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+      LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
+      RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
       MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
       MD5SUM_R="$(curl -L -k -s "${RURL}.md5sum")"
-      LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
-      RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-      RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"  
       
       [ -z "$LINSTALL" ] && exit 1
       [ -z "$RMNSTALL" ] && exit 1
@@ -542,16 +542,16 @@ inst_dnscrypt () {
     return
   fi
   if [ -f ${TARG_DIR}/installer ]; then
-    local LINSTALL
     local RURL
+    local LINSTALL
     local RMNSTALL
     local MD5SUM_L
     local MD5SUM_R
+    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+    LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
+    RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
     MD5SUM_R="$(curl -L -k -s "${RURL}.md5sum")"
-    LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
-    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-    RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     
     [ -z "$LINSTALL" ] && exit 1
     [ -z "$RMNSTALL" ] && exit 1
