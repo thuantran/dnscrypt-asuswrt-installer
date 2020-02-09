@@ -260,7 +260,7 @@ check_version () {
     local LINSTALL
     local MD5SUM_L
     local MD5SUM_R
-    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/installer"
+    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
     LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
@@ -298,7 +298,7 @@ check_version () {
      local MD5SUM_M
      local L_GEN
      MD5SUM_LM="$(md5sum ${TARG_DIR}/manager | cut -d' ' -f1)"
-     L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen"
+     L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen"
      MURL="${L_GEN}/manager"
      MD5SUM_M="$(curl -fsL "$MURL" | md5sum | awk '{print $1}')"
       
@@ -548,7 +548,7 @@ inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
   local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
   local RURL
-  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/installer"
+  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
   create_dir $TARG_DIR
   if [ $? -ne 0 ]; then
     end_op_message
