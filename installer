@@ -298,7 +298,7 @@ check_version () {
      local MD5SUM_M
      local L_GEN
      MD5SUM_LM="$(md5sum ${TARG_DIR}/manager | cut -d' ' -f1)"
-     L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen"
+     L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen"
      MURL="${L_GEN}/manager"
      MD5SUM_M="$(curl -fsL "$MURL" | md5sum | awk '{print $1}')"
       
@@ -548,7 +548,7 @@ inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
   local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
   local RURL
-  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/installer"
   create_dir $TARG_DIR
   if [ $? -ne 0 ]; then
     end_op_message
@@ -557,6 +557,7 @@ inst_dnscrypt () {
   download_file $TARG_DIR 755 $RURL
   download_file $TARG_DIR 755 $URL_GEN/manager
   download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
+    $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
     $RESOLVERS_URL_PREFIX/relays.md \
     $RESOLVERS_URL_PREFIX/relays.md.minisig
