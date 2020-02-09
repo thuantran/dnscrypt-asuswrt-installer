@@ -251,7 +251,7 @@ check_version () {
     nslookup google.com >/dev/null 2>&1
     RES_STATE=$?
     if [ -z "`pidof dnscrypt-proxy`" ] || [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
-      echo -e "$INFO No Internet Detected or Dnscrypt-Proxy is Dead, Skipping Version Check."
+      echo -e "$ERROR No Internet Detected or Dnscrypt-Proxy is Dead, Skipping Version Check."
       echo -e "$INFO Run Option 3 to reconfigure, before trying option 1."
       return
     fi
@@ -554,24 +554,61 @@ inst_dnscrypt () {
     end_op_message
     return
   fi
+  local NW_STATE
+  local RES_STATE
+  ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1
+  NW_STATE=$?
+  nslookup google.com >/dev/null 2>&1
+  RES_STATE=$?
+  if [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
+    echo -e "$ERROR Unable to detect A Connection to the Internet!"
+    end_op_message
+    return
+  fi    
   download_file $TARG_DIR 755 $RURL
   download_file $TARG_DIR 755 $URL_GEN/manager
-  download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
-    $RESOLVERS_URL_PREFIX/public-resolvers.md \
+  if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
+    local LVERSION
+    LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
+
+    [ -z "$LVERSION" ] && exit 1
+    [ -z "$DNSCRYPT_VER" ] && exit 1
+
+    if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
+       echo -e "$INFO New DNSCRYPT_VER=$DNSCRYPT_VER Available!"
+       echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $DNSCRYPT_VER ."
+       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
+       tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+       if [ $? -ne 0 ]; then
+          echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
+          end_op_message
+          return
+       fi
+       chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
+       mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
+       rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+       chmod 755 $TARG_DIR/dnscrypt-proxy
+    else
+      echo -e "$INFO DNSCRYPT_VER=$LVERSION"
+    fi
+  else
+    download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
+    tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+    if [ $? -ne 0 ]; then
+      echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
+      end_op_message
+      return
+    fi
+    chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
+    mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
+    rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+    chmod 755 $TARG_DIR/dnscrypt-proxy
+  fi
+  download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
     $RESOLVERS_URL_PREFIX/relays.md \
     $RESOLVERS_URL_PREFIX/relays.md.minisig
   chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
-  tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
-  if [ $? -ne 0 ]; then
-    echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
-    end_op_message
-    return
-  fi
-  chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
-  mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-  rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
-  chmod 755 $TARG_DIR/dnscrypt-proxy
   
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
