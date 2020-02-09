@@ -565,7 +565,7 @@ inst_dnscrypt () {
     end_op_message
     return
   fi    
-  download_file $TARG_DIR 755 $RURL && if false; then echo -e "$INFO Installer updated...Re-run Option 1 to get the rest" && exec ${TARG_DIR}/installer && exit; fi
+  download_file $TARG_DIR 755 $RURL 
   download_file $TARG_DIR 755 $URL_GEN/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION
