@@ -260,7 +260,7 @@ check_version () {
     local LINSTALL
     local MD5SUM_L
     local MD5SUM_R
-    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/installer"
     LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
@@ -556,48 +556,21 @@ inst_dnscrypt () {
   fi
   download_file $TARG_DIR 755 $RURL
   download_file $TARG_DIR 755 $URL_GEN/manager
-  if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
-    local LVERSION
-    LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
-    
-    [ -z "$LVERSION" ] && exit 1
-    [ -z "$DNSCRYPT_VER" ] && exit 1
-    
-    if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
-       echo -e "$INFO New DNSCRYPT_VER=$DNSCRYPT_VER Available!"
-       echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $DNSCRYPT_VER ."
-       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
-       tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
-       if [ $? -ne 0 ]; then
-          echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
-          end_op_message
-          return
-       fi
-       chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
-       mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-       rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
-       chmod 755 $TARG_DIR/dnscrypt-proxy
-    else
-      echo -e "$INFO DNSCRYPT_VER=$LVERSION"
-    fi
-  else
-    download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
-    tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
-    if [ $? -ne 0 ]; then
-      echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
-      end_op_message
-      return
-    fi
-    chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
-    mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-    rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
-    chmod 755 $TARG_DIR/dnscrypt-proxy
-  fi
-  download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
+  download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR} \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
     $RESOLVERS_URL_PREFIX/relays.md \
     $RESOLVERS_URL_PREFIX/relays.md.minisig
   chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
+  tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+  if [ $? -ne 0 ]; then
+    echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
+    end_op_message
+    return
+  fi
+  chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
+  mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
+  rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+  chmod 755 $TARG_DIR/dnscrypt-proxy
   
   del_jffs_script /jffs/scripts/wan-start dnscrypt-start
   del_jffs_script /jffs/scripts/openvpn-event
