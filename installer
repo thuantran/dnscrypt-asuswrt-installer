@@ -155,23 +155,12 @@ check_anonymized_support () {
           if [ "`grep '^server_names = .*'$SERVER'.*' $TOML_FILE`" ]; then
             echo -e "$INFO Found Servers for Anonymized Dnscrypt Support"
             echo -e "$INFO Choose Relays for DNSCRYPT servers"
-            echo -e "  1) Use Wildcare Option for Relays (Same set of relays for all servers)."
-            echo -e "  2) Pick Relays for Each DNSCRYPT servers"
-            read_input_num "Your choice" 1 2
-            case $CHOSEN in
-              1)
-                choose_relays_automatic
-                return
-                ;;
-              2)
-                if [ $COUNT -eq 0 ]; then 
-                  choose_relays_manual
-                elif [ $COUNT -ge 1 ]; then
-                  choose_relays_manual_next
-                fi
-                COUNT=$((COUNT + 1))
-                ;;
-            esac
+            if [ $COUNT -eq 0 ]; then 
+              choose_relays_manual
+            elif [ $COUNT -ge 1 ]; then
+              choose_relays_manual_next
+            fi
+            COUNT=$((COUNT + 1))
           else
             echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
             echo -e "$INFO Warning:Selecting Yes will disable defined servers"
