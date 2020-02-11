@@ -169,7 +169,7 @@ check_anonymized_support () {
             read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
             eval toml_gvars_write $GVARS_ARGS
             choose_relays_automatic
-          return
+            return
           fi
         done
         ;;
