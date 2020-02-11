@@ -173,14 +173,15 @@ check_anonymized_support () {
                 ;;
             esac
           else
-          echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
-          echo -e "$INFO Warning:Selecting Yes will disable defined servers"
-          echo -e "$INFO No will force installer continue as is."
-          local GVARS_ARGS
-          read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
-          eval toml_gvars_write $GVARS_ARGS
-          choose_relays_manual
+            echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
+            echo -e "$INFO Warning:Selecting Yes will disable defined servers"
+            echo -e "$INFO No will force installer continue as is."
+            local GVARS_ARGS
+            read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
+            eval toml_gvars_write $GVARS_ARGS
+            choose_relays_automatic
           return
+          fi
         done
         ;;
       3)
