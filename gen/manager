@@ -77,7 +77,7 @@ start_monitor () {
       elif [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
         logger "Warning: dnscrypt-proxy is not responding"
         start_dnscrypt
-      elif [ $RANDOM -eq 4320 ]
+      elif [ $RANDOM -eq 4320 ]; then
         RANDOM=0
         logger "Randomization: Health Check."
         start_dnscrypt
