@@ -171,8 +171,8 @@ check_anonymized_support () {
               echo -e "$INFO Found $DNSCRYPT server"
               choose_relays_manual_next
             fi
+            COUNT=$((COUNT + 1))
           fi
-          COUNT=$((COUNT + 1))
         done
         echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
         echo -e "$INFO Warning:Selecting Yes will disable defined servers"
