@@ -128,33 +128,37 @@ check_anonymized_automatic () {
     echo -e "$INFO Continue without Relays Support"
   else
     choose_relays_automatic
-    return
   fi
+  return
 }
 
 check_anonymized_support () {
+  toml_nvars_delete "routes =" $TOML_FILE
   if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
     echo -e "$INFO Checking for Anonymized Dnscrypt Support"
-    echo -e "$INFO Users may only specify Wild-card Relay Support (server_name "*")"
-    echo -e "$INFO All DNSCRYPT Server traffic will be sent through same set of chosen Relays."
-    echo -e "$INFO With this Menu, Users Can Disable, Pick, or Skip Relay Support for DNSCRYPT servers."
-    echo -e "$INFO Picking Relays brings up Menu for Choosing Relays."
+    echo -e "$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 or option 2"
+    echo -e "$INFO All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option."
+    echo -e "$INFO Option 2 gives users the choice to Setup Relays per Dnscrypt-Server or send all Servers through the Same Relays."
     echo -e "$INFO Skip allows Users to skip configuring relays."
-    echo -e "$INFO NOTE: You must disable if you want to turn off Relays that were defined on earlier configurations..."
+    echo -e "$INFO NOTE: You must now redo relays on each reconfiguration..."
     echo -e "$INFO What do you want to do:"
-    echo -e "  1) Disable Relays for DNSCRYPT servers"
-    echo -e "  2) Pick Relays for DNSCRYPT servers"
-    echo -e "  3) Skip Choosing Relays for DNSCRYPT servers"
+    echo -e "  1) Setup Automatic Servers (will disable server_names) with Wild-Card Relay Support"
+    echo -e "  2) Pick Relays for DNSCRYPT servers (Individually or Wild-Card)"
+    echo -e "  3) Skip Setting-up Relay Support."
     read_input_num "Your choice" 1 3
     case $CHOSEN in
       1)
-        echo -e "$INFO Continue without Relays Support"
-        toml_nvars_delete "routes =" $TOML_FILE
+        echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
+        echo -e "$INFO Warning:Selecting Yes will disable defined servers"
+        echo -e "$INFO No will force installer continue as is."
+        local GVARS_ARGS
+        read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || check_anonymized_support
+        eval toml_gvars_write $GVARS_ARGS
+        check_anonymized_automatic
         ;;
       2)
         local VARSARGS
-        toml_nvars_delete "routes =" $TOML_FILE
-        VARSARGS="dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6v6 af-dnswarden-dc2-ipv6v6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6v6 quad9-dnscrypt-ip6-nofilter-altv6 geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6v6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-altv6 dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6v6 ads-dnswarden-dc1-ipv6-ecsv6 ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6v6 cs-usor dnscrypt.ca-1-ipv6v6 quad9-dnscrypt-ip6-filter-priv6 mrkaran scaleway-ams-ipv6v6 dnswarden-dc3-ipv6v6 dnswarden-dc2-ipv6v6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6v6 af-dnswarden-dc1-ipv6-ecsv6 af-dnswarden-dc2-ipv6-ecsv6 quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecsv6 cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6v6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6v6 publicarray-au ads-dnswarden-dc3-ipv6v6 cs-ch jp.tiar.app-ipv6v6 dnsforfamily dnsforfamily-v6v6 dnscrypt-jp-blahdns-ipv6v6 ads-dnswarden-dc1 id-gmail securedns-ipv6v6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6v6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-priv6 quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecsv6 dnscrypt.one-ipv6v6 opennic-luggs-ipv6v6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6v6 ads-dnswarden-dc1-ipv6v6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6v6 cs-usnc dnscrypt.uk-ipv6v6 dnscrypt.eu-dk-ipv6v6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6v6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6v6 cs-swe dnscrypt.ca-2-ipv6v6 ads-dnswarden-dc3-ipv6-ecsv6 ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6v6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6v6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6v6 cs-pl"
+        VARSARGS="dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 quad9-dnscrypt-ip6-nofilter-alt geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-alt dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 quad9-dnscrypt-ip6-filter-pri mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-pri quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
         local COUNT
         local DNSCRYPT
         local SERVER
@@ -174,27 +178,9 @@ check_anonymized_support () {
             COUNT=$((COUNT + 1))
           fi
         done
-        echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
-        echo -e "$INFO Warning:Selecting Yes will disable defined servers"
-        echo -e "$INFO No will force installer continue as is."
-        local GVARS_ARGS
-        read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || return
-        eval toml_gvars_write $GVARS_ARGS
-        check_anonymized_automatic
-        return
         ;;
       3)
-        if [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
-          echo -e "$INFO Cisco does not support anonymized DNS"
-          echo -e "$INFO Continue without Relays Support"
-          toml_nvars_delete "routes =" $TOML_FILE
-        elif [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ]; then
-          echo -e "$INFO NextDNS-Custom is defined"
-          echo -e "$INFO Continue without Relays Support"
-          toml_nvars_delete "routes =" $TOML_FILE
-        else
-          echo -e "$INFO Continue without Adding or Modifying Relays Support"
-        fi
+        echo -e "$INFO Continue without Setting-up Relays Support"
         ;;
     esac
   else
