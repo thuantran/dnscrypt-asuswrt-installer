@@ -158,7 +158,7 @@ check_anonymized_support () {
         local COUNT=0
         local DNSCRYPT
         for DNSCRYPT in $VARSARGS; do
-          if [ "$(grep '^server_names = .*'$SERVER'.*' $TOML_FILE)" ]; then
+          if [ "$(grep '^server_names = .*'$DNSCRYPT'.*' $TOML_FILE)" ]; then
             SERVER=$(echo "$DNSCRYPT")
             echo -e "$INFO Found Servers for Anonymized Dnscrypt Support"
             echo -e "$INFO Choose Relays for DNSCRYPT server"
