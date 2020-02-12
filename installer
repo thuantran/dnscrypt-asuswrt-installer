@@ -133,6 +133,7 @@ check_anonymized_automatic () {
 }
 
 check_anonymized_support () {
+  toml_nvars_delete "routes =" $TOML_FILE
   if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
     echo -e "$INFO Checking for Anonymized Dnscrypt Support"
     echo -e "$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 (this supports only DNSCrypt Servers)."
@@ -1067,7 +1068,6 @@ setup_dnscrypt_impl () {
     toml_nvars_replace "fallback_resolver =" "fallback_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
     toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
-    toml_nvars_delete "routes =" $TOML_FILE
     eval toml_gvars_write $GVARS_ARGS
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
