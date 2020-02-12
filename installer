@@ -487,7 +487,7 @@ choose_relays_manual () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 $INDEX n      
     if [ $? -eq 1 ]; then
-       toml_nvars_insert "[anonymized_dns]" "routes= [ { server_name='$SERVER', via=$RELAYS } ]" $TOML_FILE 
+       toml_nvars_insert "[anonymized_dns]" "routes = [ { server_name='$SERVER', via=$RELAYS } ]" $TOML_FILE 
       return
     fi
   fi
