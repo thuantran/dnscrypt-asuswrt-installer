@@ -191,7 +191,7 @@ check_anonymized_support () {
         done
         ;;
       4)
-        if [ "$(grep '^server_name = .*'*'.*' $TOML_FILE)" ]; then
+        if [ "$(grep '^routes = .*server_name='*'.*' $TOML_FILE)" ]; then
           echo -e "$INFO Routes Wild-Card Option Detected, user may choose to remove relays or continue with relays "
           read_yesno "Do you want to remove any old relay setups?" && toml_nvars_delete "routes =" $TOML_FILE || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
         else
