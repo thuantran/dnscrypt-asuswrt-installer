@@ -163,6 +163,7 @@ check_anonymized_support () {
         toml_gvar_disable server_names
         check_anonymized_automatic
         eval toml_avars_write $AVARS_ARGS
+        ;;
       3)
         toml_nvars_delete "routes =" $TOML_FILE
         local VARSARGS
