@@ -139,7 +139,7 @@ check_anonymized_support () {
     echo -e "$INFO All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option."
     echo -e "$INFO Option 2 gives users the choice to Setup Relays per Dnscrypt-Server."
     echo -e "$INFO Skip allows Users to skip configuring relays."
-    echo -e "$INFO NOTE: You must now redo relays on each reconfiguration..."
+    echo -e "$INFO NOTE: You must now redo relays on each reconfiguration, unless you chose Wild-Card Method..."
     echo -e "$INFO What do you want to do:"
     echo -e "  1) Setup Automatic Servers (will disable server_names) or All Servers with Wild-Card Relay Support."
     echo -e "  2) Pick Relays for DNSCRYPT servers (Per Server)"
@@ -184,7 +184,12 @@ check_anonymized_support () {
         done
         ;;
       3)
-        read_yesno "Do you want to remove any old relay setups (it is recommended if you changed servers to prevent conflicts with routes)?" && toml_nvars_delete "routes =" $TOML_FILE || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
+        if [ "$(grep '^server_name = .*'*'.*' $TOML_FILE)" ]; then
+          echo -e "$INFO Routes Wild-Card Option Detected, user may choose to remove relays or continue with relays "
+          read_yesno "Do you want to remove any old relay setups?" && toml_nvars_delete "routes =" $TOML_FILE || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
+        else
+          toml_nvars_delete "routes =" $TOML_FILE
+        fi
         ;;
     esac
   else
