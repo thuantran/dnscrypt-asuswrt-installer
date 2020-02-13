@@ -1007,8 +1007,6 @@ setup_dnscrypt () {
   setup_dnscrypt_impl "$@"
   local RET=$?
   check_opendns
-  check_nextdns
-  check_anonymized_support
   if [ "$1" == "reconfig" ]; then
     if [ $RET -eq 0 ]; then
       echo -e "$INFO Restarting dnscrypt-proxy with new config..."
@@ -1069,6 +1067,9 @@ setup_dnscrypt_impl () {
     toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write $GVARS_ARGS
+    echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
+    check_nextdns
+    check_anonymized_support
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
       echo -e "$INFO Writing dnscrypt-proxy configuration failed"
