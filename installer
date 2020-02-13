@@ -123,44 +123,47 @@ check_anonymized_automatic () {
   if [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
     echo -e "$INFO Cisco does not support anonymized DNS"
     echo -e "$INFO Continue without Relays Support"
-    return
   elif [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ]; then
     echo -e "$INFO NextDNS-Custom is defined"
     echo -e "$INFO Continue without Relays Support"
-    return
   else
     choose_relays_automatic
-    eval toml_avars_write $AVARS_ARGS
-    return
   fi
 }
 
 check_anonymized_support () {
   if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
     echo -e "$INFO Checking for Anonymized Dnscrypt Support"
-    echo -e "$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 (this supports only DNSCrypt Servers)."
+    echo -e "$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 and 2 (this supports only DNSCrypt Servers)."
     echo -e "$INFO All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option."
-    echo -e "$INFO Option 2 gives users the choice to Setup Relays per Dnscrypt-Server."
+    echo -e "$INFO Option 3 gives users the choice to Setup Relays per Dnscrypt-Server."
     echo -e "$INFO Skip allows Users to skip configuring relays."
-    echo -e "$INFO NOTE: You must now redo relays on each reconfiguration, unless you chose Wild-Card Method..."
+    echo -e "$INFO NOTE: With Option 4 the user must redo relays on each reconfiguration, unless Wild-Card Method is used..."
     echo -e "$INFO What do you want to do:"
-    echo -e "  1) Setup Automatic Servers (will disable server_names) or All Servers with Wild-Card Relay Support."
-    echo -e "  2) Pick Relays for DNSCRYPT servers (Per Server)"
-    echo -e "  3) Skip Setting-up Relay Support."
-    read_input_num "Your choice" 1 3
+    echo -e "  1) Setup Automatic Servers (will disable server_names)."
+    echo -e "  2) All Servers with Wild-Card Relay Support."
+    echo -e "  3) Pick Relays for DNSCRYPT servers (Per Server)"
+    echo -e "  4) Skip Setting-up Relay Support."
+    read_input_num "Your choice" 1 4
     case $CHOSEN in
       1)
         toml_nvars_delete "routes =" $TOML_FILE
-        echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
-        echo -e "$INFO Warning:Selecting Yes will disable defined servers"
-        echo -e "$INFO No will force installer continue as is."
+        echo -e "$INFO This Allows users to Setup Relays for Automatically Chosen Servers"
         local GVARS_ARGS
         local AVARS_ARGS
-        read_yesno "Do you want to set up relay support for servers chosen automatically?" && toml_gvar_disable server_names || check_anonymized_automatic
+        toml_gvar_disable server_names
         eval toml_gvars_write $GVARS_ARGS
         check_anonymized_automatic
+        eval toml_avars_write $AVARS_ARGS
         ;;
-      2)
+      2) 
+        toml_nvars_delete "routes =" $TOML_FILE
+        echo -e "$INFO This Allows users to Setup Relays for For All Chosen Servers"
+        local AVARS_ARGS
+        toml_gvar_disable server_names
+        check_anonymized_automatic
+        eval toml_avars_write $AVARS_ARGS
+      3)
         toml_nvars_delete "routes =" $TOML_FILE
         local VARSARGS
         VARSARGS="ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 quad9-dnscrypt-ip6-nofilter-alt geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-alt dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 quad9-dnscrypt-ip6-filter-pri mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-pri quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
@@ -186,7 +189,7 @@ check_anonymized_support () {
           fi
         done
         ;;
-      3)
+      4)
         if [ "$(grep '^server_name = .*'*'.*' $TOML_FILE)" ]; then
           echo -e "$INFO Routes Wild-Card Option Detected, user may choose to remove relays or continue with relays "
           read_yesno "Do you want to remove any old relay setups?" && toml_nvars_delete "routes =" $TOML_FILE || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
