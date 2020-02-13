@@ -123,12 +123,15 @@ check_anonymized_automatic () {
   if [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
     echo -e "$INFO Cisco does not support anonymized DNS"
     echo -e "$INFO Continue without Relays Support"
+    return
   elif [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ]; then
     echo -e "$INFO NextDNS-Custom is defined"
     echo -e "$INFO Continue without Relays Support"
+    return
   else
     choose_relays_automatic
     eval toml_avars_write $AVARS_ARGS
+    return
   fi
 }
 
