@@ -133,7 +133,6 @@ check_anonymized_automatic () {
 }
 
 check_anonymized_support () {
-  toml_nvars_delete "routes =" $TOML_FILE
   if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
     echo -e "$INFO Checking for Anonymized Dnscrypt Support"
     echo -e "$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 (this supports only DNSCrypt Servers)."
@@ -148,6 +147,7 @@ check_anonymized_support () {
     read_input_num "Your choice" 1 3
     case $CHOSEN in
       1)
+        toml_nvars_delete "routes =" $TOML_FILE
         echo -e "$INFO Allowing users to setup for Automatically Chosen Servers"
         echo -e "$INFO Warning:Selecting Yes will disable defined servers"
         echo -e "$INFO No will force installer continue as is."
@@ -158,6 +158,7 @@ check_anonymized_support () {
         check_anonymized_automatic
         ;;
       2)
+        toml_nvars_delete "routes =" $TOML_FILE
         local VARSARGS
         VARSARGS="ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 quad9-dnscrypt-ip6-nofilter-alt geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-alt dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 quad9-dnscrypt-ip6-filter-pri mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-pri quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
         local COUNT
@@ -183,7 +184,7 @@ check_anonymized_support () {
         done
         ;;
       3)
-        echo -e "$INFO Continue without Setting-up Relays Support"
+        read_yesno "Do you want to remove any old relay setups (it is recommended if you changed servers to prevent conflicts with routes)?" && toml_nvars_delete "routes =" $TOML_FILE || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
         ;;
     esac
   else
