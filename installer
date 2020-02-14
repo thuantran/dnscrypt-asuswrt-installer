@@ -1464,6 +1464,4 @@ case "$1" in
     inst_dnscrypt
     ;;
 esac
-      
-      
-
+            
