@@ -161,7 +161,6 @@ check_anonymized_support () {
         toml_nvars_delete "routes =" $TOML_FILE
         echo -e "$INFO This Allows users to Setup Relays for For All Chosen Servers"
         local AVARS_ARGS
-        toml_gvar_disable server_names
         check_anonymized_automatic
         eval toml_avars_write $AVARS_ARGS
         ;;
