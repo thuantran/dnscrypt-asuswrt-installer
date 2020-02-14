@@ -656,7 +656,7 @@ inst_dnscrypt () {
     end_op_message
     return
   fi    
-  download_file $TARG_DIR 755 $RURL
+  download_file $TARG_DIR 755 $RURL && exec $TARG_DIR/installer && echo 1 && exit
   download_file $TARG_DIR 755 $URL_GEN/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION
