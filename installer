@@ -85,7 +85,8 @@ check_dns_filter_some () {
     nvram commit
     echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
     return
-  elif [ "$1" -eq 1 ]; then
+  fi
+  if [ "$1" -eq 1 ]; then
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
     nvram set dnsfilter_custom3=""
