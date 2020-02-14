@@ -78,14 +78,14 @@ check_dns_filter () {
 }
 
 check_dns_filter_some () {
-  if [ "$1" -eq 0 ]
+  if [ "$1" -eq 0 ]; then
     nvram set dnsfilter_mode="11"
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
     echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
     return
-  elif [ "$1" -eq 1 ]
+  elif [ "$1" -eq 1 ]; then
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
     nvram set dnsfilter_custom3=""
