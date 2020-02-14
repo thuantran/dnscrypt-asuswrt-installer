@@ -663,7 +663,7 @@ inst_dnscrypt () {
   if [ "MD5SUM_R" != "MD5SUM_L" ]; then 
     echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
     download_file $TARG_DIR 755 $RURL
-    exec $TARG_DIR/installer update && exit
+    exec $TARG_DIR/installer && exit
   else
     download_file $TARG_DIR 755 $RURL
   fi
@@ -1458,10 +1458,3 @@ menu () {
 }
 
 menu
-
-case "$1" in
-  update)
-    inst_dnscrypt
-    ;;
-esac
-            
