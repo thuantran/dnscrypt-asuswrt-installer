@@ -660,7 +660,7 @@ inst_dnscrypt () {
   local MD5SUM_R
   MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
   MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
-  if [ "MD5SUM_R" == "MD5SUM_L" ]; then 
+  if [ "$MD5SUM_R" == "$MD5SUM_L" ]; then 
     download_file $TARG_DIR 755 $RURL
   else
     echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
