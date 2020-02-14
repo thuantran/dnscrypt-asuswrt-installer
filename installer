@@ -73,7 +73,19 @@ check_dns_filter () {
   elif [ "$1" -eq 1 ] && [ $DNSFIL -ne 0 ]; then
     echo -e "$INFO DNSFilter is Already on."
     echo -e "$INFO User can choose to keep any custom dnsfilter values and only redirect non-custom traffic."
-    read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && check_dns_filter_some || echo -e "$INFO User chose to continue redirecting All DNS resolutions instead."
+    read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && check_dns_filter_some 0 || check_dns_filter_some 1
+  fi
+}
+
+check_dns_filter_some () {
+  if [ "$1" -eq 0 ]
+    nvram set dnsfilter_mode="11"
+    nvram set dhcp_dns1_x=""
+    nvram set dhcp_dns2_x=""
+    nvram commit
+    echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
+    return
+  elif [ "$1" -eq 1 ]
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
     nvram set dnsfilter_custom3=""
@@ -87,16 +99,9 @@ check_dns_filter () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
+    echo -e "$INFO User chose to continue redirecting All DNS resolutions instead."
+    return
   fi
-}
-
-check_dns_filter_some () {
-  nvram set dnsfilter_mode="11"
-  nvram set dhcp_dns1_x=""
-  nvram set dhcp_dns2_x=""
-  nvram commit
-  echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
-  return
 }
 
 check_jffs_enabled () {
