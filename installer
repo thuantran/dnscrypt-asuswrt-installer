@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.1.0"
+DI_VERSION="v2.1.1"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -137,8 +137,8 @@ check_anonymized_support () {
     echo -e "$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 and 2 (this supports only DNSCrypt Servers)."
     echo -e "$INFO All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option."
     echo -e "$INFO Option 3 gives users the choice to Setup Relays per Dnscrypt-Server."
-    echo -e "$INFO Skip allows Users to skip configuring relays."
-    echo -e "$INFO NOTE: With Option 4 the user must relays relays on each reconfiguration, unless the user specifies not to."
+    echo -e "$INFO Option 4 skip allows the Users to skip relay configuration or remove old relays configurations."
+    echo -e "$INFO NOTE: With Option 4 the user must redo relays on each reconfiguration, unless the user specifies not to."
     echo -e "$INFO WARNING: Issues may occur if User is not using same servers as defined in relays."
     echo -e "$INFO What do you want to do:"
     echo -e "  1) Setup Wild-Card Relay Support with Automatic Servers (will disable server_names)."
@@ -655,8 +655,18 @@ inst_dnscrypt () {
     echo -e "$ERROR Unable to detect A Connection to the Internet!"
     end_op_message
     return
-  fi    
-  download_file $TARG_DIR 755 $RURL
+  fi  
+  local MD5SUM_L
+  local MD5SUM_R
+  MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
+  MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
+  if [ "MD5SUM_R" != "MD5SUM_L" ]; then 
+    echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
+    download_file $TARG_DIR 755 $RURL
+    exec $TARG_DIR/installer update && exit
+  else
+    download_file $TARG_DIR 755 $RURL
+  fi
   download_file $TARG_DIR 755 $URL_GEN/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION
@@ -1448,3 +1458,10 @@ menu () {
 }
 
 menu
+
+case "$1" in
+  update)
+    inst_dnscrypt
+    ;;
+esac
+            
