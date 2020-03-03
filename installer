@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.1.1"
+DI_VERSION="v2.1.2"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -429,11 +429,12 @@ choose_dnscrypt_server_static () {
   echo -e "$INFO This feature allows the User to define a single server or multiple servers using the sdns stamp of the server."
   echo -e "$INFO This assigns the server with a custom name specified by the user as a static option."
   echo -e "$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option."
-  echo -e "$INFO If you do not want to continue down this path please select option 2 to return to server selection menu."
+  echo -e "$INFO If you do not want to continue down this path please select option 3 to return to server selection menu."
   echo -e "$INFO What do you want to do:"
-  echo -e "  1) Setup Static Server."
-  echo -e "  2) Skip and Go back to server selection menu."
-  read_input_num "Your choice" 1 2
+  echo -e "  1) Setup Static Servers Only."
+  echo -e "  2) Setup Static Servers with Addition of Manually Chosen Servers."
+  echo -e "  3) Go back to server selection menu."
+  read_input_num "Your choice" 1 3
     case $CHOSEN in
       1)
         echo -e "$INFO User has specified to define a Static Server."
@@ -441,8 +442,27 @@ choose_dnscrypt_server_static () {
         static_chosen 1
         ;;
       2)
-        echo -e "$INFO User has chosen to go back to server selection menu."
-        static_chosen 0
+        echo -e "$INFO User has chosen select Manually Chosen Servers First."
+        static_choose_manual_addition
+        ;;
+      3)
+        echo -e "$INFO User has chosen to go back."
+        echo -e "$INFO Choose how your DNS servers are selected:"
+        echo -e "  1) Automatically"
+        echo -e "  2) Manually"
+        echo -e "  3) Static"
+        read_input_num "Select your mode" 1 3
+        case $CHOSEN in
+          1)
+            choose_dnscrypt_server_auto
+            ;;
+          2)
+            choose_dnscrypt_server_manual
+            ;;
+          3)
+            choose_dnscrypt_server_static
+            ;;
+        esac
         ;;
     esac
 }
@@ -965,60 +985,111 @@ static_chosen () {
   local SDNSSTAMP
   local STATICNAME
   if [ "$1" -eq 0 ]; then
-    echo -e "$INFO Choose how your DNS servers are selected:"
-    echo -e "  1) Automatically"
-    echo -e "  2) Manually"
-    echo -e "  3) Static"
-    read_input_num "Select your mode" 1 3
-      case $CHOSEN in
-        1)
-          choose_dnscrypt_server_auto
-          ;;
-        2)
-          choose_dnscrypt_server_manual
-          ;;
-        3)
-          choose_dnscrypt_server_static
-          ;;
-      esac
-    return
+  local INDEX=$1
+    if [ -z $INDEX ]; then
+      local STATICRESOLVER
+      echo -e "$INFO Please choose Static Server Name"
+      echo -en "$INPUT Please enter staticname$NORM: "
+      read -r STATICNAME
+      echo -e "$INFO Please enter Static Server SDNS stamp"
+      echo -en "$INPUT Please enter sdnsstamp$NORM: "
+      read -r SDNSSTAMP
+      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    else
+      read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
+      read -r STATICNAME
+      echo -e "$INFO Please enter Static Server SDNS stamp"
+      echo -en "$INPUT Please enter sdnsstamp$NORM: "
+      read -r SDNSSTAMP
+      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    fi
+
+    local STATIC
+    STATIC=$STATICNAME
+    if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
+      echo -e "$INFO $STATIC is already set"
+    else
+      if [ "$STATICRESOLVER" ]; then
+        STATICRESOLVER="${STATICRESOLVER%?}', '$STATIC'"
+      else
+        STATICRESOLVER="'$STATIC'"
+      fi
+    fi
+    static_chosen 0 $INDEX
+  else
+    local INDEX=$1
+    if [ -z $INDEX ]; then
+      local STATICRESOLVER
+      toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
+      echo -e "$INFO Please choose Static Server Name"
+      echo -en "$INPUT Please enter staticname$NORM: "
+      read -r STATICNAME
+      echo -e "$INFO Please enter Static Server SDNS stamp"
+      echo -en "$INPUT Please enter sdnsstamp$NORM: "
+      read -r SDNSSTAMP
+      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    else
+      read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
+      read -r STATICNAME
+      echo -e "$INFO Please enter Static Server SDNS stamp"
+      echo -en "$INPUT Please enter sdnsstamp$NORM: "
+      read -r SDNSSTAMP
+      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
+      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    fi
+
+    local STATIC
+    STATIC=$STATICNAME
+    if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
+      echo -e "$INFO $STATIC is already set"
+    else
+      if [ "$STATICRESOLVER" ]; then
+        STATICRESOLVER="${STATICRESOLVER%?}, '$STATIC']"
+      else
+        STATICRESOLVER="['$STATIC']"
+      fi
+    fi
+
+    static_chosen $INDEX
+    toml_gvars_prep server_names "\"$STATICRESOLVER\""
   fi
+}
+
+static_choose_manual_addition () {
   local INDEX=$1
   if [ -z $INDEX ]; then
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RESOLVERS
     toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
-    echo -e "$INFO Please choose Static Server Name"
-    echo -en "$INPUT Please enter staticname$NORM: "
-    read -r STATICNAME
-    echo -e "$INFO Please enter Static Server SDNS stamp"
-    echo -en "$INPUT Please enter sdnsstamp$NORM: "
-    read -r SDNSSTAMP
-    toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-    toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    echo -e "$INFO Available DNS servers: "
+    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
+    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
+    read_input_num "Please choose DNS server" 1 $INDEX
   else
-    read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
-    read -r STATICNAME
-    echo -e "$INFO Please enter Static Server SDNS stamp"
-    echo -en "$INPUT Please enter sdnsstamp$NORM: "
-    read -r SDNSSTAMP
-    toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-    toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
+    if [ $? -eq 1 ]; then
+      static_chosen 0
+      toml_gvars_prep server_names "\"[${STATICRESOLVER}, $RESOLVERS]\""
+      return
+    fi
   fi
 
   local ITEM
-  ITEM=$STATICNAME
+  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md`
   if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RESOLVERS" ]; then
-      RESOLVERS="${RESOLVERS%?}, '$ITEM']"
+      RESOLVERS="${RESOLVERS%?}', '$ITEM'"
     else
-      RESOLVERS="['$ITEM']"
+      RESOLVERS="'$ITEM'"
     fi
   fi
 
-  static_chosen $INDEX
-  toml_gvars_prep server_names "\"$RESOLVERS\""
+  static_choose_manual_addition $INDEX
 }
 
 setup_dnscrypt () {
