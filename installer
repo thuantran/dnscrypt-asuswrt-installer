@@ -126,7 +126,7 @@ check_jffs_enabled () {
 }
 
 check_anonymized_automatic () {
-  if [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
+  if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
     echo -e "$INFO Servers that are potentially not compatible with relays are detected!"
     echo -e "$WARNING THESE SERVERS MIGHT NOT WORK WITH RELAYS"
     echo -e "$WARNING USE AT YOUR OWN RISK"
@@ -159,14 +159,14 @@ check_anonymized_support () {
         local AVARS_ARGS
         toml_gvar_disable server_names
         eval toml_gvars_write $GVARS_ARGS
-        check_anonymized_automatic
+        check_anonymized_automatic 1
         eval toml_avars_write $AVARS_ARGS
         ;;
       2) 
         toml_nvars_delete "routes =" $TOML_FILE
         echo -e "$INFO This Allows users to Setup Relays for For All Chosen Servers"
         local AVARS_ARGS
-        check_anonymized_automatic
+        check_anonymized_automatic 0
         eval toml_avars_write $AVARS_ARGS
         ;;
       3)
