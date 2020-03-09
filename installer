@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.1.2"
+DI_VERSION="v2.1.3"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
