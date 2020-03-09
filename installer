@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.1.2"
+DI_VERSION="v2.1.3"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -126,12 +126,11 @@ check_jffs_enabled () {
 }
 
 check_anonymized_automatic () {
-  if [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
-    echo -e "$INFO Cisco does not support anonymized DNS"
-    echo -e "$INFO Continue without Relays Support"
-  elif [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ]; then
-    echo -e "$INFO NextDNS-Custom is defined"
-    echo -e "$INFO Continue without Relays Support"
+  if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
+    echo -e "$INFO Servers that are potentially not compatible with relays are detected!"
+    echo -e "$WARNING THESE SERVERS MIGHT NOT WORK WITH RELAYS"
+    echo -e "$WARNING USE AT YOUR OWN RISK"
+    read_yesno "Do you still want to setup Wild-Card Relay Support?" && choose_relays_automatic || echo -e "$INFO Continue without Relays Support"
   else
     choose_relays_automatic
   fi
@@ -160,20 +159,20 @@ check_anonymized_support () {
         local AVARS_ARGS
         toml_gvar_disable server_names
         eval toml_gvars_write $GVARS_ARGS
-        check_anonymized_automatic
+        check_anonymized_automatic 1
         eval toml_avars_write $AVARS_ARGS
         ;;
       2) 
         toml_nvars_delete "routes =" $TOML_FILE
         echo -e "$INFO This Allows users to Setup Relays for For All Chosen Servers"
         local AVARS_ARGS
-        check_anonymized_automatic
+        check_anonymized_automatic 0
         eval toml_avars_write $AVARS_ARGS
         ;;
       3)
         toml_nvars_delete "routes =" $TOML_FILE
         local VARSARGS
-        VARSARGS="ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 quad9-dnscrypt-ip6-nofilter-alt geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-alt dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 quad9-dnscrypt-ip6-filter-pri mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-pri quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
+        VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 quad9-dnscrypt-ip4-nofilter-alt geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 quad9-dnscrypt-ip6-nofilter-alt geekdns-hk opennic-rico4514 qag.me cleanbrowsing-family-ipv6 captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm quad9-dnscrypt-ip6-filter-alt dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 quad9-dnscrypt-ip6-filter-pri mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs quad9-dnscrypt-ip4-filter-pri adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs cleanbrowsing-security quad9-dnscrypt-ip4-filter-alt v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cleanbrowsing-adult cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 cleanbrowsing-family quad9-dnscrypt-ip6-nofilter-pri quad9-dnscrypt-ip4-nofilter-pri scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 cleanbrowsing-adult-ipv6 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
         local COUNT
         local DNSCRYPT
         local SERVER
@@ -994,20 +993,20 @@ static_chosen () {
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     else
       read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     fi
 
     local STATIC
-    STATIC=$STATICNAME
+    STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
     else
@@ -1029,20 +1028,20 @@ static_chosen () {
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     else
       read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'$STATICNAME']" $TOML_FILE
-      toml_nvars_insert "[static.'$STATICNAME']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     fi
 
     local STATIC
-    STATIC=$STATICNAME
+    STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
     else
