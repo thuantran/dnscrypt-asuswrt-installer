@@ -747,7 +747,7 @@ inst_dnscrypt () {
     return
   fi
 
-  echo -e "$INFO Staring dnscrypt-proxy..."
+  echo -e "$INFO Starting dnscrypt-proxy..."
   $TARG_DIR/manager dnscrypt-start
   sleep 1
   if [ -z "`pidof dnscrypt-proxy`" ]; then
