@@ -152,14 +152,12 @@ check_anonymized_support () {
     read_input_num "Your choice" 1 3
     case $CHOSEN in
       1) 
-        toml_nvars_delete "routes =" $TOML_FILE
+        toml_avar_enable routes
         echo -e "$INFO This allows users to setup wildcard relay support for For all compatible servers"
-        local AVARS_ARGS
         check_anonymized_automatic 0
-        eval toml_avars_write $AVARS_ARGS
         ;;
       2)
-        toml_nvars_delete "routes =" $TOML_FILE
+        toml_avar_enable routes
         local VARSARGS
         VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
         local COUNT
@@ -172,10 +170,8 @@ check_anonymized_support () {
             echo -e "$INFO Found Servers for Anonymized Dnscrypt Support"
             echo -e "$INFO Choose Relays for DNSCRYPT server"
             if [ $COUNT -eq 0 ]; then
-              local AVARS_ARGS
               echo -e "$INFO Found $DNSCRYPT server"
               choose_relays_manual
-              eval toml_avars_write $AVARS_ARGS
             else
               echo -e "$INFO Found $DNSCRYPT server"
               choose_relays_manual_next
@@ -193,10 +189,8 @@ check_anonymized_support () {
           for BLOCKED in $FRAGSBLOCKED; do
             if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE)" ]; then
               if [ $NUMFRAG -eq 0 ]; then
-                local AVARS_ARGS
                 echo -e "$WARNING Found Incompatible Server(s)"
                 toml_avars_prep skip_incompatible true
-                eval toml_avars_write $AVARS_ARGS
               fi
             fi
             NUMFRAG=$((NUMFRAG + 1))
@@ -205,18 +199,16 @@ check_anonymized_support () {
           echo -e "$WARNING No compatible servers detected."
           echo -e "$INFO To continue users may still select relays for Wild-Card Support."
           echo -e "$WARNING All incompatible servers will be skipped."
-          local AVARS_ARGS
           read_yesno "Do you still want to setup Wild-Card Relay Support?" && choose_relays_automatic || echo -e "$INFO Continue without Relays Support"
-          eval toml_avars_write $AVARS_ARGS
         fi
         ;;
       3)
-        read_yesno "Do you want to remove any old relay setups (recommended)?" && toml_nvars_delete "routes =" $TOML_FILE || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
+        read_yesno "Do you want to remove any old relay setups (recommended)?" && toml_avar_disable routes || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
         ;;
     esac
   else
     echo -e "$INFO Continue without Relays Support"
-    toml_nvars_delete "routes =" $TOML_FILE
+    toml_avar_disable routes
   fi
 }
 
@@ -1165,6 +1157,7 @@ setup_dnscrypt_impl () {
       cp -f $TOML_ORI $TOML_FILE
     fi
     local GVARS_ARGS
+    local AVARS_ARGS
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
     toml_gvar_enable dnscrypt_ephemeral_keys
     toml_gvar_enable tls_disable_session_tickets
@@ -1182,6 +1175,7 @@ setup_dnscrypt_impl () {
     echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
     check_nextdns
     check_anonymized_support
+    eval toml_avars_write $AVARS_ARGS
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
       echo -e "$INFO Writing dnscrypt-proxy configuration failed"
@@ -1238,7 +1232,7 @@ toml_avars_prep () {
 
 toml_avars_write () {
   local IDX_NX_AVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
-  local IDX_GLB_INS=`awk -v VAR="#.*routes.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local IDX_GLB_INS=`awk -v VAR="#.*Anonymized DNS.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
   local VAR
   local VALUE
   local TO
