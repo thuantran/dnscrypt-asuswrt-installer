@@ -1037,7 +1037,7 @@ static_chosen () {
     local INDEX=$1
     if [ -z $INDEX ]; then
       local STATICRESOLVER
-      toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
+      toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
       echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
@@ -1078,7 +1078,7 @@ static_choose_manual_addition () {
   if [ -z $INDEX ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RESOLVERS
-    toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
+    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
     INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
