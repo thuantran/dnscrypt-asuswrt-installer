@@ -1166,6 +1166,8 @@ setup_dnscrypt_impl () {
     fi
     local GVARS_ARGS
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
+    toml_gvar_enable dnscrypt_ephemeral_keys
+    toml_gvar_enable tls_disable_session_tickets
     choose_dnscrypt_server
 
     echo -e "$INFO Set the DNS server(s) for initializing dnscrypt-proxy"
@@ -1224,6 +1226,12 @@ toml_avar_disable () {
   sed -i "1,$IDX_NX_AVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
 }
 
+toml_avar_enable () {
+  local VAR=$1
+  local IDX_NX_AVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  sed -i "1,$IDX_NX_AVAR{/^#.*$VAR = .*$/s/^#\ //}" $TOML_FILE
+}
+
 toml_avars_prep () {
   AVARS_ARGS="$AVARS_ARGS $@"
 }
@@ -1262,6 +1270,12 @@ toml_gvar_disable () {
   local VAR=$1
   local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
   sed -i "1,$IDX_NX_GVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
+}
+
+toml_gvar_enable () {
+  local VAR=$1
+  local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  sed -i "1,$IDX_NX_GVAR{/^#.*$VAR = .*$/s/^#\ //}" $TOML_FILE
 }
 
 toml_gvars_prep () {
