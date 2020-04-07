@@ -1232,7 +1232,7 @@ toml_avars_prep () {
 
 toml_avars_write () {
   local IDX_NX_AVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
-  local IDX_GLB_INS=`awk -v VAR="#.*recommended. If you do so, keep "server_names" short and distinct from relays.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local IDX_GLB_INS=`awk -v VAR="#.*Anonymized DNS        #*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
   local VAR
   local VALUE
   local TO
