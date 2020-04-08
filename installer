@@ -390,6 +390,9 @@ choose_dnscrypt_server () {
       toml_gvars_prep lb_strategy "\'random\'"
       ;;
   esac
+  #toml_gvar_enable lb_estimator
+  read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE=true || USE_LBE=false
+  toml_gvars_prep lb_estimator $USE_LBE
   echo -e "$INFO Choose how your DNS servers are selected:"
   echo -e "  1) Automatically"
   echo -e "  2) Manually"
