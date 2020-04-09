@@ -127,11 +127,13 @@ check_jffs_enabled () {
 
 check_anonymized_automatic () {
   if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ]; then
+    local AUTOMATIC
     echo -e "$INFO Servers that are potentially not compatible with relays are detected!"
     echo -e "$WARNING THESE SERVERS MIGHT NOT WORK WITH RELAYS"
     echo -e "$WARNING USE AT YOUR OWN RISK"
     read_yesno "Do you still want to setup Wild-Card Relay Support?" && AUTOMATIC=true || AUTOMATIC=false
     if [ "$AUTOMATIC" == "true" ]; then
+      local USE_BROKEN
       read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
       toml_avars_prep skip_incompatible $USE_BROKEN
       choose_relays_automatic
@@ -140,6 +142,7 @@ check_anonymized_automatic () {
       toml_avars_prep skip_incompatible false
     fi
   else
+    local USE_BROKEN
     read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
     toml_avars_prep skip_incompatible $USE_BROKEN
     choose_relays_automatic
@@ -212,6 +215,7 @@ check_anonymized_support () {
             if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE)" ]; then
               if [ $NUMFRAG -eq 0 ]; then
                 local AVARS_ARGS
+                local USE_BROKEN
                 echo -e "$WARNING Found Incompatible Server(s)"
                 read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
                 toml_avars_prep skip_incompatible $USE_BROKEN
