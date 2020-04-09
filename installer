@@ -384,7 +384,6 @@ choose_dnscrypt_server () {
   local USE_IPV6
   read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
   toml_gvars_prep ipv6_servers $USE_IPV6
-  #toml_gvar_enable lb_strategy
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
@@ -405,7 +404,6 @@ choose_dnscrypt_server () {
       toml_gvars_prep lb_strategy "\'random\'"
       ;;
   esac
-  #toml_gvar_enable lb_estimator
   read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE=true || USE_LBE=false
   toml_gvars_prep lb_estimator $USE_LBE
   echo -e "$INFO Choose how your DNS servers are selected:"
