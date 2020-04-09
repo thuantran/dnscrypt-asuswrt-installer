@@ -173,7 +173,7 @@ check_anonymized_support () {
       1) 
         local AVARS_ARGS
         toml_avar_enable routes
-        echo -e "$INFO This allows users to setup wildcard relay support for For all compatible servers"
+        echo -e "$INFO This allows users to setup wildcard relay support for all compatible servers"
         check_anonymized_automatic 0
         eval toml_avars_write $AVARS_ARGS
         ;;
