@@ -126,12 +126,22 @@ check_jffs_enabled () {
 }
 
 check_anonymized_automatic () {
-  if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
+  if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ]; then
     echo -e "$INFO Servers that are potentially not compatible with relays are detected!"
     echo -e "$WARNING THESE SERVERS MIGHT NOT WORK WITH RELAYS"
     echo -e "$WARNING USE AT YOUR OWN RISK"
-    read_yesno "Do you still want to setup Wild-Card Relay Support?" && choose_relays_automatic || echo -e "$INFO Continue without Relays Support"
+    read_yesno "Do you still want to setup Wild-Card Relay Support?" && AUTOMATIC=true || AUTOMATIC=false
+    if [ "$AUTOMATIC" == "true" ]; then
+      read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
+      toml_avars_prep skip_incompatible $USE_BROKEN
+      choose_relays_automatic
+    else
+      echo -e "$INFO Continue without Relays Support"
+      toml_avars_prep skip_incompatible false
+    fi
   else
+    read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
+    toml_avars_prep skip_incompatible $USE_BROKEN
     choose_relays_automatic
   fi
 }
@@ -203,7 +213,8 @@ check_anonymized_support () {
               if [ $NUMFRAG -eq 0 ]; then
                 local AVARS_ARGS
                 echo -e "$WARNING Found Incompatible Server(s)"
-                toml_avars_prep skip_incompatible true
+                read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
+                toml_avars_prep skip_incompatible $USE_BROKEN
                 eval toml_avars_write $AVARS_ARGS
               fi
             fi
@@ -213,8 +224,7 @@ check_anonymized_support () {
           local AVARS_ARGS
           echo -e "$WARNING No compatible servers detected."
           echo -e "$INFO To continue users may still select relays for Wild-Card Support."
-          echo -e "$WARNING All incompatible servers will be skipped."
-          read_yesno "Do you still want to setup Wild-Card Relay Support?" && choose_relays_automatic || check_anonymized_disabled
+          read_yesno "Do you still want to setup Wild-Card Relay Support?" && check_anonymized_automatic 0 || check_anonymized_disabled
           eval toml_avars_write $AVARS_ARGS
         fi
         ;;
@@ -370,6 +380,7 @@ choose_dnscrypt_server () {
   local USE_IPV6
   read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
   toml_gvars_prep ipv6_servers $USE_IPV6
+  #toml_gvar_enable lb_strategy
   echo -e "$INFO Choose DNS resolving load balancing strategy:"
   echo -e "  1) p2 (default)"
   echo -e "  2) ph"
@@ -500,7 +511,6 @@ choose_relays_automatic () {
   if [ -z $INDEX ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RELAYS
-    toml_avars_prep skip_incompatible true
     echo -e "$INFO Available Relay servers: "
     INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l`
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/relays.md
