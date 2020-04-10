@@ -1507,10 +1507,10 @@ case $(uname -m) in
     ;;
 esac
 
-check_version
-check_dns_environment
 check_jffs_enabled
+check_dns_environment
 cleanup
+check_version
 
 menu () {
   echo -e "$INFO Choose what you want to do:"
