@@ -40,6 +40,7 @@ check_dns_environment () {
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
     nvram commit
+    service restart_dnsmasq
     echo -e "$INFO DNS Environment is Ready."
   else
     echo -e "$INFO DNS Environment is Ready."
