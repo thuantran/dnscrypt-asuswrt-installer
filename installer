@@ -40,7 +40,7 @@ check_dns_environment () {
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
     nvram commit
-    service restart_dnsmasq
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO DNS Environment is Ready."
   else
     echo -e "$INFO DNS Environment is Ready."
@@ -52,8 +52,8 @@ check_dns_filter () {
   if [ "$1" -eq 0 ] && [ $DNSFIL -ne 0 ]; then
     nvram set dnsfilter_enable_x="0"
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO User chose to not force DNS through this proxy."
     return
   fi
@@ -72,8 +72,8 @@ check_dns_filter () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO Set DNSFilter to Control DNS."
   elif [ "$1" -eq 1 ] && [ $DNSFIL -ne 0 ]; then
     echo -e "$INFO DNSFilter is Already on."
@@ -88,8 +88,8 @@ check_dns_filter_some () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
     return
   fi
@@ -107,8 +107,8 @@ check_dns_filter_some () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO User chose to continue redirecting All DNS resolutions instead."
     return
   fi
@@ -808,7 +808,7 @@ inst_dnscrypt () {
     end_op_message
     return
   fi
-  service restart_dnsmasq
+  service restart_dnsmasq >/dev/null 2>&1
   manager_monitor_restart
 
   echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
