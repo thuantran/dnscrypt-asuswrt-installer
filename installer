@@ -1038,6 +1038,7 @@ static_chosen () {
   if [ "$1" -eq 0 ]; then
   local INDEX=$1
     if [ -z $INDEX ]; then
+      local STATICRESOLVER
       echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
@@ -1053,7 +1054,6 @@ static_chosen () {
     fi
 
     local STATIC
-    local STATICRESOLVER
     STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
@@ -1070,6 +1070,7 @@ static_chosen () {
   else
     local INDEX=$1
     if [ -z $INDEX ]; then
+      local STATICRESOLVER
       toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
       echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
@@ -1086,7 +1087,6 @@ static_chosen () {
     fi
 
     local STATIC
-    local STATICRESOLVER
     STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
