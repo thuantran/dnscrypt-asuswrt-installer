@@ -1054,6 +1054,7 @@ static_chosen () {
         read -r SDNSSTAMP
       elif [ "$ANOTHER" == "NO" ]; then
         echo -e "$INFO finished static setup."
+        return
       fi
     fi
 
@@ -1093,6 +1094,7 @@ static_chosen () {
         read -r SDNSSTAMP
       elif [ "$ANOTHER" == "NO" ]; then
         echo -e "$INFO finished static setup."
+        return
       fi
     fi
 
