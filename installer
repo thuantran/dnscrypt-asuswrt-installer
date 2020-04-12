@@ -40,7 +40,7 @@ check_dns_environment () {
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
     nvram commit
-    service restart_dnsmasq
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO DNS Environment is Ready."
   else
     echo -e "$INFO DNS Environment is Ready."
@@ -52,8 +52,8 @@ check_dns_filter () {
   if [ "$1" -eq 0 ] && [ $DNSFIL -ne 0 ]; then
     nvram set dnsfilter_enable_x="0"
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO User chose to not force DNS through this proxy."
     return
   fi
@@ -72,8 +72,8 @@ check_dns_filter () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO Set DNSFilter to Control DNS."
   elif [ "$1" -eq 1 ] && [ $DNSFIL -ne 0 ]; then
     echo -e "$INFO DNSFilter is Already on."
@@ -88,8 +88,8 @@ check_dns_filter_some () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO Set DNSFilter to Control DNS through this proxy, while leaving any Custom Rules and Values."
     return
   fi
@@ -107,8 +107,8 @@ check_dns_filter_some () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall
-    service restart_dnsmasq
+    service restart_firewall >/dev/null 2>&1
+    service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO User chose to continue redirecting All DNS resolutions instead."
     return
   fi
@@ -494,6 +494,7 @@ choose_dnscrypt_server_static () {
         ;;
       2)
         echo -e "$INFO User has chosen select Manually Chosen Servers First."
+        read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
         static_choose_manual_addition
         ;;
       3)
@@ -808,7 +809,7 @@ inst_dnscrypt () {
     end_op_message
     return
   fi
-  service restart_dnsmasq
+  service restart_dnsmasq >/dev/null 2>&1
   manager_monitor_restart
 
   echo -e "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:"
@@ -1045,16 +1046,18 @@ static_chosen () {
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     else
-      read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
-      read -r STATICNAME
-      echo -e "$INFO Please enter Static Server SDNS stamp"
-      echo -en "$INPUT Please enter sdnsstamp$NORM: "
-      read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+      read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+      if [ "$ANOTHER" == "YES" ]; then
+        echo -en "$INPUT Please enter staticname$NORM: "
+        read -r STATICNAME
+        echo -e "$INFO Please enter Static Server SDNS stamp"
+        echo -en "$INPUT Please enter sdnsstamp$NORM: "
+        read -r SDNSSTAMP
+      elif [ "$ANOTHER" == "NO" ]; then
+        echo -e "$INFO finished static setup."
+        return
+      fi
     fi
 
     local STATIC
@@ -1062,6 +1065,8 @@ static_chosen () {
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
     else
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
       if [ "$STATICRESOLVER" ]; then
         STATICRESOLVER="${STATICRESOLVER%?}', '$STATIC'"
       else
@@ -1080,16 +1085,18 @@ static_chosen () {
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     else
-      read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
-      read -r STATICNAME
-      echo -e "$INFO Please enter Static Server SDNS stamp"
-      echo -en "$INPUT Please enter sdnsstamp$NORM: "
-      read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+      read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+      if [ "$ANOTHER" == "YES" ]; then
+        echo -en "$INPUT Please enter staticname$NORM: "
+        read -r STATICNAME
+        echo -e "$INFO Please enter Static Server SDNS stamp"
+        echo -en "$INPUT Please enter sdnsstamp$NORM: "
+        read -r SDNSSTAMP
+      elif [ "$ANOTHER" == "NO" ]; then
+        echo -e "$INFO finished static setup."
+        return
+      fi
     fi
 
     local STATIC
@@ -1097,6 +1104,8 @@ static_chosen () {
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
     else
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
       if [ "$STATICRESOLVER" ]; then
         STATICRESOLVER="${STATICRESOLVER%?}, '$STATIC']"
       else
@@ -1382,7 +1391,7 @@ uninst_all () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/services-stop
   del_jffs_script /jffs/scripts/wan-start
-  service restart_dnsmasq
+  service restart_dnsmasq >/dev/null 2>&1
   killall -q -9 haveged rngd dnscrypt-proxy
   local MAN_PID="`pidof manager`"
   local PID
@@ -1404,7 +1413,7 @@ uninst_dnscrypt () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/wan-start
   killall -q dnscrypt-proxy
-  service restart_dnsmasq
+  service restart_dnsmasq >/dev/null 2>&1
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
   end_op_message 0
 }
