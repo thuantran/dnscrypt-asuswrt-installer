@@ -1391,7 +1391,7 @@ uninst_all () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/services-stop
   del_jffs_script /jffs/scripts/wan-start
-  service restart_dnsmasq
+  service restart_dnsmasq >/dev/null 2>&1
   killall -q -9 haveged rngd dnscrypt-proxy
   local MAN_PID="`pidof manager`"
   local PID
@@ -1413,7 +1413,7 @@ uninst_dnscrypt () {
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/wan-start
   killall -q dnscrypt-proxy
-  service restart_dnsmasq
+  service restart_dnsmasq >/dev/null 2>&1
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
   end_op_message 0
 }
