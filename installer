@@ -494,6 +494,7 @@ choose_dnscrypt_server_static () {
         ;;
       2)
         echo -e "$INFO User has chosen select Manually Chosen Servers First."
+        read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
         static_choose_manual_addition
         ;;
       3)
