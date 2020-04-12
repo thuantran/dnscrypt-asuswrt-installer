@@ -1038,7 +1038,6 @@ static_chosen () {
   if [ "$1" -eq 0 ]; then
   local INDEX=$1
     if [ -z $INDEX ]; then
-      local STATICRESOLVER
       echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
@@ -1046,14 +1045,20 @@ static_chosen () {
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
     else
-      read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
-      read -r STATICNAME
-      echo -e "$INFO Please enter Static Server SDNS stamp"
-      echo -en "$INPUT Please enter sdnsstamp$NORM: "
-      read -r SDNSSTAMP
+      read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+      if [ "$ANOTHER" == "YES" ]; then
+        echo -en "$INPUT Please enter staticname$NORM: "
+        read -r STATICNAME
+        echo -e "$INFO Please enter Static Server SDNS stamp"
+        echo -en "$INPUT Please enter sdnsstamp$NORM: "
+        read -r SDNSSTAMP
+      elif [ "$ANOTHER" == "NO" ]; then
+        echo -e "$INFO finished static setup."
+      fi
     fi
 
     local STATIC
+    local STATICRESOLVER
     STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
@@ -1079,14 +1084,20 @@ static_chosen () {
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
     else
-      read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
-      read -r STATICNAME
-      echo -e "$INFO Please enter Static Server SDNS stamp"
-      echo -en "$INPUT Please enter sdnsstamp$NORM: "
-      read -r SDNSSTAMP
+      read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+      if [ "$ANOTHER" == "YES" ]; then
+        echo -en "$INPUT Please enter staticname$NORM: "
+        read -r STATICNAME
+        echo -e "$INFO Please enter Static Server SDNS stamp"
+        echo -en "$INPUT Please enter sdnsstamp$NORM: "
+        read -r SDNSSTAMP
+      elif [ "$ANOTHER" == "NO" ]; then
+        echo -e "$INFO finished static setup."
+      fi
     fi
 
     local STATIC
+    local STATICRESOLVER
     STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
