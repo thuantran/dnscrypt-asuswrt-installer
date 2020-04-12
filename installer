@@ -1038,30 +1038,28 @@ static_chosen () {
   if [ "$1" -eq 0 ]; then
   local INDEX=$1
     if [ -z $INDEX ]; then
-      local STATICRESOLVER
       echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     else
       read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     fi
 
     local STATIC
+    local STATICRESOLVER
     STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
     else
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
       if [ "$STATICRESOLVER" ]; then
         STATICRESOLVER="${STATICRESOLVER%?}', '$STATIC'"
       else
@@ -1072,7 +1070,6 @@ static_chosen () {
   else
     local INDEX=$1
     if [ -z $INDEX ]; then
-      local STATICRESOLVER
       toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
       echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
@@ -1080,23 +1077,22 @@ static_chosen () {
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     else
       read_yesno "Do you want to set up another Static Server?" && echo -en "$INPUT Please enter staticname$NORM: " || return
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
     fi
 
     local STATIC
+    local STATICRESOLVER
     STATIC="${STATICNAME}-Static"
     if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
       echo -e "$INFO $STATIC is already set"
     else
+      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
       if [ "$STATICRESOLVER" ]; then
         STATICRESOLVER="${STATICRESOLVER%?}, '$STATIC']"
       else
