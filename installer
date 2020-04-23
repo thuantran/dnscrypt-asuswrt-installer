@@ -422,12 +422,20 @@ choose_dnscrypt_server () {
   case $CHOSEN in
     1)
       choose_dnscrypt_server_auto
-      read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && choose_dnscrypt_server_disabled || echo -e "$INFO Continuing without disabling any DNS servers:"
+      read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED=true || CHOOSE_DISABLED=false
+      if [ "$CHOOSE_DISABLED" == "true" ]; then
+        choose_dnscrypt_server_disabled
+      elif [ "$CHOOSE_DISABLED" == "false" ]; then
+        echo -e "$INFO Continuing without disabling any DNS servers."
+        toml_gvar_disable disabled_server_names
+      fi
       ;;
     2)
+      toml_gvar_disable disabled_server_names
       choose_dnscrypt_server_manual
       ;;
     3)
+      toml_gvar_disable disabled_server_names
       choose_dnscrypt_server_static
       ;;
   esac
