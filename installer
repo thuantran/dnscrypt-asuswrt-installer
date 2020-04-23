@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.1.4"
+DI_VERSION="v2.1.5"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -85,8 +85,6 @@ check_dns_filter () {
 check_dns_filter_some () {
   if [ "$1" -eq 0 ]; then
     nvram set dnsfilter_mode="11"
-    nvram set dhcp_dns1_x=""
-    nvram set dhcp_dns2_x=""
     nvram commit
     service restart_firewall >/dev/null 2>&1
     service restart_dnsmasq >/dev/null 2>&1
@@ -424,6 +422,7 @@ choose_dnscrypt_server () {
   case $CHOSEN in
     1)
       choose_dnscrypt_server_auto
+      read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && choose_dnscrypt_server_disabled || echo -e "$INFO Continuing without disabling any DNS servers:"
       ;;
     2)
       choose_dnscrypt_server_manual
@@ -441,6 +440,38 @@ choose_dnscrypt_server_auto () {
   read_yesno "Use only servers that support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
   read_yesno "Use only servers that do not log user's queries" && toml_gvars_prep require_nolog true || toml_gvars_prep require_nolog false
   read_yesno "Use only servers that do not filter result" && toml_gvars_prep require_nofilter true || toml_gvars_prep require_nofilter false
+}
+
+choose_dnscrypt_server_disabled () {
+  local INDEX=$1
+  if [ -z $INDEX ]; then
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    local RESOLVERS
+    echo -e "$INFO Available DNS servers to disable: "
+    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
+    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
+    read_input_num "Please choose DNS server to disable" 1 $INDEX
+  else
+    read_input_num "Please choose next DNS server to disable or press n to stop" 1 $INDEX n
+    if [ $? -eq 1 ]; then
+      toml_gvars_prep disabled_server_names "\"$RESOLVERS\""
+      return
+    fi
+  fi
+
+  local ITEM
+  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md`
+  if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
+    echo -e "$INFO $ITEM is already set"
+  else
+    if [ "$RESOLVERS" ]; then
+      RESOLVERS="${RESOLVERS%?}, '$ITEM']"
+    else
+      RESOLVERS="['$ITEM']"
+    fi
+  fi
+
+  choose_dnscrypt_server_disabled $INDEX
 }
 
 choose_dnscrypt_server_manual () {
