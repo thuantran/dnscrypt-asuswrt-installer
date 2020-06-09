@@ -864,19 +864,19 @@ inst_dnscrypt () {
     return
   fi
   if [ ! -d $TARG_DIR ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
-	  echo -e "$INFO Backup is detected."
-	  local USE_OLD
-	  read_yesno "Do you want Restore instead?" && USE_OLD=YES || USE_OLD=NO
-	  if [ "USE_OLD" == "YES" ]; then
-	    echo -e "$INFO Installing from an old backup!"
-	    backup_restore INSTALL
-	  elif [ "USE_OLD" == "YES" ]; then
-	    echo -e "$INFO Continuing without restoring from backup!"
-	  fi
+    echo -e "$INFO Backup is detected."
+    local USE_OLD
+    read_yesno "Do you want Restore instead?" && USE_OLD=YES || USE_OLD=NO
+    if [ "USE_OLD" == "YES" ]; then
+      echo -e "$INFO Installing from an old backup!"
+      backup_restore INSTALL
+    elif [ "USE_OLD" == "YES" ]; then
+      echo -e "$INFO Continuing without restoring from backup!"
+    fi
   elif [ -d $TARG_DIR ]; then
-	  read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP || echo -e "$INFO continuing without making a backup."
+    read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP || echo -e "$INFO continuing without making a backup."
   fi
-  [ ! -d $TARG_DIR ] && create_dir $TARG_DIR
+  create_dir $TARG_DIR
   if [ $? -ne 0 ]; then
     end_op_message
     return
