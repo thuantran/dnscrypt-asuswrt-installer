@@ -24,7 +24,7 @@ _quote() {
 }
 
 backup_restore () {
-  if [ -d $TARG_DIR ] && [ "$1" == "BACKUP" ]; then
+  if [ "$1" == "BACKUP" ] && [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     echo -e "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition."
     echo -e "$INFO Please wait a moment."
     if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
@@ -42,7 +42,7 @@ backup_restore () {
     fi
     tar cvpzf $BASE_DIR/backup_dnscrypt.tar.gz $TARG_DIR >/dev/null 2>&1
     echo -e "$INFO Backup complete"
-  elif [ ! -d $TARG_DIR ] && [ "$1" == "BACKUP" ]; then
+  elif [ "$1" == "BACKUP" ] && [ ! -d $TARG_DIR ] && [ ! -f ${TARG_DIR}/dnscrypt-proxy ]; then
     echo -e "$ERROR No Directory to Backup!"
     end_op_message
     return
@@ -873,7 +873,7 @@ inst_dnscrypt () {
     elif [ "USE_OLD" == "YES" ]; then
       echo -e "$INFO Continuing without restoring from backup!"
     fi
-  elif [ -d $TARG_DIR ]; then
+  elif [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP || echo -e "$INFO continuing without making a backup."
   fi
   create_dir $TARG_DIR
@@ -1697,7 +1697,7 @@ menu () {
   echo -e "  7) Uninstall (P)RNG"
   echo -e "  8) Install swap file"
   echo -e "  9) Uninstall ALL"
-  [ -d $TARG_DIR ] && echo -e "  b) Backup"
+  [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] echo -e "  b) Backup"
   [ -d $TARG_DIR ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && echo -e "  r) Restore"
   echo -e "  q) Quit"
   read_input_num "Please enter the number that designates your selection:" 1 9 b r q
