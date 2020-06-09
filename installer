@@ -25,38 +25,38 @@ _quote() {
 
 backup_restore () {
   if [ -d $TARG_DIR ] && [ "$1" == "BACKUP" ]; then
-	  echo -e "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition."
-	  echo -e "$INFO Please wait a moment."
-	  if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
-	    echo -e "$INFO There is an old backup detected."
-	    local USE_OLD
-	    read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
-	    if [ "USE_OLD" == "YES" ]; then
-		    echo -e "$INFO Leaving Old Backup."
-		    end_op_message
-		    return
-	    elif [ "USE_OLD" == "NO" ]; then
-	      echo -e "$INFO Removing Old Backup."
-	      rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
-	    fi
-	  fi
-	  tar cvpzf $BASE_DIR/backup_dnscrypt.tar.gz $TARG_DIR >/dev/null 2>&1
-	  echo -e "$INFO Backup complete"
+    echo -e "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition."
+    echo -e "$INFO Please wait a moment."
+    if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
+      echo -e "$INFO There is an old backup detected."
+      local USE_OLD
+      read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
+      if [ "USE_OLD" == "YES" ]; then
+        echo -e "$INFO Leaving Old Backup."
+	end_op_message
+	return
+      elif [ "USE_OLD" == "NO" ]; then
+	echo -e "$INFO Removing Old Backup."
+	rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
+      fi
+    fi
+    tar cvpzf $BASE_DIR/backup_dnscrypt.tar.gz $TARG_DIR >/dev/null 2>&1
+    echo -e "$INFO Backup complete"
   elif [ ! -d $TARG_DIR ] && [ "$1" == "BACKUP" ]; then
-	  echo -e "$ERROR No Directory to Backup!"
-	  end_op_message
-	  return
+    echo -e "$ERROR No Directory to Backup!"
+    end_op_message
+    return
   fi
   if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
     echo -e "$INFO Please wait a moment."
-	  tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
-	  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
+    tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
+    del_jffs_script /jffs/scripts/wan-start dnscrypt-start
     del_jffs_script /jffs/scripts/openvpn-event
     del_jffs_script /jffs/scripts/firewall-start
     del_jffs_script /jffs/scripts/wan-start
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
-	  setup_dnscrypt
+    setup_dnscrypt
     if [ $? -ne 0 ]; then
       end_op_message
       return
@@ -73,33 +73,32 @@ backup_restore () {
     fi
     service restart_dnsmasq >/dev/null 2>&1
     manager_monitor_restart
-	  echo -e "$INFO Backup restored!"    
+    echo -e "$INFO Backup restored!"    
     end_op_message 0
   elif [ ! -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
-	  echo -e "$ERROR No Backup found!"
-	  echo -e "$ERROR Please make sure Backup Resides in $BASE_DIR"
-	  end_op_message
-	  return
+    echo -e "$ERROR No Backup found!"
+    echo -e "$ERROR Please make sure Backup Resides in $BASE_DIR"
+    end_op_message
+    return
   elif [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "INSTALL" ]; then
     echo -e "$INFO Please wait a moment."
-	  tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
-	  download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
-	    $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
-	    $RESOLVERS_URL_PREFIX/relays.md \
-	    $RESOLVERS_URL_PREFIX/relays.md.minisig
-	  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
-	  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
+    tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
+    download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
+      $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
+      $RESOLVERS_URL_PREFIX/relays.md \
+      $RESOLVERS_URL_PREFIX/relays.md.minisig
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
+    del_jffs_script /jffs/scripts/wan-start dnscrypt-start
     del_jffs_script /jffs/scripts/openvpn-event
     del_jffs_script /jffs/scripts/firewall-start
     del_jffs_script /jffs/scripts/wan-start
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
-	  setup_dnscrypt
+    setup_dnscrypt
     if [ $? -ne 0 ]; then
       end_op_message
       return
     fi
-
     echo -e "$INFO Starting dnscrypt-proxy..."
     $TARG_DIR/manager dnscrypt-start
     sleep 1
@@ -113,7 +112,7 @@ backup_restore () {
     manager_monitor_restart
 
     echo -e "$INFO Backup restored!"
-	  echo -e "$INFO  - Add swap"
+    echo -e "$INFO  - Add swap"
     echo -e "$INFO  - Add a RNG"
     echo -e "$INFO  - Set your timezone"
     end_op_message 0	
@@ -1759,14 +1758,14 @@ menu () {
       echo
       read_yesno "Do you want to continue?" && uninst_all || menu
       ;;
-	  b|B)
-	    echo -e "$INFO This operation will allow you to backup everything!"
-	    read_yesno "Do you want to continue?" && backup_restore BACKUP || menu
-	    ;;
+    b|B)
+      echo -e "$INFO This operation will allow you to backup everything!"
+      read_yesno "Do you want to continue?" && backup_restore BACKUP || menu
+      ;;
     r|R)
       echo -e "$INFO This operation will allow you to restore everything!"
-	    read_yesno "Do you want to continue?" && backup_restore RESTORE || menu
-	    ;;
+      read_yesno "Do you want to continue?" && backup_restore RESTORE || menu
+      ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made"
       echo -e "$INFO In case of anomaly, please reboot your router!"
