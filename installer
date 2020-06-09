@@ -59,6 +59,7 @@ backup_restore () {
     if [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
       echo -e "$ERROR No internet- Skipping the updating for Server/Relay Files."
     else
+      local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
       download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
         $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
         $RESOLVERS_URL_PREFIX/relays.md \
@@ -98,6 +99,7 @@ backup_restore () {
   elif [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "INSTALL" ]; then
     echo -e "$INFO Please wait a moment."
     tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
+    local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
     download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
       $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
       $RESOLVERS_URL_PREFIX/relays.md \
