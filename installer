@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DI_VERSION="v2.1.5"
+DI_VERSION="v2.1.6"
 LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -11,7 +11,8 @@ ERROR="$BOLD *** Error: $NORM"
 WARNING="$BOLD * Warning: $NORM"
 INPUT="$BOLD => $NORM"
 
-readonly TARG_DIR=/jffs/dnscrypt
+readonly BASE_DIR=/jffs
+readonly TARG_DIR=$BASE_DIR/dnscrypt
 readonly CONF_FILE=$TARG_DIR/.config
 readonly TOML_FILE=$TARG_DIR/dnscrypt-proxy.toml
 readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
@@ -19,7 +20,104 @@ readonly TOML_ERR=$TARG_DIR/dnscrypt-proxy.toml.err
 readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
 
 _quote() {
-  echo $1 | sed 's/[]\/()$*.^|[]/\\&/g'
+  echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
+}
+
+backup_restore () {
+  if [ -d $TARG_DIR ] && [ "$1" == "BACKUP" ]; then
+	  echo -e "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition."
+	  echo -e "$INFO Please wait a moment."
+	  if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
+	    echo -e "$INFO There is an old backup detected."
+	    local USE_OLD
+	    read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
+	    if [ "USE_OLD" == "YES" ]; then
+		    echo -e "$INFO Leaving Old Backup."
+		    end_op_message
+		    return
+	    elif [ "USE_OLD" == "NO" ]; then
+	      echo -e "$INFO Removing Old Backup."
+	      rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
+	    fi
+	  fi
+	  tar cvpzf $BASE_DIR/backup_dnscrypt.tar.gz $TARG_DIR >/dev/null 2>&1
+	  echo -e "$INFO Backup complete"
+  elif [ ! -d $TARG_DIR ] && [ "$1" == "BACKUP" ]; then
+	  echo -e "$ERROR No Directory to Backup!"
+	  end_op_message
+	  return
+  fi
+  if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
+    echo -e "$INFO Please wait a moment."
+	  tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
+	  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
+    del_jffs_script /jffs/scripts/openvpn-event
+    del_jffs_script /jffs/scripts/firewall-start
+    del_jffs_script /jffs/scripts/wan-start
+    write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+    write_manager_script /jffs/scripts/init-start init-start
+	  setup_dnscrypt
+    if [ $? -ne 0 ]; then
+      end_op_message
+      return
+    fi
+
+    echo -e "$INFO Starting dnscrypt-proxy..."
+    $TARG_DIR/manager dnscrypt-start
+    sleep 1
+    if [ -z "$(pidof dnscrypt-proxy)" ]; then
+      echo -e "$ERROR Couldn't start dnscrypt-proxy"
+      echo -e "$ERROR Please send WebUI System Log to dev"
+      end_op_message
+      return
+    fi
+    service restart_dnsmasq >/dev/null 2>&1
+    manager_monitor_restart
+	  echo -e "$INFO Backup restored!"    
+    end_op_message 0
+  elif [ ! -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
+	  echo -e "$ERROR No Backup found!"
+	  echo -e "$ERROR Please make sure Backup Resides in $BASE_DIR"
+	  end_op_message
+	  return
+  elif [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "INSTALL" ]; then
+    echo -e "$INFO Please wait a moment."
+	  tar -xvzpf /jffs/backup_dnscrypt.tar.gz >/dev/null 2>&1
+	  download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
+	    $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
+	    $RESOLVERS_URL_PREFIX/relays.md \
+	    $RESOLVERS_URL_PREFIX/relays.md.minisig
+	  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
+	  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
+    del_jffs_script /jffs/scripts/openvpn-event
+    del_jffs_script /jffs/scripts/firewall-start
+    del_jffs_script /jffs/scripts/wan-start
+    write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+    write_manager_script /jffs/scripts/init-start init-start
+	  setup_dnscrypt
+    if [ $? -ne 0 ]; then
+      end_op_message
+      return
+    fi
+
+    echo -e "$INFO Starting dnscrypt-proxy..."
+    $TARG_DIR/manager dnscrypt-start
+    sleep 1
+    if [ -z "$(pidof dnscrypt-proxy)" ]; then
+      echo -e "$ERROR Couldn't start dnscrypt-proxy"
+      echo -e "$ERROR Please send WebUI System Log to dev"
+      end_op_message
+      return
+    fi
+    service restart_dnsmasq >/dev/null 2>&1
+    manager_monitor_restart
+
+    echo -e "$INFO Backup restored!"
+	  echo -e "$INFO  - Add swap"
+    echo -e "$INFO  - Add a RNG"
+    echo -e "$INFO  - Set your timezone"
+    end_op_message 0	
+  fi
 }
 
 check_dnscrypt_toml () {
@@ -35,8 +133,8 @@ check_dnscrypt_toml () {
 }
 
 check_dns_environment () {
-  local DNSPRIV=`nvram get dnspriv_enable`
-  if [ $DNSPRIV -ne 0 ]; then
+  local DNSPRIV=$(nvram get dnspriv_enable)
+  if [ "$DNSPRIV" -ne 0 ]; then
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
     nvram commit
@@ -48,8 +146,8 @@ check_dns_environment () {
 }
 
 check_dns_filter () {
-  local DNSFIL=`nvram get dnsfilter_enable_x`
-  if [ "$1" -eq 0 ] && [ $DNSFIL -ne 0 ]; then
+  local DNSFIL=$(nvram get dnsfilter_enable_x)
+  if [ "$1" -eq 0 ] && [ "$DNSFIL" -ne 0 ]; then
     nvram set dnsfilter_enable_x="0"
     nvram commit
     service restart_firewall >/dev/null 2>&1
@@ -57,7 +155,7 @@ check_dns_filter () {
     echo -e "$INFO User chose to not force DNS through this proxy."
     return
   fi
-  if [ "$1" -eq 1 ] && [ $DNSFIL -ne 1 ]; then
+  if [ "$1" -eq 1 ] && [ "$DNSFIL" -ne 1 ]; then
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
     nvram set dnsfilter_custom3=""
@@ -75,7 +173,7 @@ check_dns_filter () {
     service restart_firewall >/dev/null 2>&1
     service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO Set DNSFilter to Control DNS."
-  elif [ "$1" -eq 1 ] && [ $DNSFIL -ne 0 ]; then
+  elif [ "$1" -eq 1 ] && [ "$DNSFIL" -ne 0 ]; then
     echo -e "$INFO DNSFilter is Already on."
     echo -e "$INFO User can choose to keep any custom dnsfilter values and only redirect non-custom traffic."
     read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && check_dns_filter_some 0 || check_dns_filter_some 1
@@ -113,16 +211,16 @@ check_dns_filter_some () {
 }
 
 check_jffs_enabled () {
-  if [ "`nvram get jffs2_format`" == "1" ]; then
+  if [ "$(nvram get jffs2_format)" == "1" ]; then
     echo -e "$ERROR JFFS partition is scheduled to be reformatted"
     echo -e "$ERROR Please reboot to format or disable that setting and try again. Exiting..."
     exit 1
   fi
 
-  local JFFS2_ENABLED=`nvram get jffs2_enable`
-  local JFFS2_SCRIPTS=`nvram get jffs2_scripts`
+  local JFFS2_ENABLED=$(nvram get jffs2_enable)
+  local JFFS2_SCRIPTS=$(nvram get jffs2_scripts)
 
-  if [ $JFFS2_ENABLED -ne 1 ] || [ $JFFS2_SCRIPTS -ne 1 ]; then
+  if [ "$JFFS2_ENABLED" -ne 1 ] || [ "$JFFS2_SCRIPTS" -ne 1 ]; then
     echo -e "$INFO JFFS custom scripts and configs are not enabled. Enabling them"
     nvram set jffs2_enable=1
     nvram set jffs2_scripts=1
@@ -182,14 +280,14 @@ check_anonymized_support () {
         toml_avar_enable routes
         echo -e "$INFO This allows users to setup wildcard relay support for all compatible servers"
         check_anonymized_automatic 0
-        eval toml_avars_write $AVARS_ARGS
+        eval toml_avars_write "$AVARS_ARGS"
         ;;
       2)
         local AVARS_ARGS
         toml_avar_enable routes
-        eval toml_avars_write $AVARS_ARGS
+        eval toml_avars_write "$AVARS_ARGS"
         local VARSARGS
-        VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
+        VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri cleanbrowsing-adult cleanbrowsing-family-ipv6 cleanbrowsing-family cleanbrowsing-security"
         local COUNT
         local DNSCRYPT
         local SERVER
@@ -203,7 +301,7 @@ check_anonymized_support () {
               local AVARS_ARGS
               echo -e "$INFO Found $DNSCRYPT server"
               choose_relays_manual
-              eval toml_avars_write $AVARS_ARGS
+              eval toml_avars_write "$AVARS_ARGS"
             else
               echo -e "$INFO Found $DNSCRYPT server"
               choose_relays_manual_next
@@ -211,52 +309,51 @@ check_anonymized_support () {
             COUNT=$((COUNT + 1))
           fi
         done
-        if [ $COUNT -ne 0 ]; then
-          local FRAGSBLOCKED
-          FRAGSBLOCKED="cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri cleanbrowsing-adult cleanbrowsing-family-ipv6 cleanbrowsing-family cleanbrowsing-security"
-          local BLOCKED
-          local FRAG
-          local NUMFRAG
-          NUMFRAG=0
-          for BLOCKED in $FRAGSBLOCKED; do
-            if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE)" ]; then
-              if [ $NUMFRAG -eq 0 ]; then
-                local AVARS_ARGS
-                local USE_BROKEN
-                echo -e "$WARNING Found Incompatible Server(s)"
-                read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
-                toml_avars_prep skip_incompatible $USE_BROKEN
-                eval toml_avars_write $AVARS_ARGS
-              fi
+        local FRAGSBLOCKED
+        FRAGSBLOCKED="cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri cleanbrowsing-adult cleanbrowsing-family-ipv6 cleanbrowsing-family cleanbrowsing-security"
+        local BLOCKED
+        local FRAG
+        local NUMFRAG
+        NUMFRAG=0
+        for BLOCKED in $FRAGSBLOCKED; do
+         if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE)" ]; then
+            if [ "$NUMFRAG" -eq 0 ]; then
+              local AVARS_ARGS=""
+              local USE_BROKEN
+              echo -e "$WARNING Found Incompatible Server(s)"
+              read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
+              toml_avars_prep skip_incompatible $USE_BROKEN
+              eval toml_avars_write "$AVARS_ARGS"
             fi
             NUMFRAG=$((NUMFRAG + 1))
-          done
-        else
+          fi          
+        done
+        if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ]; then
           local AVARS_ARGS
           echo -e "$WARNING No compatible servers detected."
           echo -e "$INFO To continue users may still select relays for Wild-Card Support."
           read_yesno "Do you still want to setup Wild-Card Relay Support?" && check_anonymized_automatic 0 || check_anonymized_disabled
-          eval toml_avars_write $AVARS_ARGS
+          eval toml_avars_write "$AVARS_ARGS"
         fi
         ;;
       3)
         local AVARS_ARGS
         read_yesno "Do you want to remove any old relay setups (recommended)?" && check_anonymized_disabled || echo -e "$INFO Continue without Setting-up Relays or Modifying Support"
-        eval toml_avars_write $AVARS_ARGS
+        eval toml_avars_write "$AVARS_ARGS"
         ;;
     esac
   else
     local AVARS_ARGS
     check_anonymized_disabled
-    eval toml_avars_write $AVARS_ARGS
+    eval toml_avars_write "$AVARS_ARGS"
   fi
 }
 
 check_opendns () {
-  if [ "`grep '^server_names = .*cisco.*' $TOML_FILE`" ]; then
+  if [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
     if [ -f $CONF_FILE ]; then
-      local OPENDNS_USER=`awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE`
-      local OPENDNS_PASSWORD=`awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE`
+      local OPENDNS_USER=$(awk -F'=' '/OPENDNS_USER/ {print $2}' $CONF_FILE)
+      local OPENDNS_PASSWORD=$(awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' $CONF_FILE)
       if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
         echo -e "$INFO Found OpenDNS account ${BOLD}${OPENDNS_USER}"
         echo -e "$INFO What do you want to do:"
@@ -287,29 +384,29 @@ check_opendns () {
 }
 
 check_nextdns () {
-  if [ "`grep '^server_names = .*nextdns.*' $TOML_FILE`" ]; then
-     echo -e "$INFO Found NextDNS Server Selection"
-     echo -e "$INFO If you have a NextDNS Account visit https://my.nextdns.io/login enter your setup and copy your DNS STAMP"
-     echo -e "$INFO What do you want to do:"
-     echo -e "  1) Setup Your SDNS STAMP"
-     echo -e "  2) Skip dont have account"
-     read_input_num "Your choice" 1 2
-     case $CHOSEN in
+  if [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ]; then
+    echo -e "$INFO Found NextDNS Server Selection"
+    echo -e "$INFO If you have a NextDNS Account visit https://my.nextdns.io/login enter your setup and copy your DNS STAMP"
+    echo -e "$INFO What do you want to do:"
+    echo -e "  1) Setup Your SDNS STAMP"
+    echo -e "  2) Skip dont have account"
+    read_input_num "Your choice" 1 2
+    case $CHOSEN in
        1)
-         echo -e "$INFO User has specified to define NextDNS-Custom"
-         nextdns_authen 1
-         ;;
+        echo -e "$INFO User has specified to define NextDNS-Custom"
+        nextdns_authen 1
+        ;;
        2)
-         echo -e "$INFO User has chosen to skip NextDNS-Custom"
-         nextdns_authen 0
-         ;;
-     esac
+        echo -e "$INFO User has chosen to skip NextDNS-Custom"
+        nextdns_authen 0
+        ;;
+    esac
   fi
 }
 
 check_swap () {
-  local SWAP_SIZE=`awk '/SwapTotal/ {print $2}' /proc/meminfo`
-  if [ $SWAP_SIZE -gt 0 ]; then
+  local SWAP_SIZE=$(awk '/SwapTotal/ {print $2}' /proc/meminfo)
+  if [ "$SWAP_SIZE" -gt 0 ]; then
     echo -e "$INFO Swap file is already setup"
     end_op_message 0
     return
@@ -326,7 +423,7 @@ check_version () {
     NW_STATE=$?
     nslookup google.com >/dev/null 2>&1
     RES_STATE=$?
-    if [ -z "`pidof dnscrypt-proxy`" ] || [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
+    if [ -z "$(pidof dnscrypt-proxy)" ] || [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
       echo -e "$ERROR No Internet Detected or Dnscrypt-Proxy is Dead, Skipping Version Check."
       echo -e "$INFO Run Option 3 to reconfigure, before trying option 1."
       end_op_message
@@ -452,15 +549,15 @@ choose_dnscrypt_server_auto () {
 
 choose_dnscrypt_server_disabled () {
   local INDEX=$1
-  if [ -z $INDEX ]; then
+  if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RESOLVERS
     echo -e "$INFO Available DNS servers to disable: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
+    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
-    read_input_num "Please choose DNS server to disable" 1 $INDEX
+    read_input_num "Please choose DNS server to disable" 1 "$INDEX"
   else
-    read_input_num "Please choose next DNS server to disable or press n to stop" 1 $INDEX n
+    read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then
       toml_gvars_prep disabled_server_names "\"$RESOLVERS\""
       return
@@ -468,8 +565,8 @@ choose_dnscrypt_server_disabled () {
   fi
 
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md`
-  if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
+  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md)
+  if [ "$(echo "$RESOLVERS" | grep -F "'$ITEM'")" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RESOLVERS" ]; then
@@ -479,21 +576,21 @@ choose_dnscrypt_server_disabled () {
     fi
   fi
 
-  choose_dnscrypt_server_disabled $INDEX
+  choose_dnscrypt_server_disabled "$INDEX"
 }
 
 choose_dnscrypt_server_manual () {
   local INDEX=$1
-  if [ -z $INDEX ]; then
+  if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RESOLVERS
     toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
+    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
-    read_input_num "Please choose DNS server" 1 $INDEX
+    read_input_num "Please choose DNS server" 1 "$INDEX"
   else
-    read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
+    read_input_num "Please choose next DNS server or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then
       toml_gvars_prep server_names "\"$RESOLVERS\""
       return
@@ -501,8 +598,8 @@ choose_dnscrypt_server_manual () {
   fi
 
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md`
-  if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
+  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md)
+  if [ "$(echo "$RESOLVERS" | grep -F "'$ITEM'")" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RESOLVERS" ]; then
@@ -512,7 +609,7 @@ choose_dnscrypt_server_manual () {
     fi
   fi
 
-  choose_dnscrypt_server_manual $INDEX
+  choose_dnscrypt_server_manual "$INDEX"
 }
 
 choose_dnscrypt_server_static () {
@@ -529,7 +626,7 @@ choose_dnscrypt_server_static () {
       1)
         echo -e "$INFO User has specified to define a Static Server."
         read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-        static_chosen 1
+        static_chosen 0
         ;;
       2)
         echo -e "$INFO User has chosen select Manually Chosen Servers First."
@@ -560,15 +657,15 @@ choose_dnscrypt_server_static () {
 
 choose_relays_automatic () {
   local INDEX=$1
-  if [ -z $INDEX ]; then
+  if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RELAYS
     echo -e "$INFO Available Relay servers: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l`
+    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/relays.md
-    read_input_num "Please choose RELAY server" 1 $INDEX
+    read_input_num "Please choose RELAY server" 1 "$INDEX"
   else
-    read_input_num "Please choose next RELAY server or press n to stop" 1 $INDEX n      
+    read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
        toml_avars_prep routes "\"[ { server_name='*', via=$RELAYS } ]\""
       return
@@ -576,9 +673,9 @@ choose_relays_automatic () {
   fi
 
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md`
+  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md)
  
-  if [ "`echo $RELAYS | grep -F $ITEM`" ]; then
+  if [ "$(echo "$RELAYS" | grep -F "'$ITEM'")" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RELAYS" ]; then
@@ -588,20 +685,20 @@ choose_relays_automatic () {
     fi
   fi
 
-  choose_relays_automatic $INDEX
+  choose_relays_automatic "$INDEX"
 }
 
 choose_relays_manual () {
   local INDEX=$1
-  if [ -z $INDEX ]; then
+  if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RELAYS
     echo -e "$INFO Available Relay servers: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l`
+    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/relays.md
-    read_input_num "Please choose RELAY server" 1 $INDEX
+    read_input_num "Please choose RELAY server" 1 "$INDEX"
   else
-    read_input_num "Please choose next RELAY server or press n to stop" 1 $INDEX n      
+    read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
        toml_avars_prep routes "\"[ { server_name='$SERVER', via=$RELAYS } ]\"" 
       return
@@ -609,9 +706,9 @@ choose_relays_manual () {
   fi
 
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md`
+  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md)
  
-  if [ "`echo $RELAYS | grep -F $ITEM`" ]; then
+  if [ "$(echo "$RELAYS" | grep -F "'$ITEM'")" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RELAYS" ]; then
@@ -621,20 +718,20 @@ choose_relays_manual () {
     fi
   fi
 
-  choose_relays_manual $INDEX
+  choose_relays_manual "$INDEX"
 }
 
 choose_relays_manual_next () {
   local INDEX=$1
-  if [ -z $INDEX ]; then
+  if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
     local RELAYS
     echo -e "$INFO Available Relay servers: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l`
+    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/relays.md
-    read_input_num "Please choose RELAY server" 1 $INDEX
+    read_input_num "Please choose RELAY server" 1 "$INDEX"
   else
-    read_input_num "Please choose next RELAY server or press n to stop" 1 $INDEX n      
+    read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
        toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=$RELAYS } ]" $TOML_FILE 
       return
@@ -642,9 +739,9 @@ choose_relays_manual_next () {
   fi
 
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md`
+  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md)
  
-  if [ "`echo $RELAYS | grep -F $ITEM`" ]; then
+  if [ "$(echo "$RELAYS" | grep -F "'$ITEM'")" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RELAYS" ]; then
@@ -654,7 +751,7 @@ choose_relays_manual_next () {
     fi
   fi
 
-  choose_relays_manual_next $INDEX
+  choose_relays_manual_next "$INDEX"
 }
 
 cleanup () {
@@ -672,10 +769,10 @@ create_dir () {
 del_between_magic () {
   local TARG=$1
   local MAGIC=$2
-  [ -f $TARG ] || return
-  local BOUNDS=`awk -v PATT=$MAGIC '($0 ~ PATT) {printf NR","}' $TARG`
+  [ -f "$TARG" ] || return
+  local BOUNDS=$(awk -v PATT="$MAGIC" '($0 ~ PATT) {printf NR","}' "$TARG")
   if [ "$BOUNDS" ]; then
-    sed -i "${BOUNDS%,}d" $TARG
+    sed -i "${BOUNDS%,}d" "$TARG"
   fi
 }
 
@@ -691,25 +788,25 @@ del_jffs_script () {
   local TARG=$1
   local LINE_NUM
   local LINE_ABOVE
-  [ -f $TARG ] || return
+  [ -f "$TARG" ] || return
   if [ "$2" ]; then
     local OP=${2:0:1}
     if [ "$OP" == "!" ]; then
-      LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|grep -v "$(_quote $2)"|cut -d':' -f1`
+      LINE_NUM=$(grep -n -F "[ -x $TARG_DIR/" "$TARG"|grep -v "$(_quote "$2")"|cut -d':' -f1)
     else
-      LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|grep "$(_quote $2)"|cut -d':' -f1`
+      LINE_NUM=$(grep -n -F "[ -x $TARG_DIR/" "$TARG"|grep "$(_quote "$2")"|cut -d':' -f1)
     fi
   else
-    LINE_NUM=`grep -n -F "[ -x $TARG_DIR/" $TARG|cut -d':' -f1`
+    LINE_NUM=$(grep -n -F "[ -x $TARG_DIR/" "$TARG"|cut -d':' -f1)
   fi
-  [ -z $LINE_NUM ] && return
-  sed -i "${LINE_NUM}d" $TARG
-  if [ $LINE_NUM -gt 1 ]; then
+  [ -z "$LINE_NUM" ] && return
+  sed -i "${LINE_NUM}d" "$TARG"
+  if [ "$LINE_NUM" -gt 1 ]; then
     LINE_NUM=$((LINE_NUM-1))
-    LINE_ABOVE=`sed "$LINE_NUMq;d" $TARG`
-    [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" $TARG
+    LINE_ABOVE=$(sed "$LINE_NUMq;d" "$TARG")
+    [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" "$TARG"
   fi
-  [ "`cat $TARG`" == "#!/bin/sh" ] && rm -f $TARG
+  [ "$(cat "$TARG")" == "#!/bin/sh" ] && rm -f "$TARG"
 }
 
 download_file () {
@@ -720,18 +817,18 @@ download_file () {
   local MD5SUM_OLD
   local MD5SUM_CURR
   for URL in "$@"; do
-    FILENAME="`basename $URL`"
-    MD5SUM_OLD="`[ -f $TARG/$FILENAME ] && md5sum $TARG/$FILENAME | cut -d' ' -f1`"
+    FILENAME="$(basename "$URL")"
+    MD5SUM_OLD="$([ -f "$TARG"/"$FILENAME" ] && md5sum "$TARG"/"$FILENAME" | cut -d' ' -f1)"
     MD5SUM_CURR="$(curl -fsL "$URL" | md5sum | awk '{print $1}')"
-    if [ `echo -n $MD5SUM_CURR | wc -c` -eq 32 ] && [ "$MD5SUM_CURR" == "$MD5SUM_OLD" ]; then
+    if [ $(echo -n "$MD5SUM_CURR" | wc -c) -eq 32 ] && [ "$MD5SUM_CURR" == "$MD5SUM_OLD" ]; then
       echo -e "$INFO $FILENAME is up to date. Skipping..."
     else
       local COUNT=0
       while [ $COUNT -lt 3 ]; do
         echo -e "$INFO Downloading $FILENAME"
-        curl -L -k -s "$URL" -o $TARG/$FILENAME
+        curl -L -k -s "$URL" -o "$TARG"/"$FILENAME"
         if [ $? -eq 0 ]; then
-          chmod $PERM $TARG/$FILENAME
+          chmod "$PERM" "$TARG"/"$FILENAME"
           break
         fi
         COUNT=$((COUNT+1))
@@ -756,11 +853,6 @@ inst_dnscrypt () {
   local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
   local RURL
   RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-  create_dir $TARG_DIR
-  if [ $? -ne 0 ]; then
-    end_op_message
-    return
-  fi
   local NW_STATE
   local RES_STATE
   ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1
@@ -771,19 +863,42 @@ inst_dnscrypt () {
     echo -e "$ERROR Unable to detect A Connection to the Internet!"
     end_op_message
     return
+  fi
+  if [ ! -d $TARG_DIR ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
+	  echo -e "$INFO Backup is detected."
+	  local USE_OLD
+	  read_yesno "Do you want Restore instead?" && USE_OLD=YES || USE_OLD=NO
+	  if [ "USE_OLD" == "YES" ]; then
+	    echo -e "$INFO Installing from an old backup!"
+	    backup_restore INSTALL
+	  elif [ "USE_OLD" == "YES" ]; then
+	    echo -e "$INFO Continuing without restoring from backup!"
+	  fi
+  elif [ -d $TARG_DIR ]; then
+	  read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP || echo -e "$INFO continuing without making a backup."
+  fi
+  [ ! -d $TARG_DIR ] && create_dir $TARG_DIR
+  if [ $? -ne 0 ]; then
+    end_op_message
+    return
   fi  
   local MD5SUM_L
   local MD5SUM_R
-  MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
-  MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
-  if [ "$MD5SUM_R" == "$MD5SUM_L" ]; then 
+  [ -f ${TARG_DIR}/installer ] && MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)" && MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
+  if [ ! -f ${TARG_DIR}/installer ]; then 
     download_file $TARG_DIR 755 $RURL
-  else
-    echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
-    download_file $TARG_DIR 755 $RURL
-    exec $TARG_DIR/installer && exit
+  elif [ "$MD5SUM_R" != "$MD5SUM_L" ]; then
+    local NOW
+    read_yesno "Do you want to update installer?" && NOW=YES || NOW=NO
+    if [ "$NOW" == "YES" ]; then
+      echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
+      download_file $TARG_DIR 755 $RURL
+      exec ${TARG_DIR}/installer && exit
+    elif [ "$NOW" == "NO" ]; then
+      echo -e "$INFO Installer update Aborted! Re-run option 1 later if you change your mind.."
+    fi
   fi
-  download_file $TARG_DIR 755 $URL_GEN/manager
+  download_file $TARG_DIR 755 "$URL_GEN"/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION
     LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
@@ -794,31 +909,31 @@ inst_dnscrypt () {
     if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
        echo -e "$INFO New DNSCRYPT_VER=$DNSCRYPT_VER Available!"
        echo -e "$INFO Updating DNSCRYPT_VER=$LVERSION to $DNSCRYPT_VER ."
-       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
-       tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+       download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/"${DNSCRYPT_VER}"/"${DNSCRYPT_TAR}"
+       tar xzv -C $TARG_DIR -f $TARG_DIR/"$DNSCRYPT_TAR"
        if [ $? -ne 0 ]; then
           echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
           end_op_message
           return
        fi
-       chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
-       mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-       rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+       chown $(nvram get http_username):root $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/*
+       mv $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/* $TARG_DIR
+       rm -r $TARG_DIR/"$DNSCRYPT_ARCH_TAR" $TARG_DIR/"$DNSCRYPT_TAR"
        chmod 755 $TARG_DIR/dnscrypt-proxy
     else
       echo -e "$INFO DNSCRYPT_VER=$LVERSION"
     fi
   else
-    download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}
-    tar xzv -C $TARG_DIR -f $TARG_DIR/$DNSCRYPT_TAR
+    download_file $TARG_DIR 644 https://github.com/jedisct1/dnscrypt-proxy/releases/download/"${DNSCRYPT_VER}"/"${DNSCRYPT_TAR}"
+    tar xzv -C $TARG_DIR -f $TARG_DIR/"$DNSCRYPT_TAR"
     if [ $? -ne 0 ]; then
       echo -e "$ERROR Unable to download dnscrypt-proxy package for your router"
       end_op_message
       return
     fi
-    chown `nvram get http_username`:root $TARG_DIR/$DNSCRYPT_ARCH_TAR/*
-    mv $TARG_DIR/$DNSCRYPT_ARCH_TAR/* $TARG_DIR
-    rm -r $TARG_DIR/$DNSCRYPT_ARCH_TAR $TARG_DIR/$DNSCRYPT_TAR
+    chown $(nvram get http_username):root $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/*
+    mv $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/* $TARG_DIR
+    rm -r $TARG_DIR/"$DNSCRYPT_ARCH_TAR" $TARG_DIR/"$DNSCRYPT_TAR"
     chmod 755 $TARG_DIR/dnscrypt-proxy
   fi
   download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
@@ -842,7 +957,7 @@ inst_dnscrypt () {
   echo -e "$INFO Starting dnscrypt-proxy..."
   $TARG_DIR/manager dnscrypt-start
   sleep 1
-  if [ -z "`pidof dnscrypt-proxy`" ]; then
+  if [ -z "$(pidof dnscrypt-proxy)" ]; then
     echo -e "$ERROR Couldn't start dnscrypt-proxy"
     echo -e "$ERROR Please send WebUI System Log to dev"
     end_op_message
@@ -859,12 +974,12 @@ inst_dnscrypt () {
 }
 
 manager_monitor_restart () {
-  local MAN_PID="`pidof manager`"
+  local MAN_PID="$(pidof manager)"
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "`cat /proc/$PID/cmdline | grep dnscrypt`" ]; then
-        kill -9 $PID
+      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
+        kill -9 "$PID"
         break
       fi
     done
@@ -881,7 +996,7 @@ nextdns_authen () {
   read -r SDNS
   local GVARS_ARGS
   toml_gvars_prep server_names "\"['NextDNS-Custom']\""
-  eval toml_gvars_write $GVARS_ARGS
+  eval toml_gvars_write "$GVARS_ARGS"
   toml_static_removal
   toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
   toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$SDNS'" $TOML_FILE
@@ -905,7 +1020,7 @@ opendns_authen () {
   echo
   if [ -z "$PW1" ] || [ -z "$PW2" ] || [ "$PW1" != "$PW2" ]; then
     echo -e "$ERROR Password entered incorrectly!"
-    opendns_authen $1
+    opendns_authen "$1"
   fi
 
   write_conf OPENDNS_USER "\"$USERNAME\""
@@ -926,7 +1041,7 @@ inst_random () {
     1)
       rm -f $TARG_DIR/rngd $TARG_DIR/stty
       killall -q -9 haveged
-      download_file $TARG_DIR 755 $URL_ARCH/haveged $URL_GEN/manager
+      download_file $TARG_DIR 755 "$URL_ARCH"/haveged "$URL_GEN"/manager
       write_conf RAN_PRV haveged
       $TARG_DIR/haveged -w1024 -v1
       ;;
@@ -934,11 +1049,11 @@ inst_random () {
       local RNG_DEV
       rm -f $TARG_DIR/haveged
       killall -q -9 rngd
-      download_file $TARG_DIR 755 $URL_ARCH/rngd $URL_ARCH/stty $URL_GEN/manager
+      download_file $TARG_DIR 755 "$URL_ARCH"/rngd "$URL_ARCH"/stty "$URL_GEN"/manager
       inst_ran_dev || return
       write_conf RAN_PRV rngd
-      $TARG_DIR/stty raw -echo -ixoff -F /dev/$RNG_DEV speed 115200
-      $TARG_DIR/rngd -r /dev/$RNG_DEV
+      $TARG_DIR/stty raw -echo -ixoff -F /dev/"$RNG_DEV" speed 115200
+      $TARG_DIR/rngd -r /dev/"$RNG_DEV"
       ;;
   esac
 
@@ -948,9 +1063,9 @@ inst_random () {
 
 inst_ran_dev () {
   if [ -c /dev/ttyACM0 ]; then
-    local PRODSTR=`cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=`
-    local VID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 1`
-    local PID=`echo $PRODSTR | cut -d '=' -f 2 | cut -d '/' -f 2`
+    local PRODSTR=$(cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=)
+    local VID=$(echo "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 1)
+    local PID=$(echo "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 2)
     if [ "$VID" == "4d8" ] && [ "$PID" == "f5fe" ]; then
       echo -e "$INFO Found TrueRNG USB HW RNG"
       RNG_DEV=ttyACM0
@@ -979,8 +1094,8 @@ inst_ran_dev () {
 
 inst_swap () {
   local SWAP_SIZE=524288
-  local USB_COUNT=`df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){print $6}}' | wc -l`
-  if [ $USB_COUNT -lt 1 ]; then
+  local USB_COUNT=$(df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){print $6}}' | wc -l)
+  if [ "$USB_COUNT" -lt 1 ]; then
     echo -e "$ERROR Unable to find any external USB storage"
     echo -e "$ERROR Or no suitable external USB storage found"
     echo -e "$ERROR Please connect a USB storage with at least"
@@ -991,13 +1106,13 @@ inst_swap () {
 
   echo -e "$INFO Available partition to install swap file:$NORM"
   df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6 " (" $4/1024 "MB free)"}}'
-  read_input_num "Please select the partition to install swap file" 1 $USB_COUNT
-  local MOUNT=`df | awk -v IDX=$CHOSEN -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}'`
+  read_input_num "Please select the partition to install swap file" 1 "$USB_COUNT"
+  local MOUNT=$(df | awk -v IDX="$CHOSEN" -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}')
 
   echo -e "$INFO Please wait..."
   dd if=/dev/zero of="$MOUNT/swap" bs=1024 count=$SWAP_SIZE
-  local MOUNT_FS=`df -T "$MOUNT"|awk 'FNR==2 {print $2}'`
-  [ ${MOUNT_FS%?} == "ext" ] && chmod 600 "$MOUNT/swap"
+  local MOUNT_FS=$(df -T "$MOUNT"|awk 'FNR==2 {print $2}')
+  [ "${MOUNT_FS%?}" == "ext" ] && chmod 600 "$MOUNT/swap"
   mkswap "$MOUNT/swap"
   swapon "$MOUNT/swap"
   if [ $? -ne 0 ]; then
@@ -1015,8 +1130,8 @@ inst_swap () {
 read_input_dns () {
   echo -en "$INPUT $1 ${BOLD}$2: $NORM"
   read DNS_SERVER
-  [ -z $DNS_SERVER ] && DNS_SERVER=$2
-  if [ "`echo $DNS_SERVER | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}'`" ]; then
+  [ -z "$DNS_SERVER" ] && DNS_SERVER=$2
+  if [ "$(echo "$DNS_SERVER" | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}')" ]; then
     echo -e "$ERROR Invalid DNS server address entered"
     read_input_dns "$@"
   fi
@@ -1025,15 +1140,15 @@ read_input_dns () {
 read_input_dns_n () {
   echo -en "$INPUT $1 ${BOLD}$2: $NORM"
   read NDNS_SERVER
-  [ -z $NDNS_SERVER ] && NDNS_SERVER=$2
-  if [ "`echo $NDNS_SERVER | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}'`" ]; then
+  [ -z "$NDNS_SERVER" ] && NDNS_SERVER=$2
+  if [ "$(echo "$NDNS_SERVER" | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}')" ]; then
     echo -e "$ERROR Invalid DNS server address entered"
     read_input_dns "$@"
   fi
 }
 
 read_input_num () {
-  if [ -z $4 ]; then
+  if [ -z "$4" ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
   else
     echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
@@ -1042,12 +1157,12 @@ read_input_num () {
   if [ "$CHOSEN" ] && [ "$CHOSEN" == "$4" ]; then
     return 1
   fi
-  if [ -z "`echo $CHOSEN | grep -E '^[0-9]+$'`" ]; then
+  if [ -z "$(echo "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
     echo -e "$ERROR Invalid character entered! Retrying..."
     read_input_num "$@"
     return
   fi
-  if [ $CHOSEN -lt $2 ] || [ $CHOSEN -gt $3 ] ; then
+  if [ "$CHOSEN" -lt "$2" ] || [ "$CHOSEN" -gt "$3" ] ; then
     echo -e "$ERROR Chosen number is not in range! Retrying..."
     read_input_num "$@"
     return
@@ -1076,109 +1191,108 @@ static_chosen () {
   local SDNSSTAMP
   local STATICNAME
   if [ "$1" -eq 0 ]; then
-  local INDEX=$1
-    if [ -z $INDEX ]; then
-      local STATICRESOLVER
-      echo -e "$INFO Please choose Static Server Name"
-      echo -en "$INPUT Please enter staticname$NORM: "
-      read -r STATICNAME
-      echo -e "$INFO Please enter Static Server SDNS stamp"
-      echo -en "$INPUT Please enter sdnsstamp$NORM: "
-      read -r SDNSSTAMP
-    else
-      read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
-      if [ "$ANOTHER" == "YES" ]; then
-        echo -en "$INPUT Please enter staticname$NORM: "
-        read -r STATICNAME
-        echo -e "$INFO Please enter Static Server SDNS stamp"
-        echo -en "$INPUT Please enter sdnsstamp$NORM: "
-        read -r SDNSSTAMP
-      elif [ "$ANOTHER" == "NO" ]; then
-        echo -e "$INFO finished static setup."
-        return
-      fi
-    fi
-
-    local STATIC
-    STATIC="${STATICNAME}-Static"
-    if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
-      echo -e "$INFO $STATIC is already set"
-    else
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
-      if [ "$STATICRESOLVER" ]; then
-        STATICRESOLVER="${STATICRESOLVER%?}', '$STATIC'"
-      else
-        STATICRESOLVER="'$STATIC'"
-      fi
-    fi
-    static_chosen 0 $INDEX
+    local STATICRESOLVER
+    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
+    echo -e "$INFO Please choose Static Server Name"
+    echo -en "$INPUT Please enter staticname$NORM: "
+    read -r STATICNAME
+    echo -e "$INFO Please enter Static Server SDNS stamp"
+    echo -en "$INPUT Please enter sdnsstamp$NORM: "
+    read -r SDNSSTAMP
   else
-    local INDEX=$1
-    if [ -z $INDEX ]; then
-      local STATICRESOLVER
-      toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
-      echo -e "$INFO Please choose Static Server Name"
+    read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+    if [ "$ANOTHER" == "YES" ]; then
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
-    else
-      read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
-      if [ "$ANOTHER" == "YES" ]; then
-        echo -en "$INPUT Please enter staticname$NORM: "
-        read -r STATICNAME
-        echo -e "$INFO Please enter Static Server SDNS stamp"
-        echo -en "$INPUT Please enter sdnsstamp$NORM: "
-        read -r SDNSSTAMP
-      elif [ "$ANOTHER" == "NO" ]; then
-        echo -e "$INFO finished static setup."
-        return
-      fi
+    elif [ "$ANOTHER" == "NO" ]; then
+      echo -e "$INFO finished static setup."
+      toml_gvars_prep server_names "\"$STATICRESOLVER\""
+      return
     fi
-
-    local STATIC
-    STATIC="${STATICNAME}-Static"
-    if [ "`echo $STATICRESOLVER | grep -F $STATIC`" ]; then
-      echo -e "$INFO $STATIC is already set"
-    else
-      toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
-      toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
-      if [ "$STATICRESOLVER" ]; then
-        STATICRESOLVER="${STATICRESOLVER%?}, '$STATIC']"
-      else
-        STATICRESOLVER="['$STATIC']"
-      fi
-    fi
-
-    static_chosen $INDEX
-    toml_gvars_prep server_names "\"$STATICRESOLVER\""
   fi
+
+  local STATIC
+  STATIC="${STATICNAME}-Static"
+  if [ "$(echo "$STATICRESOLVER" | grep -F "$STATIC")" ]; then
+    echo -e "$INFO $STATIC is already set"
+  else
+    toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+    toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    if [ "$STATICRESOLVER" ]; then
+      STATICRESOLVER="${STATICRESOLVER%?}, '$STATIC']"
+    else
+      STATICRESOLVER="['$STATIC']"
+    fi
+  fi
+  static_chosen 1  
 }
 
-static_choose_manual_addition () {
-  local INDEX=$1
-  if [ -z $INDEX ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
-    local RESOLVERS
-    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
-    echo -e "$INFO Available DNS servers: "
-    INDEX=`awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l`
-    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
-    read_input_num "Please choose DNS server" 1 $INDEX
+static_chosen_manual () {
+  local SDNSSTAMP
+  local STATICNAME
+  if [ "$1" -eq 0 ]; then
+    local STATICRESOLVER
+    echo -e "$INFO Please choose Static Server Name"
+    echo -en "$INPUT Please enter staticname$NORM: "
+    read -r STATICNAME
+    echo -e "$INFO Please enter Static Server SDNS stamp"
+    echo -en "$INPUT Please enter sdnsstamp$NORM: "
+    read -r SDNSSTAMP
   else
-    read_input_num "Please choose next DNS server or press n to stop" 1 $INDEX n
-    if [ $? -eq 1 ]; then
-      static_chosen 0
+    read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+    if [ "$ANOTHER" == "YES" ]; then
+      echo -en "$INPUT Please enter staticname$NORM: "
+      read -r STATICNAME
+      echo -e "$INFO Please enter Static Server SDNS stamp"
+      echo -en "$INPUT Please enter sdnsstamp$NORM: "
+      read -r SDNSSTAMP
+    elif [ "$ANOTHER" == "NO" ]; then
+      echo -e "$INFO finished static setup."
       toml_gvars_prep server_names "\"[${STATICRESOLVER}, $RESOLVERS]\""
       return
     fi
   fi
 
+  local STATIC
+  STATIC="${STATICNAME}-Static"
+  if [ "$(echo "$STATICRESOLVER" | grep -F "$STATIC")" ]; then
+    echo -e "$INFO $STATIC is already set"
+  else
+    toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
+    toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
+    if [ "$STATICRESOLVER" ]; then
+      STATICRESOLVER="${STATICRESOLVER%?}', '$STATIC'"
+    else
+      STATICRESOLVER="'$STATIC'"
+    fi
+  fi
+  static_chosen_manual 1
+}
+
+static_choose_manual_addition () {
+  local INDEX=$1
+  if [ -z "$INDEX" ]; then
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    local RESOLVERS
+    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
+    echo -e "$INFO Available DNS servers: "
+    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
+    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
+    read_input_num "Please choose DNS server" 1 "$INDEX"
+  else
+    read_input_num "Please choose next DNS server or press n to stop" 1 "$INDEX" n
+    if [ $? -eq 1 ]; then
+      static_chosen_manual 0
+      return
+    fi
+  fi
+
   local ITEM
-  ITEM=`awk -v INDEX=$CHOSEN -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md`
-  if [ "`echo $RESOLVERS | grep -F $ITEM`" ]; then
+  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md)
+  if [ "$(echo "$RESOLVERS" | grep -F "'$ITEM'")" ]; then
     echo -e "$INFO $ITEM is already set"
   else
     if [ "$RESOLVERS" ]; then
@@ -1188,7 +1302,7 @@ static_choose_manual_addition () {
     fi
   fi
 
-  static_choose_manual_addition $INDEX
+  static_choose_manual_addition "$INDEX"
 }
 
 setup_dnscrypt () {
@@ -1213,7 +1327,7 @@ setup_dnscrypt () {
 }
 
 setup_dnscrypt_impl () {
-  if [ -z $1 ] && [ -f $TOML_FILE ]; then
+  if [ -z "$1" ] && [ -f $TOML_FILE ]; then
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
       setup_dnscrypt_impl x
@@ -1260,9 +1374,9 @@ setup_dnscrypt_impl () {
     read_input_dns_n "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolver =" "fallback_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level $CHOSEN ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
-    eval toml_gvars_write $GVARS_ARGS
+    eval toml_gvars_write "$GVARS_ARGS"
     echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
     check_nextdns
     check_anonymized_support
@@ -1280,14 +1394,14 @@ set_timezone () {
   local TMP=/root
   local TZ_DATA=tzdata-2018c-1-any.pkg.tar.bz2
 
-  download_file $TARG_DIR 755 $URL_GEN/manager
-  download_file $TMP 644 $URL_GEN/$TZ_DATA
-  local INDEX=`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l`
+  download_file $TARG_DIR 755 "$URL_GEN"/manager
+  download_file $TMP 644 "$URL_GEN"/$TZ_DATA
+  local INDEX=$(tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l)
   echo -e "$INFO Available timezones/locations:"
   tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
-  read_input_num "Select your timezone/location" 1 $INDEX
-  local TZ_FILE="`tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=$CHOSEN '{++i}i==INDEX{print $0}'`"
-  echo -e "$INFO `basename $TZ_FILE` selected"
+  read_input_num "Select your timezone/location" 1 "$INDEX"
+  local TZ_FILE="$(tar tjf $TMP/$TZ_DATA | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
+  echo -e "$INFO $(basename "$TZ_FILE") selected"
   tar xjf $TMP/$TZ_DATA -C $TMP usr/share/zoneinfo/posix
   mv "$TMP/$TZ_FILE" $TARG_DIR/localtime
   if [ $? -ne 0 ]; then
@@ -1299,20 +1413,20 @@ set_timezone () {
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
   ln -sf $TARG_DIR/localtime /etc/localtime
-  [ "`pidof dnscrypt-proxy`" ] && $TARG_DIR/manager dnscrypt-start
+  [ "$(pidof dnscrypt-proxy)" ] && $TARG_DIR/manager dnscrypt-start
   rm -r $TMP/$TZ_DATA $TMP/usr
   end_op_message 0
 }
 
 toml_avar_disable () {
   local VAR=$1
-  local IDX_NX_AVAR=`awk 'END {print NR}' $TOML_FILE`
+  local IDX_NX_AVAR=$(awk 'END {print NR}' $TOML_FILE)
   sed -i "1,$IDX_NX_AVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
 }
 
 toml_avar_enable () {
   local VAR=$1
-  local IDX_NX_AVAR=`awk 'END {print NR}' $TOML_FILE`
+  local IDX_NX_AVAR=$(awk 'END {print NR}' $TOML_FILE)
   sed -i "1,$IDX_NX_AVAR{/^#.*$VAR = .*$/s/^#\ //}" $TOML_FILE
 }
 
@@ -1321,8 +1435,8 @@ toml_avars_prep () {
 }
 
 toml_avars_write () {
-  local IDX_NX_AVAR=`awk 'END {print NR}' $TOML_FILE`
-  local IDX_GLB_INS=`awk -v VAR="#.*Anonymized DNS        #*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local IDX_NX_AVAR=$(awk 'END {print NR}' $TOML_FILE)
+  local IDX_GLB_INS=$(awk -v VAR="#.*Anonymized DNS        #*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
   local VAR
   local VALUE
   local TO
@@ -1333,17 +1447,17 @@ toml_avars_write () {
     VAR=$1; shift
     VALUE=$1; shift
     TO=$(_quote "$VAR = $VALUE")
-    INDEX=`awk -v IDX=$IDX_NX_AVAR -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    INDEX=$(awk -v IDX="$IDX_NX_AVAR" -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE)
     if [ "$INDEX" ]; then
       SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
       continue
     fi
-    INDEX=`awk -v IDX=$IDX_NX_AVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    INDEX=$(awk -v IDX="$IDX_NX_AVAR" -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE)
     if [ "$INDEX" ]; then
       SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
       continue
     fi
-    [ -z $HAS_GLB_INS ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
+    [ -z "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
     HAS_GLB_INS=1
   done
   [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
@@ -1352,13 +1466,13 @@ toml_avars_write () {
 
 toml_gvar_disable () {
   local VAR=$1
-  local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  local IDX_NX_GVAR=$(awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE)
   sed -i "1,$IDX_NX_GVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
 }
 
 toml_gvar_enable () {
   local VAR=$1
-  local IDX_NX_GVAR=`awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE`
+  local IDX_NX_GVAR=$(awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE)
   sed -i "1,$IDX_NX_GVAR{/^#.*$VAR = .*$/s/^#\ //}" $TOML_FILE
 }
 
@@ -1367,8 +1481,8 @@ toml_gvars_prep () {
 }
 
 toml_gvars_write () {
-  local IDX_NX_GVAR=`awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE`
-  local IDX_GLB_INS=`awk -v VAR="#.*Global settings.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE`
+  local IDX_NX_GVAR=$(awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE)
+  local IDX_GLB_INS=$(awk -v VAR="#.*Global settings.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
   local VAR
   local VALUE
   local TO
@@ -1379,12 +1493,12 @@ toml_gvars_write () {
     VAR=$1; shift
     VALUE=$1; shift
     TO=$(_quote "$VAR = $VALUE")
-    INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    INDEX=$(awk -v IDX="$IDX_NX_GVAR" -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE)
     if [ "$INDEX" ]; then
       SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
       continue
     fi
-    INDEX=`awk -v IDX=$IDX_NX_GVAR -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE`
+    INDEX=$(awk -v IDX="$IDX_NX_GVAR" -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE)
     if [ "$INDEX" ]; then
       SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
       continue
@@ -1399,22 +1513,22 @@ toml_gvars_write () {
 toml_nvars_insert () {
   PATTERN=$(_quote "$1")
   CONTENT=$(_quote "$2")
-  sed -i "/$PATTERN/a$CONTENT" $3
+  sed -i "/$PATTERN/a$CONTENT" "$3"
 }
 
 toml_nvars_replace () {
   PATTERN=$(_quote "$1")
   CONTENT=$(_quote "$2")
-  sed -i "s/$PATTERN/$CONTENT/" $3
+  sed -i "s/$PATTERN/$CONTENT/" "$3"
 }
 
 toml_nvars_append () {
-  echo "$1" >> $2
+  echo "$1" >> "$2"
 }
 
 toml_nvars_delete () {
   PATTERN=$(_quote "$1")
-  sed -i "/$PATTERN/d" $2
+  sed -i "/$PATTERN/d" "$2"
 }
 
 toml_static_removal () {
@@ -1424,6 +1538,10 @@ toml_nvars_delete "stamp =" $TOML_FILE
 }
 
 uninst_all () {
+  if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
+    echo -e "$INFO Old Backup Detected!"
+    read_yesno "Do you want to remove backup?(this will prevent resorting later)" && rm -rf $BASE_DIR/backup_dnscrypt.tar.gz || echo -e "$INFO Keeping backup instead."
+  fi
   rm -rf $TARG_DIR
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/init-start
@@ -1432,12 +1550,12 @@ uninst_all () {
   del_jffs_script /jffs/scripts/wan-start
   service restart_dnsmasq >/dev/null 2>&1
   killall -q -9 haveged rngd dnscrypt-proxy
-  local MAN_PID="`pidof manager`"
+  local MAN_PID="$(pidof manager)"
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "`cat /proc/$PID/cmdline | grep dnscrypt`" ]; then
-        kill -9 $PID
+      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
+        kill -9 "$PID"
         break
       fi
     done
@@ -1468,7 +1586,7 @@ uninst_random () {
 
 unset_timezone () {
   rm -f $TARG_DIR/localtime
-  [ -z "`grep \"^RAN_PRV=.*$\" $TARG_DIR/.config`" ] && [ ! -f $TARG_DIR/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
+  [ -z "$(grep \"^RAN_PRV=.*$\" $TARG_DIR/.config)" ] && [ ! -f $TARG_DIR/dnscrypt-proxy ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
   end_op_message 0
 }
 
@@ -1479,7 +1597,7 @@ write_conf () {
   if [ ! -f $CONF_FILE ]; then
     touch $CONF_FILE && chmod 644 $CONF_FILE
   fi
-  if [ "`grep $VAR $CONF_FILE`" ]; then
+  if [ "$(grep "$VAR" $CONF_FILE)" ]; then
     VALUE=$(_quote "$VALUE")
     sed -i "/^$VAR=/s/=.*/=$VALUE/" $CONF_FILE
   else
@@ -1490,50 +1608,50 @@ write_conf () {
 write_command_script () {
   local TARG=$1
   local COMMAND=$2
-  local FILENAME="`basename \"$TARG\"`"
+  local FILENAME="$(basename "$TARG")"
 
-  if [ ! -f $TARG ]; then
+  if [ ! -f "$TARG" ]; then
     echo -e "$INFO Creating $FILENAME file"
-    echo "#!/bin/sh" > $TARG
+    echo "#!/bin/sh" > "$TARG"
   fi
-  chmod 755 $TARG
+  chmod 755 "$TARG"
 
-  if [ `grep -c -F "$COMMAND" $TARG` -gt 0 ]; then
+  if [ $(grep -c -F "$COMMAND" "$TARG") -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
     echo -e "$INFO Configure $FILENAME file"
-    echo "$COMMAND" >> $TARG
+    echo "$COMMAND" >> "$TARG"
   fi
 }
 
 write_manager_script () {
   local TARG=$1
   local OP=$2
-  local FILENAME="`basename \"$TARG\"`"
+  local FILENAME="$(basename "$TARG")"
   local COMMAND=$TARG_DIR/manager
 
-  if [ ! -f $TARG ]; then
+  if [ ! -f "$TARG" ]; then
     echo -e "$INFO Creating $FILENAME file"
-    echo "#!/bin/sh" > $TARG
+    echo "#!/bin/sh" > "$TARG"
   fi
-  chmod 755 $TARG $COMMAND
-  del_between_magic $TARG dnscrypt-asuswrt-installer
+  chmod 755 "$TARG" $COMMAND
+  del_between_magic "$TARG" dnscrypt-asuswrt-installer
 
-  if [ `grep -c -F "[ -x $COMMAND ] && $COMMAND $OP" $TARG` -gt 0 ]; then
+  if [ $(grep -c -F "[ -x $COMMAND ] && $COMMAND $OP" "$TARG") -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
     echo -e "$INFO Configure $FILENAME file"
-    if [ "`grep \"^$COMMAND\" $TARG`" ]; then
-      sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" $TARG
+    if [ "$(grep \"^$COMMAND\" "$TARG")" ]; then
+      sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" "$TARG"
     else
-      del_jffs_script $TARG !manager
-      [ `tail -1 $TARG|grep -c '^$'` -eq 0 ] && echo "" >> $TARG
-      echo "[ -x $COMMAND ] && $COMMAND $OP" >> $TARG
+      del_jffs_script "$TARG" !manager
+      [ $(tail -1 "$TARG"|grep -c '^$') -eq 0 ] && echo "" >> "$TARG"
+      echo "[ -x $COMMAND ] && $COMMAND $OP" >> "$TARG"
     fi
   fi
 }
 
-[ $1 ] && BRANCH=$1 || BRANCH=master
+[ "$1" ] && BRANCH=$1 || BRANCH=master
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 
@@ -1580,8 +1698,10 @@ menu () {
   echo -e "  7) Uninstall (P)RNG"
   echo -e "  8) Install swap file"
   echo -e "  9) Uninstall ALL"
+  [ -d $TARG_DIR ] && echo -e "  b) Backup"
+  [ -d $TARG_DIR ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && echo -e "  r) Restore"
   echo -e "  q) Quit"
-  read_input_num "Please enter the number that designates your selection:" 1 9 q
+  read_input_num "Please enter the number that designates your selection:" 1 9 b r q
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)"
@@ -1639,6 +1759,14 @@ menu () {
       echo
       read_yesno "Do you want to continue?" && uninst_all || menu
       ;;
+	  b|B)
+	    echo -e "$INFO This operation will allow you to backup everything!"
+	    read_yesno "Do you want to continue?" && backup_restore BACKUP || menu
+	    ;;
+    r|R)
+      echo -e "$INFO This operation will allow you to restore everything!"
+	    read_yesno "Do you want to continue?" && backup_restore RESTORE || menu
+	    ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made"
       echo -e "$INFO In case of anomaly, please reboot your router!"
