@@ -1726,7 +1726,7 @@ menu () {
   [ -d $TARG_DIR ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && echo -e "  r) Restore"
   echo -e "  q) Quit"
   [ ! -d $TARG_DIR ] || [ ! -f ${TARG_DIR}/dnscrypt-proxy ] && read_input_num "Please enter the number that designates your selection:" 1 9 q
-  [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && read_input_num "Please enter the number that designates your selection:" 1 9 b q
+  [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && [ ! -f $BASE_DIR/backup_dnscrypt.tar.gz ] && read_input_num "Please enter the number that designates your selection:" 1 9 b q
   [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && read_input_num "Please enter the number that designates your selection:" 1 9 b r q
   case $CHOSEN in
     1)
