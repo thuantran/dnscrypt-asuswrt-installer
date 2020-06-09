@@ -1147,13 +1147,21 @@ read_input_dns_n () {
 }
 
 read_input_num () {
-  if [ -z "$4" ]; then
+  if [ -z "$4" ] || [ -z "$5" ] || [ -z "$6" ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
-  else
+  elif [ -n "$4" ] || [ -z "$5" ] || [ -z "$6" ]; then 
     echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
+  elif [ -n "$4" ] || [ -n "$5" ] || [ -z "$6" ]; then 
+    echo -en "$INPUT $1, $BOLD[$2-$3/$4/$5]$NORM: "
+  elif [ -n "$4" ] || [ -n "$5" ] || [ -n "$6" ]; then 
+    echo -en "$INPUT $1, $BOLD[$2-$3/$4/$5/$6]$NORM: "  
   fi
   read CHOSEN
   if [ "$CHOSEN" ] && [ "$CHOSEN" == "$4" ]; then
+    return 1
+  elif [ "$CHOSEN" ] && [ "$CHOSEN" == "$5" ]; then
+    return 1
+  elif [ "$CHOSEN" ] && [ "$CHOSEN" == "$6" ]; then
     return 1
   fi
   if [ -z "$(echo "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
@@ -1700,7 +1708,9 @@ menu () {
   [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] echo -e "  b) Backup"
   [ -d $TARG_DIR ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && echo -e "  r) Restore"
   echo -e "  q) Quit"
-  read_input_num "Please enter the number that designates your selection:" 1 9 b r q
+  [ ! -d $TARG_DIR ] || [ ! -f ${TARG_DIR}/dnscrypt-proxy ] && read_input_num "Please enter the number that designates your selection:" 1 9 q
+  [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && read_input_num "Please enter the number that designates your selection:" 1 9 b q
+  [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && read_input_num "Please enter the number that designates your selection:" 1 9 b r q
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)"
