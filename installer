@@ -151,8 +151,12 @@ backup_restore () {
 check_dnscrypt_toml () {
   [ ! -f $TOML_FILE ] && return
   echo -e "$INFO Checking dnscrypt-proxy configuration..."
+  local LVERSION
+  LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
   $TARG_DIR/dnscrypt-proxy -check -config $TOML_FILE
-  if [ $? -ne 0 ]; then
+  if [ "$LVERSION" == "2.0.43" ]; then
+    echo -e "$ERROR Skipping this test until next version..."
+  elif [ $? -ne 0 ]; then
     echo -e "$INFO Move invalid configuration file to $TOML_ERR"
     echo -e "$INFO Operation will continue with clean config file"
     mv $TOML_FILE $TOML_ERR
