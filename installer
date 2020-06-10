@@ -42,10 +42,10 @@ backup_restore () {
     fi
     tar -czvf $BASE_DIR/backup_dnscrypt.tar.gz -C $TARG_DIR ../dnscrypt/ >/dev/null 2>&1    
     echo -e "$INFO Backup complete"
+    end_op_message 0
   elif [ "$1" == "BACKUP" ] && [ ! -d $TARG_DIR ] && [ ! -f ${TARG_DIR}/dnscrypt-proxy ]; then
     echo -e "$ERROR $TARG_DIR/dnscrypt-proxy to Backup!"
-    end_op_message
-    return
+    end_op_message 0
   fi
   if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
     echo -e "$INFO Please wait a moment."
