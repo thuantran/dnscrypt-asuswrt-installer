@@ -1,8 +1,9 @@
 #!/bin/sh
 
 DI_VERSION="v2.1.6"
-LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
+#LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+#DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
+DNSCRYPT_VER="2.0.42"
 
 BOLD="\033[1m"
 NORM="\033[0m"
@@ -33,8 +34,7 @@ backup_restore () {
       read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
       if [ "USE_OLD" == "YES" ]; then
         echo -e "$INFO Leaving Old Backup."
-	end_op_message
-	return
+	end_op_message 0
       elif [ "USE_OLD" == "NO" ]; then
 	echo -e "$INFO Removing Old Backup."
 	rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
@@ -903,7 +903,7 @@ inst_dnscrypt () {
     elif [ "USE_OLD" == "YES" ]; then
       echo -e "$INFO Continuing without restoring from backup!"
     fi
-  elif [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
+  elif [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && [ ! -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
     read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP || echo -e "$INFO continuing without making a backup."
   fi
   create_dir $TARG_DIR
@@ -1007,7 +1007,7 @@ manager_monitor_restart () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(cat /proc/$PID/cmdline | grep dnscrypt)" ]; then
+      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
         kill -9 "$PID"
         break
       fi
@@ -1591,7 +1591,7 @@ uninst_all () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(cat /proc/$PID/cmdline | grep dnscrypt)" ]; then
+      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
         kill -9 "$PID"
         break
       fi
