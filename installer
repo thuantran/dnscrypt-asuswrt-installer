@@ -1177,13 +1177,13 @@ read_input_dns_n () {
 }
 
 read_input_num () {
-  if [ -z "$4" ] || [ -z "$5" ] || [ -z "$6" ]; then
+  if [ -z "$4" ] && [ -z "$5" ] && [ -z "$6" ]; then
     echo -en "$INPUT $1, $BOLD[$2-$3]$NORM: "
-  elif [ -n "$4" ] || [ -z "$5" ] || [ -z "$6" ]; then 
+  elif [ -n "$4" ] && [ -z "$5" ] && [ -z "$6" ]; then 
     echo -en "$INPUT $1, $BOLD[$2-$3/$4]$NORM: "
-  elif [ -n "$4" ] || [ -n "$5" ] || [ -z "$6" ]; then 
+  elif [ -n "$4" ] && [ -n "$5" ] && [ -z "$6" ]; then 
     echo -en "$INPUT $1, $BOLD[$2-$3/$4/$5]$NORM: "
-  elif [ -n "$4" ] || [ -n "$5" ] || [ -n "$6" ]; then 
+  elif [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ]; then 
     echo -en "$INPUT $1, $BOLD[$2-$3/$4/$5/$6]$NORM: "  
   fi
   read CHOSEN
