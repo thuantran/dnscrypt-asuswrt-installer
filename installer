@@ -1007,7 +1007,7 @@ manager_monitor_restart () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
+      if [ "$(cat /proc/$PID/cmdline | grep dnscrypt)" ]; then
         kill -9 "$PID"
         break
       fi
@@ -1591,7 +1591,7 @@ uninst_all () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
+      if [ "$(cat /proc/$PID/cmdline | grep dnscrypt)" ]; then
         kill -9 "$PID"
         break
       fi
