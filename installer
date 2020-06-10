@@ -61,7 +61,11 @@ backup_restore () {
     if [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
       echo -e "$ERROR No internet- Skipping the updating for Server/Relay Files."
     else
+      local RURL
+      RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
       local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
+      download_file $TARG_DIR 755 $RURL
+      download_file $TARG_DIR 755 "$URL_GEN"/manager
       download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
         $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
         $RESOLVERS_URL_PREFIX/relays.md \
@@ -99,11 +103,15 @@ backup_restore () {
     end_op_message
     return
   elif [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "INSTALL" ]; then
+    local RURL
+    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+    local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
     echo -e "$INFO Please wait a moment."
     tar -xzvf $BASE_DIR/backup_dnscrypt.tar.gz -C $BASE_DIR >/dev/null 2>&1
     chown $(nvram get http_username):root $TARG_DIR/*
     chmod 755 $TARG_DIR/dnscrypt-proxy
-    local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
+    download_file $TARG_DIR 755 $RURL
+    download_file $TARG_DIR 755 "$URL_GEN"/manager
     download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
       $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
       $RESOLVERS_URL_PREFIX/relays.md \
