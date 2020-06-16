@@ -151,12 +151,8 @@ backup_restore () {
 check_dnscrypt_toml () {
   [ ! -f $TOML_FILE ] && return
   echo -e "$INFO Checking dnscrypt-proxy configuration..."
-  local LVERSION
-  LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
   $TARG_DIR/dnscrypt-proxy -check -config $TOML_FILE
-  if [ "$LVERSION" == "2.0.43" ]; then
-    echo -e "$ERROR Skipping this test until next version..."
-  elif [ $? -ne 0 ]; then
+  if [ $? -ne 0 ]; then
     echo -e "$INFO Move invalid configuration file to $TOML_ERR"
     echo -e "$INFO Operation will continue with clean config file"
     mv $TOML_FILE $TOML_ERR
@@ -1075,7 +1071,7 @@ inst_random () {
       killall -q -9 haveged
       download_file $TARG_DIR 755 "$URL_ARCH"/haveged "$URL_GEN"/manager
       write_conf RAN_PRV haveged
-      $TARG_DIR/haveged -w1024 -v1
+      $TARG_DIR/haveged -w 1024 -d 32 -i 32 -v 1
       ;;
     2)
       local RNG_DEV
