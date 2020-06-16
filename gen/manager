@@ -143,7 +143,7 @@ case $1 in
     timezone
     case $RAN_PRV in
       haveged)
-        /jffs/dnscrypt/haveged -w1024 -v1
+        /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
         ;;
       rngd)
         init_hwrng &
