@@ -1071,7 +1071,7 @@ inst_random () {
       killall -q -9 haveged
       download_file $TARG_DIR 755 "$URL_ARCH"/haveged "$URL_GEN"/manager
       write_conf RAN_PRV haveged
-      $TARG_DIR/haveged -w1024 -v1
+      $TARG_DIR/haveged -w 1024 -d 32 -i 32 -v 1
       ;;
     2)
       local RNG_DEV
