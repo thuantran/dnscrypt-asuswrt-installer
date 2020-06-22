@@ -878,7 +878,7 @@ end_op_message () {
 
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
-  local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
+  local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
   local RURL
   RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
   local NW_STATE
