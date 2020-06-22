@@ -62,7 +62,7 @@ backup_restore () {
     else
       local RURL
       RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-      local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
+      local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
       echo -e "$INFO Please hold on while the latest local files are updated.."
       download_file $TARG_DIR 755 $RURL
       download_file $TARG_DIR 755 "$URL_GEN"/manager
@@ -105,7 +105,7 @@ backup_restore () {
   elif [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "INSTALL" ]; then
     local RURL
     RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-    local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
+    local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
     echo -e "$INFO Please wait a moment."
     tar -xzvf $BASE_DIR/backup_dnscrypt.tar.gz -C $BASE_DIR >/dev/null 2>&1
     chown $(nvram get http_username):root $TARG_DIR/*
@@ -878,7 +878,7 @@ end_op_message () {
 
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
-  local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v2/"
+  local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
   local RURL
   RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
   local NW_STATE
