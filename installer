@@ -66,7 +66,9 @@ backup_restore () {
       echo -e "$INFO Please hold on while the latest local files are updated.."
       download_file $TARG_DIR 755 $RURL
       download_file $TARG_DIR 755 "$URL_GEN"/manager
-      download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml 
+      if [ "$("${TARG_DIR}/dnscrypt-proxy" -version)" == "2.0.44" ]; then
+      	download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
+      fi
       download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
         $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
         $RESOLVERS_URL_PREFIX/relays.md \
@@ -113,7 +115,9 @@ backup_restore () {
     chmod 755 $TARG_DIR/dnscrypt-proxy
     download_file $TARG_DIR 755 $RURL
     download_file $TARG_DIR 755 "$URL_GEN"/manager
-    download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
+    if [ "$("${TARG_DIR}/dnscrypt-proxy" -version)" == "2.0.44" ]; then
+      download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
+    fi
     download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
       $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
       $RESOLVERS_URL_PREFIX/relays.md \
@@ -966,7 +970,9 @@ inst_dnscrypt () {
     rm -r $TARG_DIR/"$DNSCRYPT_ARCH_TAR" $TARG_DIR/"$DNSCRYPT_TAR"
     chmod 755 $TARG_DIR/dnscrypt-proxy
   fi
-  download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
+  if [ "$("${TARG_DIR}/dnscrypt-proxy" -version)" == "2.0.44" ]; then
+     download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
+  fi
   download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
     $RESOLVERS_URL_PREFIX/relays.md \
