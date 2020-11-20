@@ -41,31 +41,35 @@ _quote() {
 }
 
 ScriptHeader () {
-	printf "\\n"
-	printf "##\\n"
-	printf "#           _____ _    _  _______          _______ _______     __  __ ______ _____  _      _____ _   _ \\n"
-	printf "#    /\    / ____| |  | |/ ____\ \        / |  __ |__   __|   |  \/  |  ____|  __ \| |    |_   _| \ | |\\n"
-	printf "#   /  \  | (___ | |  | | (___  \ \  /\  / /| |__) | | |______| \  / | |__  | |__) | |      | | |  \| |\\n"
-	printf "#  / /\ \  \___ \| |  | |\___ \  \ \/  \/ / |  _  /  | |______| |\/| |  __| |  _  /| |      | | | . ` |\\n"
-	printf "# / ____ \ ____) | |__| |____) |  \  /\  /  | | \ \  | |      | |  | | |____| | \ \| |____ _| |_| |\  |\\n"
-	printf "#/_/    \_|_____/ \____/|_____/    \/  \/   |_|  \_\ |_|      |_|  |_|______|_|  \_|______|_____|_| \_|\\n"
-	printf "# _____  _   _  _____  _____ _______     _______ _______     _____  _____   ______   ___     __\\n"
-	printf "#|  __ \| \ | |/ ____|/ ____|  __ \ \   / |  __ |__   __|   |  __ \|  __ \ / __ \ \ / \ \   / /\\n"
-	printf "#| |  | |  \| | (___ | |    | |__) \ \_/ /| |__) | | |______| |__) | |__) | |  | \ V / \ \_/ / \\n"
-	printf "#| |  | | . ` |\___ \| |    |  _  / \   / |  ___/  | |______|  ___/|  _  /| |  | |> <   \   /  \\n"
-	printf "#| |__| | |\  |____) | |____| | \ \  | |  | |      | |      | |    | | \ \| |__| / . \   | |   \\n"
-	printf "#|_____/|_| \_|_____/ \_____|_|  \_\ |_|  |_|      |_|      |_|    |_|  \_\\____/_/ \_\  |_|   \\n"
-	printf "# _____ _   _  _____ _______       _      _      ______ _____  \\n"
-	printf "#|_   _| \ | |/ ____|__   __|/\   | |    | |    |  ____|  __ \ \\n"
-	printf "#  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |\\n"
-	printf "#  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  / \\n"
-	printf "# _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \ \\n"
-	printf "#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\\\n"
-	check_jffs_enabled
-	check_dns_environment
-	cleanup
-	check_version
-	menu
+	printf '\n'
+	printf '##\n'
+	printf '#           _____ _    _  _______          _______ _______     __  __ ______ _____  _      _____ _   _ \n'
+	printf '#    /\    / ____| |  | |/ ____\ \        / |  __ |__   __|   |  \/  |  ____|  __ \| |    |_   _| \ | |\n'
+	printf '#   /  \  | (___ | |  | | (___  \ \  /\  / /| |__) | | |______| \  / | |__  | |__) | |      | | |  \| |\n'
+	printf '#  / /\ \  \___ \| |  | |\___ \  \ \/  \/ / |  _  /  | |______| |\/| |  __| |  _  /| |      | | | . ` |\n'
+	printf '# / ____ \ ____) | |__| |____) |  \  /\  /  | | \ \  | |      | |  | | |____| | \ \| |____ _| |_| |\  |\n'
+	printf '#/_/    \_|_____/ \____/|_____/    \/  \/   |_|  \_\ |_|      |_|  |_|______|_|  \_|______|_____|_| \_|\n'
+	printf '# _____  _   _  _____  _____ _______     _______ _______     _____  _____   ______   ___     __ \n'
+	printf '#|  __ \| \ | |/ ____|/ ____|  __ \ \   / |  __ |__   __|   |  __ \|  __ \ / __ \ \ / \ \   / / \n'
+	printf '#| |  | |  \| | (___ | |    | |__) \ \_/ /| |__) | | |______| |__) | |__) | |  | \ V / \ \_/ /  \n'
+	printf '#| |  | | . ` |\___ \| |    |  _  / \   / |  ___/  | |______|  ___/|  _  /| |  | |> <   \   /   \n'
+	printf '#| |__| | |\  |____) | |____| | \ \  | |  | |      | |      | |    | | \ \| |__| / . \   | |    \n'
+	printf '#|_____/|_| \_|_____/ \_____|_|  \_\ |_|  |_|      |_|      |_|    |_|  \_\\____/_/ \_\  |_|    \n'
+	printf '# _____ _   _  _____ _______       _      _      ______ _____   \n'
+	printf '#|_   _| \ | |/ ____|__   __|/\   | |    | |    |  ____|  __ \  \n'
+	printf '#  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) | \n'
+	printf '#  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /  \n'
+	printf '# _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \  \n'
+	printf '#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\ \n'
+	if [ "$1" == "STARTUP" ]; then
+		check_jffs_enabled
+		check_dns_environment
+		cleanup
+		check_version
+		menu
+        else
+		menu
+	fi
 }
 
 backup_restore () {
@@ -848,7 +852,7 @@ end_op_message () {
   echo =====================================================
   echo
   echo
-  menu
+  ScriptHeader
 }
 
 inst_dnscrypt () {
@@ -1670,47 +1674,47 @@ menu () {
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || menu
+      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || ScriptHeader
       ;;
     2)
       echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be modified as required.\n"
-      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || menu
+      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || ScriptHeader
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy\n"
-      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || menu
+      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || ScriptHeader
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router\n$INFO timezone for background services and processes\n"
-      read_yesno "Do you want to proceed?" && set_timezone || menu
+      read_yesno "Do you want to proceed?" && set_timezone || ScriptHeader
       ;;
     5)
       echo -e "$INFO This operation allows you to unset your router\n$INFO timezone for background services and processes\n"
-      read_yesno "Do you want to proceed?" && unset_timezone || menu
+      read_yesno "Do you want to proceed?" && unset_timezone || ScriptHeader
       ;;
     6)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || menu
+      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || ScriptHeader
       ;;
     7)
       echo -e "$INFO This operation will uninstall (P)RNG\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || menu
+      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || ScriptHeader
       ;;
     8)
       echo -e "$INFO This operation will install a swap file for your device\n$INFO You need an external USB storage to host this file\n"
-      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || menu
+      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || ScriptHeader
       ;;
     9)
       echo -e "$INFO This operation will cleanup everything installed by this script (except swap)\n"
-      read_yesno "Do you want to continue?" && uninst_all || menu
+      read_yesno "Do you want to continue?" && uninst_all || ScriptHeader
       ;;
     b|B)
       echo -e "$INFO This operation will allow you to backup everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore BACKUP || menu
+      read_yesno "Do you want to continue?" && backup_restore BACKUP || ScriptHeader
       ;;
     r|R)
       echo -e "$INFO This operation will allow you to restore everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore RESTORE || menu
+      read_yesno "Do you want to continue?" && backup_restore RESTORE || ScriptHeader
       ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made\n$INFO In case of anomaly, please reboot your router!"
@@ -1718,4 +1722,4 @@ menu () {
   esac
 }
 
-ScriptHeader
+ScriptHeader STARTUP
