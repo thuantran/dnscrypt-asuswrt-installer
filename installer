@@ -41,6 +41,7 @@ _quote() {
 }
 
 ScriptHeader () {
+        clear
 	printf '\n'
 	printf '########################################################################################################\n'
 	printf '#           _____ _    _  _______          _______ _______     __  __ ______ _____  _      _____ _   _ #\n'
@@ -71,6 +72,7 @@ ScriptHeader () {
 		check_version
 		menu
         else
+	        check_version
 		menu
 	fi
 }
