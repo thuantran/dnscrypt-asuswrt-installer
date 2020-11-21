@@ -69,7 +69,7 @@ backup_restore () {
       read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
       if [ "USE_OLD" == "YES" ]; then
         echo -e "$INFO Leaving Old Backup."
-	end_op_message 0
+	end_op_message
       elif [ "USE_OLD" == "NO" ]; then
 	echo -e "$INFO Removing Old Backup."
 	rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
@@ -80,7 +80,7 @@ backup_restore () {
     end_op_message 0
   elif [ "$1" == "BACKUP" ] && [ ! -d $TARG_DIR ] && [ ! -f ${TARG_DIR}/dnscrypt-proxy ]; then
     echo -e "$ERROR $TARG_DIR/dnscrypt-proxy to Backup!"
-    end_op_message 0
+    end_op_message
   fi
   if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
     echo -e "$INFO Please wait a moment."
@@ -319,7 +319,7 @@ check_anonymized_disabled () {
 
 check_anonymized_support () {
   if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
-    echo -e "$INFO Checking for Anonymized Dnscrypt Support.\n..\n...\n....\n.....\n......\n$INFO Users may specify Wild-card Relay Support (server_name "*") with option 1 (this supports only DNSCrypt Servers).\n$WARNING All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option.\n$INFO Option 2 gives users the choice to Setup Relays per Dnscrypt-Server.\n$INFO Option 3 allows the users to skip relay configuration or remove old relays configurations.\n$WARNING Option 1 & 2 delete old relay configurations.\n$WARNING Issues may occur if user is not using same servers as defined in relays.\n$INFO What do you want to do:\n  1) All Servers with Wild-Card Relay Support.\n  2) Pick Relays for DNSCRYPT servers (Per Server).\n  3) Skip Setting-up/Modifying Relay Support."
+    echo -e "$INFO Checking for Anonymized Dnscrypt Support.\n..\n...\n....\n.....\n......\n$INFO You may specify Wild-card Relay Support (server_name "*") with option 1 (this supports only DNSCrypt Servers).\n$WARNING All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option.\n$INFO Option 2 gives you the choice to Setup Relays per Dnscrypt-Server.\n$INFO Option 3 allows you to skip relay configuration or remove old relays configurations.\n$WARNING Option 1 & 2 delete old relay configurations.\n$WARNING Issues may occur if you are not using same servers as defined in relays.\n$INFO What do you want to do:\n  1) All Servers with Wild-Card Relay Support.\n  2) Pick Relays for DNSCRYPT servers (Per Server).\n  3) Skip Setting-up/Modifying Relay Support."
     read_input_num "Your choice" 1 3
     case $CHOSEN in
       1) 
@@ -376,7 +376,7 @@ check_anonymized_support () {
         done
         if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ]; then
           local AVARS_ARGS
-          echo -e "$WARNING No compatible servers detected.\n$INFO To continue users may still select relays for Wild-Card Support."
+          echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
           read_yesno "Do you still want to setup Wild-Card Relay Support?" && check_anonymized_automatic 0 || check_anonymized_disabled
           eval toml_avars_write "$AVARS_ARGS"
         fi
@@ -430,11 +430,11 @@ check_nextdns () {
     read_input_num "Your choice" 1 2
     case $CHOSEN in
        1)
-        echo -e "$INFO User has specified to define NextDNS-Custom"
+        echo -e "$INFO You have specified to define NextDNS-Custom"
         nextdns_authen 1
         ;;
        2)
-        echo -e "$INFO User has chosen to skip NextDNS-Custom"
+        echo -e "$INFO You have chosen to skip NextDNS-Custom"
         nextdns_authen 0
         ;;
     esac
@@ -628,7 +628,7 @@ choose_dnscrypt_server_manual () {
 }
 
 choose_dnscrypt_server_static () {
-  echo -e "$INFO This feature allows you to define a single server or multiple servers using the sdns stamp of the server.\n$INFO This assigns the server with a custom name specified by the user as a static option.\n$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option.\n$INFO If you do not want to continue down this path please select option 3 to return to server selection menu.\n$INFO What do you want to do:\n  1) Setup Static Servers Only.\n  2) Setup Static Servers with Addition of Manually Chosen Servers.\n  3) Go back to server selection menu."
+  echo -e "$INFO This feature allows you to define a single server or multiple servers using the sdns stamp of the server.\n$INFO This assigns the server with a custom name you can specify as a static option.\n$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option.\n$INFO If you do not want to continue down this path please select option 3 to return to server selection menu.\n$INFO What do you want to do:\n  1) Setup Static Servers Only.\n  2) Setup Static Servers with Addition of Manually Chosen Servers.\n  3) Go back to server selection menu."
   read_input_num "Your choice" 1 3
     case $CHOSEN in
       1)
@@ -1706,6 +1706,7 @@ menu () {
       ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made\n$INFO In case of anomaly, please reboot your router!"
+      clear
       ;;
   esac
 }
