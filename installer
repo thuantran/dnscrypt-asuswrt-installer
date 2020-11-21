@@ -430,11 +430,11 @@ check_nextdns () {
     read_input_num "Your choice" 1 2
     case $CHOSEN in
        1)
-        echo -e "$INFO User has specified to define NextDNS-Custom"
+        echo -e "$INFO You have specified to define NextDNS-Custom"
         nextdns_authen 1
         ;;
        2)
-        echo -e "$INFO User has chosen to skip NextDNS-Custom"
+        echo -e "$INFO You have chosen to skip NextDNS-Custom"
         nextdns_authen 0
         ;;
     esac
