@@ -67,10 +67,10 @@ backup_restore () {
       echo -e "$INFO There is an old backup detected."
       local USE_OLD
       read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
-      if [ "USE_OLD" == "YES" ]; then
+      if [ "$USE_OLD" == "YES" ]; then
         echo -e "$INFO Leaving Old Backup."
 	end_op_message
-      elif [ "USE_OLD" == "NO" ]; then
+      elif [ "$USE_OLD" == "NO" ]; then
 	echo -e "$INFO Removing Old Backup."
 	rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
       fi
@@ -85,7 +85,7 @@ backup_restore () {
   if [ -f $BASE_DIR/backup_dnscrypt.tar.gz ] && [ "$1" == "RESTORE" ]; then
     echo -e "$INFO Please wait a moment."
     tar -xzvf $BASE_DIR/backup_dnscrypt.tar.gz -C $BASE_DIR >/dev/null 2>&1
-    chown $(nvram get http_username):root $TARG_DIR/*
+    chown "$(nvram get http_username)":root $TARG_DIR/*
     chmod 755 $TARG_DIR/dnscrypt-proxy
     local NW_STATE
     local RES_STATE
@@ -145,7 +145,7 @@ backup_restore () {
     local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
     echo -e "$INFO Please wait a moment."
     tar -xzvf $BASE_DIR/backup_dnscrypt.tar.gz -C $BASE_DIR >/dev/null 2>&1
-    chown $(nvram get http_username):root $TARG_DIR/*
+    chown "$(nvram get http_username)":root $TARG_DIR/*
     chmod 755 $TARG_DIR/dnscrypt-proxy
     download_file $TARG_DIR 755 $RURL
     download_file $TARG_DIR 755 "$URL_GEN"/manager
@@ -470,7 +470,7 @@ check_version () {
       local MD5SUM_L
       local MD5SUM_R
       RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
-      LINSTALL="v$(cat "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
+      LINSTALL="v$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
       RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
       MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)"
       MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"      
@@ -801,7 +801,7 @@ del_jffs_script () {
     LINE_ABOVE=$(sed "$LINE_NUMq;d" "$TARG")
     [ -z "$LINE_ABOVE" ] && sed -i "${LINE_NUM}d" "$TARG"
   fi
-  [ "$(cat "$TARG")" == "#!/bin/sh" ] && rm -f "$TARG"
+  [ "$(awk '{ print }' "$TARG")" == "#!/bin/sh" ] && rm -f "$TARG"
 }
 
 download_file () {
@@ -863,10 +863,10 @@ inst_dnscrypt () {
     echo -e "$INFO Backup is detected."
     local USE_OLD
     read_yesno "Do you want Restore instead?" && USE_OLD=YES || USE_OLD=NO
-    if [ "USE_OLD" == "YES" ]; then
+    if [ "$USE_OLD" == "YES" ]; then
       echo -e "$INFO Installing from an old backup!"
       backup_restore INSTALL
-    elif [ "USE_OLD" == "YES" ]; then
+    elif [ "$USE_OLD" == "NO" ]; then
       echo -e "$INFO Continuing without restoring from backup!"
     fi
   elif [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && [ ! -f $BASE_DIR/backup_dnscrypt.tar.gz ]; then
@@ -908,7 +908,7 @@ inst_dnscrypt () {
           end_op_message
           return
        fi
-       chown $(nvram get http_username):root $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/*
+       chown "$(nvram get http_username)":root $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/*
        mv $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/* $TARG_DIR
        rm -r $TARG_DIR/"$DNSCRYPT_ARCH_TAR" $TARG_DIR/"$DNSCRYPT_TAR"
        chmod 755 $TARG_DIR/dnscrypt-proxy
@@ -923,7 +923,7 @@ inst_dnscrypt () {
       end_op_message
       return
     fi
-    chown $(nvram get http_username):root $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/*
+    chown "$(nvram get http_username)":root $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/*
     mv $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/* $TARG_DIR
     rm -r $TARG_DIR/"$DNSCRYPT_ARCH_TAR" $TARG_DIR/"$DNSCRYPT_TAR"
     chmod 755 $TARG_DIR/dnscrypt-proxy
@@ -967,7 +967,7 @@ manager_monitor_restart () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
+      if [ "$(awk '{ print }' /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
         kill -9 "$PID"
         break
       fi
@@ -1044,7 +1044,7 @@ inst_random () {
 
 inst_ran_dev () {
   if [ -c /dev/ttyACM0 ]; then
-    local PRODSTR=$(cat /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=)
+    local PRODSTR=$(awk '{ print }' /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=)
     local VID=$(echo "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 1)
     local PID=$(echo "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 2)
     if [ "$VID" == "4d8" ] && [ "$PID" == "f5fe" ]; then
@@ -1520,19 +1520,19 @@ uninst_all () {
   del_jffs_script /jffs/scripts/init-start
   del_jffs_script /jffs/scripts/firewall-start
   del_jffs_script /jffs/scripts/services-stop
-  del_jffs_script /jffs/scripts/wan-start
-  service restart_dnsmasq >/dev/null 2>&1
+  del_jffs_script /jffs/scripts/wan-start  
   killall -q -9 haveged rngd dnscrypt-proxy
   local MAN_PID="$(pidof manager)"
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(cat /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
+      if [ "$(awk '{ print }' /proc/"$PID"/cmdline | grep dnscrypt)" ]; then
         kill -9 "$PID"
         break
       fi
     done
   fi
+  service restart_dnsmasq >/dev/null 2>&1
   end_op_message 0
 }
 
@@ -1587,7 +1587,7 @@ write_command_script () {
     echo "#!/bin/sh" > "$TARG"
   fi
   chmod 755 "$TARG"
-  if [ $(grep -c -F "$COMMAND" "$TARG") -gt 0 ]; then
+  if [ "$(grep -c -F "$COMMAND" "$TARG")" -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
     echo -e "$INFO Configure $FILENAME file"
@@ -1606,7 +1606,7 @@ write_manager_script () {
   fi
   chmod 755 "$TARG" $COMMAND
   del_between_magic "$TARG" dnscrypt-asuswrt-installer
-  if [ $(grep -c -F "[ -x $COMMAND ] && $COMMAND $OP" "$TARG") -gt 0 ]; then
+  if [ "$(grep -c -F "[ -x $COMMAND ] && $COMMAND $OP" "$TARG")" -gt 0 ]; then
     echo -e "$INFO $FILENAME file already configured"
   else
     echo -e "$INFO Configure $FILENAME file"
@@ -1614,7 +1614,7 @@ write_manager_script () {
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" "$TARG"
     else
       del_jffs_script "$TARG" !manager
-      [ $(tail -1 "$TARG"|grep -c '^$') -eq 0 ] && echo "" >> "$TARG"
+      [ "$(tail -1 "$TARG"|grep -c '^$')" -eq 0 ] && echo "" >> "$TARG"
       echo "[ -x $COMMAND ] && $COMMAND $OP" >> "$TARG"
     fi
   fi
@@ -1646,7 +1646,7 @@ case $(uname -m) in
     # echo -e "$WARNING USE AT YOUR OWN RISK"
     # ;;
   *)
-    echo "This is unsupported platform, sorry."
+    echo "$ERROR This is unsupported platform, sorry."
     exit 1
     ;;
 esac
