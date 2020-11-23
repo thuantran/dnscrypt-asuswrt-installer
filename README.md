@@ -70,7 +70,7 @@ echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscr
 ```
 in current directory and send me the archive for debug.
 
-I also need follwoing information:
+I also need following information:
 - Which dns server you selected during dnscrypt installation
 - Which router you're using
 - Firmware and its version
