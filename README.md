@@ -1,9 +1,8 @@
-So to solve all the problems with installing dnscrypt with entware (or similar) then setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, I made my own installer for dnscrypt-proxy.
+To resolve all problems associated with installing Dnscrypt-Proxy with Entware (or similar) along with setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, this installer of dnscrypt-proxy resolves all these concerns... The only requirement is an Asus Router flashed with custom Asuswrt-Merlin Firmware.
 
 # Requirements:
-- ARM based ASUS routers
-- asuswrt-merlin firmwares or compatible
-- jffs support and script enabled
+- ARM based ASUS routers that use Asuswrt-Merlin Firmware
+- JFFS support and enabled
 
 # Incompatibilities:
 - No known issue
@@ -20,10 +19,10 @@ So to solve all the problems with installing dnscrypt with entware (or similar) 
 - Ability to setup a swap file
 - Ability to setup timezone file (/etc/localtime) used by dnscrypt-proxy and other apps
 - Ability to reconfigure dnscrypt-proxy without reinstalling unlike previous installer for dnscrypt-proxy version 1.x.x
-- Ability to configure anonymized relay support per Dnscrypt server through menu option or Wildcard Relay Support to cover all dnscrypt servers.
+- Ability to configure anonymized relay support per Dnscrypt server through menu option or Wildcard Relay Support to cover all dnscrypt servers when automatic is selected.
 - Support for NextDNS.io Account SDNS stamp as Static server.
-- Support for addition of multiple static servers using SDNS Stamp and Custom Server Naming - can be mixed with servers on the resolvers list.
-- Improved Installer/Update Functions.
+- Support for addition of multiple static servers using SDNS Stamp and Custom Server Naming that can be mixed with servers on the resolvers list.
+- Improved Installer/Update/Backup Functions.
 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
@@ -62,22 +61,20 @@ I need following directory and files:
 ```
 /jffs/dnscrypt
 /jffs/scripts/dnsmasq.postconf
-/jffs/scripts/firewall-start
-/jffs/scripts/wan-start
 ```
 One can use this command to create a tar archive of these files:
 ```
-echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/dnsmasq.postconf /jffs/scripts/firewall-start /jffs/scripts/wan-start ; rm exclude-files
+echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/dnsmasq.postconf; rm exclude-files
 ```
 in current directory and send me the archive for debug.
 
 I also need follwoing information:
-- Which dns server you selected during dnscrypt installtion
+- Which dns server you selected during dnscrypt installation
 - Which router you're using
 - Firmware and its version
 
 # How I made this:
 - Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
 - Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
-- Write the installer script with stuffs inspired from entware-setup.sh from asuswrt-merlin
-- You can look at all the stuffs here https://github.com/thuantran/dnscrypt-asuswrt-installer
+- I wrote the installer script with stuff inspired from entware-setup.sh from asuswrt-merlin
+- You can look at all the stuff here https://github.com/thuantran/dnscrypt-asuswrt-installer
