@@ -1,3 +1,5 @@
+<a href="https://ibb.co/3CmV5dX"><img src="https://i.ibb.co/nLM4qm2/installer.jpg" alt="installer" border="0"></a>
+
 To resolve all problems associated with installing Dnscrypt-Proxy with Entware (or similar) along with setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, this installer of dnscrypt-proxy resolves all these concerns... The only requirement is an Asus Router flashed with custom Asuswrt-Merlin Firmware.
 
 # Requirements:
