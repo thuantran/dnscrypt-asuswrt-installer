@@ -56,6 +56,8 @@ ScriptHeader () {
 		check_version
 		menu
         else
+	        check_jffs_enabled
+		cleanup
 	        check_version
 		menu
 	fi
@@ -1659,7 +1661,7 @@ menu () {
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || ScriptHeader
+      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || ScriptHeader STARTUP
       ;;
     2)
       echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be modified as required.\n"
@@ -1667,7 +1669,7 @@ menu () {
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy\n"
-      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || ScriptHeader
+      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || ScriptHeader STARTUP
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router\n$INFO timezone for background services and processes\n"
@@ -1694,12 +1696,12 @@ menu () {
       read_yesno "Do you want to continue?" && uninst_all || ScriptHeader
       ;;
     b|B)
-      echo -e "$INFO This operation will allow you to backup everything!\n"
+      echo -e "$INFO This operation will backup everything!\n"
       read_yesno "Do you want to continue?" && backup_restore BACKUP || ScriptHeader
       ;;
     r|R)
-      echo -e "$INFO This operation will allow you to restore everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore RESTORE || ScriptHeader
+      echo -e "$INFO This operation will restore everything!\n"
+      read_yesno "Do you want to continue?" && backup_restore RESTORE || ScriptHeader STARTUP
       ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made\n$INFO In case of anomaly, please reboot your router!"
@@ -1708,4 +1710,4 @@ menu () {
   esac
 }
 
-ScriptHeader STARTUP
+ScriptHeader
