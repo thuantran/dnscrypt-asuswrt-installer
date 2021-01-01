@@ -22,16 +22,17 @@
 #|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.1.8                               #
 #                                                                                                      #
 ########################################################################################################
-DI_VERSION="v2.1.8"
-LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
-BOLD="\033[1m"
-NORM="\033[0m"
-INFO="$BOLD Info: $NORM"
-ERROR="$BOLD *** Error: $NORM"
-WARNING="$BOLD * Warning: $NORM"
-INPUT="$BOLD => $NORM"
+readonly DI_VERSION="v2.1.8"
+readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
+
+readonly BOLD="\033[1m"
+readonly NORM="\033[0m"
+readonly INFO="$BOLD Info: $NORM"
+readonly ERROR="$BOLD *** Error: $NORM"
+readonly WARNING="$BOLD * Warning: $NORM"
+readonly INPUT="$BOLD => $NORM"
 
 readonly BASE_DIR=/jffs
 readonly TARG_DIR=$BASE_DIR/dnscrypt
