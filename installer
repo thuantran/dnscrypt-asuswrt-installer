@@ -23,7 +23,7 @@
 #                                                                                                      #
 ########################################################################################################
 
-readonly DI_VERSION="v2.1.8"
+DI_VERSION="v2.1.8"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
