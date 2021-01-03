@@ -448,7 +448,6 @@ check_version () {
     RES_STATE=$?
     if [ -z "$(pidof dnscrypt-proxy)" ] || [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
       echo -e "$ERROR No Internet Detected or Dnscrypt-Proxy is Dead, Skipping Version Check.\n$INFO Run Option 3 to reconfigure, before trying option 1."
-      end_op_message
     else
       local RURL
       local RMNSTALL
