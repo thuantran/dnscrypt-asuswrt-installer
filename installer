@@ -19,19 +19,20 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.1.7                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.1.8                               #
 #                                                                                                      #
 ########################################################################################################
-DI_VERSION="v2.1.7"
-LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
-BOLD="\033[1m"
-NORM="\033[0m"
-INFO="$BOLD Info: $NORM"
-ERROR="$BOLD *** Error: $NORM"
-WARNING="$BOLD * Warning: $NORM"
-INPUT="$BOLD => $NORM"
+readonly DI_VERSION="v2.1.8"
+readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
+
+readonly BOLD="\033[1m"
+readonly NORM="\033[0m"
+readonly INFO="$BOLD Info: $NORM"
+readonly ERROR="$BOLD *** Error: $NORM"
+readonly WARNING="$BOLD * Warning: $NORM"
+readonly INPUT="$BOLD => $NORM"
 
 readonly BASE_DIR=/jffs
 readonly TARG_DIR=$BASE_DIR/dnscrypt
@@ -48,16 +49,11 @@ _quote() {
 ScriptHeader () {
         clear
         sed -n '2,24p' "$0"
-	if [ "$1" == "STARTUP" ]; then
-		check_jffs_enabled
-		check_dns_environment
-		cleanup
-		check_version
-		menu
-        else
-	        check_version
-		menu
-	fi
+	check_jffs_enabled
+	check_dns_environment
+	cleanup
+	check_version
+	menu
 }
 
 backup_restore () {
@@ -102,9 +98,6 @@ backup_restore () {
       echo -e "$INFO Please hold on while the latest local files are updated.."
       download_file $TARG_DIR 755 $RURL
       download_file $TARG_DIR 755 "$URL_GEN"/manager
-      if [ "$("${TARG_DIR}/dnscrypt-proxy" -version)" == "2.0.44" ]; then
-      	download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
-      fi
       download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
         $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
         $RESOLVERS_URL_PREFIX/relays.md \
@@ -149,9 +142,6 @@ backup_restore () {
     chmod 755 $TARG_DIR/dnscrypt-proxy
     download_file $TARG_DIR 755 $RURL
     download_file $TARG_DIR 755 "$URL_GEN"/manager
-    if [ "$("${TARG_DIR}/dnscrypt-proxy" -version)" == "2.0.44" ]; then
-      download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
-    fi
     download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
       $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
       $RESOLVERS_URL_PREFIX/relays.md \
@@ -213,8 +203,7 @@ check_dns_filter () {
   if [ "$1" -eq 0 ] && [ "$DNSFIL" -ne 0 ]; then
     nvram set dnsfilter_enable_x="0"
     nvram commit
-    service restart_firewall >/dev/null 2>&1
-    service restart_dnsmasq >/dev/null 2>&1
+    service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
     echo -e "$INFO DNS will not be forced through this proxy."
     return
   fi
@@ -233,8 +222,7 @@ check_dns_filter () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall >/dev/null 2>&1
-    service restart_dnsmasq >/dev/null 2>&1
+    service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
     echo -e "$INFO DNSFilter is set to Control DNS."
   elif [ "$1" -eq 1 ] && [ "$DNSFIL" -ne 0 ]; then
     echo -e "$INFO DNSFilter is Already on.\n$INFO You can choose to keep any custom dnsfilter values and only redirect non-custom traffic or send all traffic through this proxy."
@@ -246,8 +234,7 @@ check_dns_filter_some () {
   if [ "$1" -eq 0 ]; then
     nvram set dnsfilter_mode="11"
     nvram commit
-    service restart_firewall >/dev/null 2>&1
-    service restart_dnsmasq >/dev/null 2>&1
+    service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
     echo -e "$INFO DNSFilter is set to control DNS through this proxy, while leaving any Custom Rules and Values."
     return
   fi
@@ -265,9 +252,8 @@ check_dns_filter_some () {
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
     nvram commit
-    service restart_firewall >/dev/null 2>&1
-    service restart_dnsmasq >/dev/null 2>&1
-    echo -e "$INFO DNS is set to redirecting All DNS resolutions through this proxy."
+    service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
+    echo -e "$INFO DNS is set to redirect All DNS resolutions through this proxy."
     return
   fi
 }
@@ -334,7 +320,7 @@ check_anonymized_support () {
         toml_avar_enable routes
         eval toml_avars_write "$AVARS_ARGS"
         local VARSARGS
-        VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl"
+        VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri"
         local COUNT
         local DNSCRYPT
         local SERVER
@@ -356,7 +342,7 @@ check_anonymized_support () {
           fi
         done
         local FRAGSBLOCKED
-        FRAGSBLOCKED="cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri cleanbrowsing-adult cleanbrowsing-family-ipv6 cleanbrowsing-family cleanbrowsing-security"
+        FRAGSBLOCKED="cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 cleanbrowsing-adult cleanbrowsing-adult-ipv6 cleanbrowsing-family cleanbrowsing-family-ipv6 cleanbrowsing-security cleanbrowsing-security-ipv6"
         local BLOCKED
         local FRAG
         local NUMFRAG
@@ -927,9 +913,6 @@ inst_dnscrypt () {
     mv $TARG_DIR/"$DNSCRYPT_ARCH_TAR"/* $TARG_DIR
     rm -r $TARG_DIR/"$DNSCRYPT_ARCH_TAR" $TARG_DIR/"$DNSCRYPT_TAR"
     chmod 755 $TARG_DIR/dnscrypt-proxy
-  fi
-  if [ "$("${TARG_DIR}/dnscrypt-proxy" -version)" == "2.0.44" ]; then
-     download_file $TARG_DIR 644 https://raw.githubusercontent.com/DNSCrypt/dnscrypt-proxy/19c0c3f7db918ada8dd1e7b9b857099c1bb8609b/dnscrypt-proxy/example-dnscrypt-proxy.toml
   fi
   download_file $TARG_DIR 644 $RESOLVERS_URL_PREFIX/public-resolvers.md \
     $RESOLVERS_URL_PREFIX/public-resolvers.md.minisig \
@@ -1697,11 +1680,11 @@ menu () {
       read_yesno "Do you want to continue?" && uninst_all || ScriptHeader
       ;;
     b|B)
-      echo -e "$INFO This operation will allow you to backup everything!\n"
+      echo -e "$INFO This operation will backup everything!\n"
       read_yesno "Do you want to continue?" && backup_restore BACKUP || ScriptHeader
       ;;
     r|R)
-      echo -e "$INFO This operation will allow you to restore everything!\n"
+      echo -e "$INFO This operation will restore everything!\n"
       read_yesno "Do you want to continue?" && backup_restore RESTORE || ScriptHeader
       ;;
     q|Q)
@@ -1711,4 +1694,4 @@ menu () {
   esac
 }
 
-ScriptHeader STARTUP
+ScriptHeader
