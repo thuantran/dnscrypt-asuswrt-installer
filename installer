@@ -825,6 +825,7 @@ end_op_message () {
   echo =====================================================
   echo
   echo
+  sleep 3
   ScriptHeader
 }
 
@@ -1688,6 +1689,7 @@ menu () {
       ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made\n$INFO In case of anomaly, please reboot your router!"
+      sleep 3
       clear
       ;;
   esac
