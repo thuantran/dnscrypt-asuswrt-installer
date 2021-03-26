@@ -822,11 +822,12 @@ download_file () {
 
 end_op_message () {
   [ "$1" == "0" ] && echo -e "$INFO Operation completed. You can quit or continue"
+  [ "$1" == "1" ] && echo -e "$INFO Operation aborted. You can quit or continue"
   echo =====================================================
   echo
   echo
   sleep 3
-  ScriptHeader
+  exec ${TARG_DIR}/installer && exit
 }
 
 inst_dnscrypt () {
@@ -1608,6 +1609,8 @@ write_manager_script () {
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 
+sed -n '2,24p' "$0"
+
 case $ROUTER_MODEL in
   RT-AX56U|RT-AX58U|RT-AX3000)
     echo "$ERROR This is an unsupported model, sorry."
@@ -1645,6 +1648,11 @@ case $(uname -m) in
     ;;
 esac
 
+check_jffs_enabled
+check_dns_environment
+cleanup
+check_version
+
 menu () {
   echo -e "$INFO Choose what you want to do:\n  1) Install/Update dnscrypt-proxy\n  2) Uninstall dnscrypt-proxy\n  3) Configure dnscrypt-proxy\n  4) Set timezone\n  5) Unset timezone\n  6) Install (P)RNG\n  7) Uninstall (P)RNG\n  8) Install swap file\n  9) Uninstall ALL"
   [ -d $TARG_DIR ] && [ -f ${TARG_DIR}/dnscrypt-proxy ] && echo -e "  b) Backup"
@@ -1656,47 +1664,47 @@ menu () {
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || ScriptHeader
+      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || end_op_message 1
       ;;
     2)
       echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be modified as required.\n"
-      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || ScriptHeader
+      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || end_op_message 1
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy\n"
-      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || ScriptHeader
+      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || end_op_message 1
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router\n$INFO timezone for background services and processes\n"
-      read_yesno "Do you want to proceed?" && set_timezone || ScriptHeader
+      read_yesno "Do you want to proceed?" && set_timezone || end_op_message 1
       ;;
     5)
       echo -e "$INFO This operation allows you to unset your router\n$INFO timezone for background services and processes\n"
-      read_yesno "Do you want to proceed?" && unset_timezone || ScriptHeader
+      read_yesno "Do you want to proceed?" && unset_timezone || end_op_message 1
       ;;
     6)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || ScriptHeader
+      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || end_op_message 1
       ;;
     7)
       echo -e "$INFO This operation will uninstall (P)RNG\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || ScriptHeader
+      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || end_op_message 1
       ;;
     8)
       echo -e "$INFO This operation will install a swap file for your device\n$INFO You need an external USB storage to host this file\n"
-      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || ScriptHeader
+      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || end_op_message 1
       ;;
     9)
       echo -e "$INFO This operation will cleanup everything installed by this script (except swap)\n"
-      read_yesno "Do you want to continue?" && uninst_all || ScriptHeader
+      read_yesno "Do you want to continue?" && uninst_all || end_op_message 1
       ;;
     b|B)
       echo -e "$INFO This operation will backup everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore BACKUP || ScriptHeader
+      read_yesno "Do you want to continue?" && backup_restore BACKUP || end_op_message 1
       ;;
     r|R)
       echo -e "$INFO This operation will restore everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore RESTORE || ScriptHeader
+      read_yesno "Do you want to continue?" && backup_restore RESTORE || end_op_message 1
       ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made\n$INFO In case of anomaly, please reboot your router!"
@@ -1706,4 +1714,4 @@ menu () {
   esac
 }
 
-ScriptHeader
+menu
