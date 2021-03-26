@@ -1604,8 +1604,19 @@ write_manager_script () {
 }
 
 [ "$1" ] && BRANCH=$1 || BRANCH=master
+[ -z "$(nvram get odmpid)" ] && ROUTER_MODEL=$(nvram get productid) || ROUTER_MODEL=$(nvram get odmpid)
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
+
+case $ROUTER_MODEL in
+  RT-AX56U|RT-AX58U|RT-AX3000)
+    echo "$ERROR This is an unsupported model, sorry."
+    exit 1
+    ;;
+  *)
+    echo -e "$INFO Detected $ROUTER_MODEL Model Router.
+    ;;
+esac
 
 case $(uname -m) in
   armv7l)
@@ -1629,7 +1640,7 @@ case $(uname -m) in
     # echo -e "$WARNING USE AT YOUR OWN RISK"
     # ;;
   *)
-    echo "$ERROR This is unsupported platform, sorry."
+    echo "$ERROR This is an unsupported platform, sorry."
     exit 1
     ;;
 esac
