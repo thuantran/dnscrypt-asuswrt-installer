@@ -828,7 +828,7 @@ end_op_message () {
   echo
   echo
   sleep 3
-  exec "$SCRIPT_LOC" && exit
+  exec "$(chmod 755 $SCRIPT_LOC)" && exit
 }
 
 inst_dnscrypt () {
@@ -876,7 +876,7 @@ inst_dnscrypt () {
     if [ "$NOW" == "YES" ]; then
       echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
       download_file $TARG_DIR 755 $RURL
-      exec "$SCRIPT_LOC" && exit
+      exec ${TARG_DIR}/installer && exit
     elif [ "$NOW" == "NO" ]; then
       echo -e "$INFO Installer update Aborted! Re-run option 1 later if you change your mind.."
     fi
