@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.1.8                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.1.9                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.1.8"
+DI_VERSION="v2.1.9"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -41,19 +41,10 @@ readonly TOML_FILE=$TARG_DIR/dnscrypt-proxy.toml
 readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
 readonly TOML_ERR=$TARG_DIR/dnscrypt-proxy.toml.err
 readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
+readonly SCRIPT_LOC=$(readlink -f "$0")
 
 _quote() {
   echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
-}
-
-ScriptHeader () {
-        clear
-        sed -n '2,24p' "$0"
-	check_jffs_enabled
-	check_dns_environment
-	cleanup
-	check_version
-	menu
 }
 
 backup_restore () {
@@ -822,11 +813,16 @@ download_file () {
 
 end_op_message () {
   [ "$1" == "0" ] && echo -e "$INFO Operation completed. You can quit or continue"
+  [ "$1" == "1" ] && echo -e "$INFO Operation aborted. You can quit or continue"
   echo =====================================================
   echo
   echo
   sleep 3
-  ScriptHeader
+  if [ ! -f ${TARG_DIR}/installer ]; then
+    chmod 755 "$SCRIPT_LOC" && exec "$SCRIPT_LOC" && exit
+  else
+    chmod 755 "${TARG_DIR}/installer" && exec "${TARG_DIR}/installer" && exit
+  fi
 }
 
 inst_dnscrypt () {
@@ -863,22 +859,7 @@ inst_dnscrypt () {
     end_op_message
     return
   fi  
-  local MD5SUM_L
-  local MD5SUM_R
-  [ -f ${TARG_DIR}/installer ] && MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)" && MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
-  if [ ! -f ${TARG_DIR}/installer ]; then 
-    download_file $TARG_DIR 755 $RURL
-  elif [ "$MD5SUM_R" != "$MD5SUM_L" ]; then
-    local NOW
-    read_yesno "Do you want to update installer?" && NOW=YES || NOW=NO
-    if [ "$NOW" == "YES" ]; then
-      echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
-      download_file $TARG_DIR 755 $RURL
-      exec ${TARG_DIR}/installer && exit
-    elif [ "$NOW" == "NO" ]; then
-      echo -e "$INFO Installer update Aborted! Re-run option 1 later if you change your mind.."
-    fi
-  fi
+  download_file $TARG_DIR 755 $RURL
   download_file $TARG_DIR 755 "$URL_GEN"/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION
@@ -1604,8 +1585,22 @@ write_manager_script () {
 }
 
 [ "$1" ] && BRANCH=$1 || BRANCH=master
+[ -z "$(nvram get odmpid)" ] && ROUTER_MODEL=$(nvram get productid) || ROUTER_MODEL=$(nvram get odmpid)
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
+
+clear
+sed -n '2,24p' "$0"
+
+case $ROUTER_MODEL in
+  RT-AX56U|RT-AX58U|RT-AX3000)
+    echo -e "$ERROR This is an unsupported Router, sorry."
+    exit 1
+    ;;
+  *)
+    echo -e "$INFO Detected $ROUTER_MODEL Router."
+    ;;
+esac
 
 case $(uname -m) in
   armv7l)
@@ -1629,10 +1624,15 @@ case $(uname -m) in
     # echo -e "$WARNING USE AT YOUR OWN RISK"
     # ;;
   *)
-    echo "$ERROR This is unsupported platform, sorry."
+    echo -e "$ERROR This is an unsupported platform, sorry."
     exit 1
     ;;
 esac
+
+check_jffs_enabled
+check_dns_environment
+cleanup
+check_version
 
 menu () {
   echo -e "$INFO Choose what you want to do:\n  1) Install/Update dnscrypt-proxy\n  2) Uninstall dnscrypt-proxy\n  3) Configure dnscrypt-proxy\n  4) Set timezone\n  5) Unset timezone\n  6) Install (P)RNG\n  7) Uninstall (P)RNG\n  8) Install swap file\n  9) Uninstall ALL"
@@ -1645,47 +1645,47 @@ menu () {
   case $CHOSEN in
     1)
       echo -e "$INFO This operation will install dnscrypt-proxy and related files (<6MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || ScriptHeader
+      read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || end_op_message 1
       ;;
     2)
       echo -e "$INFO This operation will uninstall dnscrypt-proxy and related files\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be modified as required.\n"
-      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || ScriptHeader
+      read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || end_op_message 1
       ;;
     3)
       echo -e "$INFO This operation allows you to configure dnscrypt-proxy\n"
-      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || ScriptHeader
+      read_yesno "Do you want to proceed?" && setup_dnscrypt reconfig || end_op_message 1
       ;;
     4)
       echo -e "$INFO This operation allows you to set your router\n$INFO timezone for background services and processes\n"
-      read_yesno "Do you want to proceed?" && set_timezone || ScriptHeader
+      read_yesno "Do you want to proceed?" && set_timezone || end_op_message 1
       ;;
     5)
       echo -e "$INFO This operation allows you to unset your router\n$INFO timezone for background services and processes\n"
-      read_yesno "Do you want to proceed?" && unset_timezone || ScriptHeader
+      read_yesno "Do you want to proceed?" && unset_timezone || end_op_message 1
       ;;
     6)
       echo -e "$INFO This operation will install a (P)RNG (<0.5MB)\n$INFO to jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || ScriptHeader
+      read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || end_op_message 1
       ;;
     7)
       echo -e "$INFO This operation will uninstall (P)RNG\n$INFO from jffs, no other data will be changed.\n$INFO Also some start scripts will be installed/modified as required.\n"
-      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || ScriptHeader
+      read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || end_op_message 1
       ;;
     8)
       echo -e "$INFO This operation will install a swap file for your device\n$INFO You need an external USB storage to host this file\n"
-      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || ScriptHeader
+      read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || end_op_message 1
       ;;
     9)
       echo -e "$INFO This operation will cleanup everything installed by this script (except swap)\n"
-      read_yesno "Do you want to continue?" && uninst_all || ScriptHeader
+      read_yesno "Do you want to continue?" && uninst_all || end_op_message 1
       ;;
     b|B)
       echo -e "$INFO This operation will backup everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore BACKUP || ScriptHeader
+      read_yesno "Do you want to continue?" && backup_restore BACKUP || end_op_message 1
       ;;
     r|R)
       echo -e "$INFO This operation will restore everything!\n"
-      read_yesno "Do you want to continue?" && backup_restore RESTORE || ScriptHeader
+      read_yesno "Do you want to continue?" && backup_restore RESTORE || end_op_message 1
       ;;
     q|Q)
       echo -e "$INFO Operations have been applied if any has been made\n$INFO In case of anomaly, please reboot your router!"
@@ -1695,4 +1695,4 @@ menu () {
   esac
 }
 
-ScriptHeader
+menu
