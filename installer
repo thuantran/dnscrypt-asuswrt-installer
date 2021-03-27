@@ -1594,7 +1594,7 @@ sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
   RT-AX56U|RT-AX58U|RT-AX3000)
-    echo "$ERROR This is an unsupported Router, sorry."
+    echo -e "$ERROR This is an unsupported Router, sorry."
     exit 1
     ;;
   *)
@@ -1624,7 +1624,7 @@ case $(uname -m) in
     # echo -e "$WARNING USE AT YOUR OWN RISK"
     # ;;
   *)
-    echo "$ERROR This is an unsupported platform, sorry."
+    echo -e "$ERROR This is an unsupported platform, sorry."
     exit 1
     ;;
 esac
