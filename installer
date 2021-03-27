@@ -1618,7 +1618,7 @@ case $ROUTER_MODEL in
     exit 1
     ;;
   *)
-    echo -e "$INFO Detected $ROUTER_MODEL Model Router.
+    echo -e "$INFO Detected $ROUTER_MODEL Model Router."
     ;;
 esac
 
