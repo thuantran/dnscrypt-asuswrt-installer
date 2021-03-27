@@ -42,21 +42,9 @@ readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
 readonly TOML_ERR=$TARG_DIR/dnscrypt-proxy.toml.err
 readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
 readonly SCRIPT_LOC=$(readlink -f "$0")
-##$(basename "$0")
-
 
 _quote() {
   echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
-}
-
-ScriptHeader () {
-        clear
-        sed -n '2,24p' "$0"
-	check_jffs_enabled
-	check_dns_environment
-	cleanup
-	check_version
-	menu
 }
 
 backup_restore () {
@@ -830,7 +818,11 @@ end_op_message () {
   echo
   echo
   sleep 3
-  chmod 755 "$SCRIPT_LOC" && exec "$SCRIPT_LOC" && exit
+  if [ ! -f ${TARG_DIR}/installer ]; then
+    chmod 755 "$SCRIPT_LOC" && exec "$SCRIPT_LOC" && exit
+  else
+    chmod 755 "${TARG_DIR}/installer" && exec "${TARG_DIR}/installer" && exit
+  fi
 }
 
 inst_dnscrypt () {
@@ -867,22 +859,7 @@ inst_dnscrypt () {
     end_op_message
     return
   fi  
-  local MD5SUM_L
-  local MD5SUM_R
-  [ -f ${TARG_DIR}/installer ] && MD5SUM_L="$(md5sum ${TARG_DIR}/installer | cut -d' ' -f1)" && MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
-  if [ ! -f ${TARG_DIR}/installer ]; then 
-    download_file $TARG_DIR 755 $RURL
-  elif [ "$MD5SUM_R" != "$MD5SUM_L" ]; then
-    local NOW
-    read_yesno "Do you want to update installer?" && NOW=YES || NOW=NO
-    if [ "$NOW" == "YES" ]; then
-      echo -e "$INFO Downloading New Installer. Re-run option 1 to get any remaining updates.."
-      download_file $TARG_DIR 755 $RURL
-      exec ${TARG_DIR}/installer && exit
-    elif [ "$NOW" == "NO" ]; then
-      echo -e "$INFO Installer update Aborted! Re-run option 1 later if you change your mind.."
-    fi
-  fi
+  download_file $TARG_DIR 755 $RURL
   download_file $TARG_DIR 755 "$URL_GEN"/manager
   if [ -f ${TARG_DIR}/dnscrypt-proxy ]; then
     local LVERSION
@@ -1612,15 +1589,16 @@ write_manager_script () {
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 
+clear
 sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
   RT-AX56U|RT-AX58U|RT-AX3000)
-    echo "$ERROR This is an unsupported model, sorry."
+    echo "$ERROR This is an unsupported Router, sorry."
     exit 1
     ;;
   *)
-    echo -e "$INFO Detected $ROUTER_MODEL Model Router."
+    echo -e "$INFO Detected $ROUTER_MODEL Router."
     ;;
 esac
 
