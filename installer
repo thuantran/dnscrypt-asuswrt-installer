@@ -41,8 +41,9 @@ readonly TOML_FILE=$TARG_DIR/dnscrypt-proxy.toml
 readonly TOML_BAK=$TARG_DIR/dnscrypt-proxy.toml.bak
 readonly TOML_ERR=$TARG_DIR/dnscrypt-proxy.toml.err
 readonly TOML_ORI=$TARG_DIR/example-dnscrypt-proxy.toml
-readonly SCRIPT_LOC=$(basename "$0")
-#$(readlink -f "$0")
+readonly SCRIPT_LOC=$(readlink -f "$0")
+##$(basename "$0")
+
 
 _quote() {
   echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
@@ -829,7 +830,7 @@ end_op_message () {
   echo
   echo
   sleep 3
-  ./$SCRIPT_LOC && exit
+  chmod 755 "$SCRIPT_LOC" && exec "$SCRIPT_LOC" && exit
 }
 
 inst_dnscrypt () {
