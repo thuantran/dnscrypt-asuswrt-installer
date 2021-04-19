@@ -246,11 +246,12 @@ check_jffs_enabled () {
     echo -e "$ERROR JFFS partition is scheduled to be reformatted.\n$ERROR Please reboot to format or disable that setting and try again.\n$ERROR Exiting..."
     exit 1
   fi
-  local JFFS2_ENABLED=$(nvram get jffs2_enable)
   local JFFS2_SCRIPTS=$(nvram get jffs2_scripts)
+  [ -z "$(nvram get jffs2_enable)" ] && local JFFS2_ENABLED=$(nvram get jffs2_on) || local JFFS2_ENABLED=$(nvram get jffs2_enable)
+  [ -z "$(nvram get jffs2_enable)" ] && local jffs2_on=jffs2_on || local jffs2_on=jffs2_enable
   if [ "$JFFS2_ENABLED" -ne 1 ] || [ "$JFFS2_SCRIPTS" -ne 1 ]; then
     echo -e "$INFO JFFS custom scripts and configs are not enabled.\n$INFO Enabling them now!"
-    nvram set jffs2_enable=1
+    nvram set ${jffs2_on}=1
     nvram set jffs2_scripts=1
     nvram commit
   else
