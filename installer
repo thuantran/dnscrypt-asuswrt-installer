@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.1.9                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.0                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.1.9"
+DI_VERSION="v2.2.0"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -56,10 +56,10 @@ backup_restore () {
       read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
       if [ "$USE_OLD" == "YES" ]; then
         echo -e "$INFO Leaving Old Backup."
-	end_op_message
+		end_op_message
       elif [ "$USE_OLD" == "NO" ]; then
-	echo -e "$INFO Removing Old Backup."
-	rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
+		echo -e "$INFO Removing Old Backup."
+		rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
       fi
     fi
     tar -czvf $BASE_DIR/backup_dnscrypt.tar.gz -C $TARG_DIR ../dnscrypt/ >/dev/null 2>&1    
@@ -95,10 +95,6 @@ backup_restore () {
         $RESOLVERS_URL_PREFIX/relays.md.minisig
     fi 
     chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
-    del_jffs_script /jffs/scripts/wan-start dnscrypt-start
-    del_jffs_script /jffs/scripts/openvpn-event
-    del_jffs_script /jffs/scripts/firewall-start
-    del_jffs_script /jffs/scripts/wan-start
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -138,10 +134,6 @@ backup_restore () {
       $RESOLVERS_URL_PREFIX/relays.md \
       $RESOLVERS_URL_PREFIX/relays.md.minisig
     chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
-    del_jffs_script /jffs/scripts/wan-start dnscrypt-start
-    del_jffs_script /jffs/scripts/openvpn-event
-    del_jffs_script /jffs/scripts/firewall-start
-    del_jffs_script /jffs/scripts/wan-start
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -254,11 +246,12 @@ check_jffs_enabled () {
     echo -e "$ERROR JFFS partition is scheduled to be reformatted.\n$ERROR Please reboot to format or disable that setting and try again.\n$ERROR Exiting..."
     exit 1
   fi
-  local JFFS2_ENABLED=$(nvram get jffs2_enable)
   local JFFS2_SCRIPTS=$(nvram get jffs2_scripts)
+  [ -z "$(nvram get jffs2_enable)" ] && local JFFS2_ENABLED=$(nvram get jffs2_on) || local JFFS2_ENABLED=$(nvram get jffs2_enable)
+  [ -z "$(nvram get jffs2_enable)" ] && local jffs2_on=jffs2_on || local jffs2_on=jffs2_enable
   if [ "$JFFS2_ENABLED" -ne 1 ] || [ "$JFFS2_SCRIPTS" -ne 1 ]; then
     echo -e "$INFO JFFS custom scripts and configs are not enabled.\n$INFO Enabling them now!"
-    nvram set jffs2_enable=1
+    nvram set ${jffs2_on}=1
     nvram set jffs2_scripts=1
     nvram commit
   else
@@ -727,6 +720,10 @@ choose_relays_manual_next () {
 
 cleanup () {
   rm -f $TARG_DIR/dnscrypt-fw-rules $TARG_DIR/dnscrypt-start $TARG_DIR/dnsmasq-dnscrypt-reconfig $TARG_DIR/fake-hwclock* $TARG_DIR/init-start $TARG_DIR/services-stop
+  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
+  del_jffs_script /jffs/scripts/openvpn-event
+  del_jffs_script /jffs/scripts/firewall-start
+  del_jffs_script /jffs/scripts/wan-start
 }
 
 create_dir () {
@@ -900,10 +897,6 @@ inst_dnscrypt () {
     $RESOLVERS_URL_PREFIX/relays.md \
     $RESOLVERS_URL_PREFIX/relays.md.minisig
   chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig
-  del_jffs_script /jffs/scripts/wan-start dnscrypt-start
-  del_jffs_script /jffs/scripts/openvpn-event
-  del_jffs_script /jffs/scripts/firewall-start
-  del_jffs_script /jffs/scripts/wan-start
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   setup_dnscrypt
@@ -1482,9 +1475,7 @@ uninst_all () {
   rm -rf $TARG_DIR
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/init-start
-  del_jffs_script /jffs/scripts/firewall-start
-  del_jffs_script /jffs/scripts/services-stop
-  del_jffs_script /jffs/scripts/wan-start  
+  del_jffs_script /jffs/scripts/services-stop  
   killall -q -9 haveged rngd dnscrypt-proxy
   local MAN_PID="$(pidof manager)"
   local PID
@@ -1504,8 +1495,6 @@ uninst_dnscrypt () {
   echo -e "$INFO Uninstalling dnscrypt-proxy..."
   rm -f $TARG_DIR/dnscrypt-proxy $TARG_DIR/nonroot
   del_jffs_script /jffs/scripts/dnsmasq.postconf
-  del_jffs_script /jffs/scripts/firewall-start
-  del_jffs_script /jffs/scripts/wan-start
   killall -q dnscrypt-proxy
   service restart_dnsmasq >/dev/null 2>&1
   echo -e "$INFO Some configuration files are not removed in case you want to reinstall"
