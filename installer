@@ -1575,6 +1575,8 @@ write_manager_script () {
 
 [ "$1" ] && BRANCH=$1 || BRANCH=master
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL=$(nvram get productid) || ROUTER_MODEL=$(nvram get odmpid)
+ROUTER_OS=$(uname)
+ROUTER_ARCH=$(uname -m)
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 
@@ -1591,18 +1593,30 @@ case $ROUTER_MODEL in
     ;;
 esac
 
-case $(uname -m) in
-  armv7l)
-    URL_ARCH=$URL_ARCH/armv7
-    DNSCRYPT_ARCH=linux_arm
-    DNSCRYPT_ARCH_TAR=linux-arm
-    echo -e "$INFO Detected ARMv7 architecture."
+case $ROUTER_OS in
+  Linux)
+    echo -e "$INFO Detected $ROUTER_OS Platform."
+    ROUTER_OS=linux
     ;;
-  aarch64)
+  *)
+    echo -e "$ERROR This is an unsupported Platform, sorry."
+    ;;
+esac
+
+case $ROUTER_ARCH in
+  aarch64|arm64)
+    ROUTER_ARCH=arm64
     URL_ARCH=$URL_ARCH/armv8
-    DNSCRYPT_ARCH=linux_arm64
-    DNSCRYPT_ARCH_TAR=linux-arm64
+    DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+    DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
     echo -e "$INFO Detected ARMv8 architecture."
+    ;;
+  armv7l)
+    ROUTER_ARCH=arm
+    URL_ARCH=$URL_ARCH/armv7
+    DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+    DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
+    echo -e "$INFO Detected ARMv7 architecture."
     ;;
   # mips)
     # URL_ARCH=$URL_ARCH/mips
