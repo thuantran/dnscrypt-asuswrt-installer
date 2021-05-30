@@ -1585,21 +1585,22 @@ sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
   RT-AX56U|RT-AX58U|RT-AX3000)
-    echo -e "$ERROR This is an unsupported Router, sorry."
+    echo -e "$ERROR This is an unsupported router, sorry."
     exit 1
     ;;
   *)
-    echo -e "$INFO Detected $ROUTER_MODEL Router."
+    echo -e "$INFO Detected $ROUTER_MODEL router."
     ;;
 esac
 
 case $ROUTER_OS in
   Linux)
-    echo -e "$INFO Detected $ROUTER_OS Platform."
     ROUTER_OS=linux
+    echo -e "$INFO Detected $ROUTER_OS platform."
     ;;
   *)
-    echo -e "$ERROR This is an unsupported Platform, sorry."
+    echo -e "$ERROR This is an unsupported platform, sorry."
+    exit 1
     ;;
 esac
 
@@ -1627,7 +1628,7 @@ case $ROUTER_ARCH in
     # echo -e "$WARNING USE AT YOUR OWN RISK"
     # ;;
   *)
-    echo -e "$ERROR This is an unsupported platform, sorry."
+    echo -e "$ERROR This is an unsupported architecture, sorry."
     exit 1
     ;;
 esac
