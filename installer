@@ -1585,8 +1585,8 @@ sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
   RT-AX56U|RT-AX58U|RT-AX3000)
-    echo -e "$ERROR This is an unsupported router, sorry."
-    exit 1
+    echo -e "$INFO Detected $ROUTER_MODEL router."
+    CONDITIONAL_ARCH=TRUE
     ;;
   *)
     echo -e "$INFO Detected $ROUTER_MODEL router."
@@ -1603,35 +1603,42 @@ case $ROUTER_OS in
     exit 1
     ;;
 esac
-
-case $ROUTER_ARCH in
-  aarch64|arm64)
-    ROUTER_ARCH=arm64
-    URL_ARCH=$URL_ARCH/armv8
-    DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
-    DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
-    echo -e "$INFO Detected ARMv8 architecture."
-    ;;
-  armv7l)
-    ROUTER_ARCH=arm
-    URL_ARCH=$URL_ARCH/armv7
-    DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
-    DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
-    echo -e "$INFO Detected ARMv7 architecture."
-    ;;
-  # mips)
-    # URL_ARCH=$URL_ARCH/mips
-    # DNSCRYPT_ARCH=linux_mipsle
-    # DNSCRYPT_ARCH_TAR=linux-mipsle
-    # echo -e "$INFO Detected MIPSEL architecture."
-    # echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
-    # echo -e "$WARNING USE AT YOUR OWN RISK"
-    # ;;
-  *)
-    echo -e "$ERROR This is an unsupported architecture, sorry."
-    exit 1
-    ;;
-esac
+if [ "$CONDITIONAL_ARCH" = "TRUE" ]; then
+  ROUTER_ARCH=arm
+  URL_ARCH=$URL_ARCH/armv7
+  DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+  DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
+  echo -e "$INFO Detected ARMv7 architecture."
+else
+  case $ROUTER_ARCH in
+    aarch64|arm64)
+      ROUTER_ARCH=arm64
+      URL_ARCH=$URL_ARCH/armv8
+      DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+      DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
+      echo -e "$INFO Detected ARMv8 architecture."
+      ;;
+    armv7l)
+      ROUTER_ARCH=arm
+      URL_ARCH=$URL_ARCH/armv7
+      DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+      DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
+      echo -e "$INFO Detected ARMv7 architecture."
+      ;;
+    # mips)
+      # URL_ARCH=$URL_ARCH/mips
+      # DNSCRYPT_ARCH=linux_mipsle
+      # DNSCRYPT_ARCH_TAR=linux-mipsle
+      # echo -e "$INFO Detected MIPSEL architecture."
+      # echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
+      # echo -e "$WARNING USE AT YOUR OWN RISK"
+      # ;;
+    *)
+      echo -e "$ERROR This is an unsupported architecture, sorry."
+      exit 1
+      ;;
+  esac
+fi
 
 check_jffs_enabled
 check_dns_environment
