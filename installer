@@ -1619,14 +1619,6 @@ case $ROUTER_ARCH in
     DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
     echo -e "$INFO Detected ARMv7 architecture."
     ;;
-  # mips)
-   # URL_ARCH=$URL_ARCH/mips
-   # DNSCRYPT_ARCH=linux_mipsle
-   # DNSCRYPT_ARCH_TAR=linux-mipsle
-   # echo -e "$INFO Detected MIPSEL architecture."
-   # echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
-   # echo -e "$WARNING USE AT YOUR OWN RISK"
-   # ;;
   *)
     echo -e "$ERROR This is an unsupported architecture, sorry."
     exit 1
