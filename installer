@@ -1306,8 +1306,8 @@ setup_dnscrypt_impl () {
     read_input_dns "Default is" 9.9.9.9
     read_input_dns_n "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_nvars_replace "fallback_resolver =" "fallback_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
+    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write "$GVARS_ARGS"
     echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
