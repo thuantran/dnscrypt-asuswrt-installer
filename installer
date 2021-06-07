@@ -1306,8 +1306,8 @@ setup_dnscrypt_impl () {
     read_input_dns "Default is" 9.9.9.9
     read_input_dns_n "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_nvars_replace "fallback_resolver =" "fallback_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_gvars_prep fallback_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
+    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write "$GVARS_ARGS"
     echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
@@ -1575,6 +1575,8 @@ write_manager_script () {
 
 [ "$1" ] && BRANCH=$1 || BRANCH=master
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL=$(nvram get productid) || ROUTER_MODEL=$(nvram get odmpid)
+ROUTER_OS=$(uname)
+ROUTER_ARCH=$(uname -m)
 URL_GEN=https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/$BRANCH/gen
 URL_ARCH=https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/$BRANCH
 
@@ -1582,41 +1584,47 @@ clear
 sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
-  RT-AX56U|RT-AX58U|RT-AX3000)
-    echo -e "$ERROR This is an unsupported Router, sorry."
-    exit 1
-    ;;
+  #RT-AX56U|RT-AX58U|RT-AX3000)
+  #  echo -e "$INFO Detected $ROUTER_MODEL router."
+  #  CONDITIONAL_ARCH=TRUE
+  #  ;;
   *)
-    echo -e "$INFO Detected $ROUTER_MODEL Router."
+    echo -e "$INFO Detected $ROUTER_MODEL router."
     ;;
 esac
 
-case $(uname -m) in
-  armv7l)
-    URL_ARCH=$URL_ARCH/armv7
-    DNSCRYPT_ARCH=linux_arm
-    DNSCRYPT_ARCH_TAR=linux-arm
-    echo -e "$INFO Detected ARMv7 architecture."
+case $ROUTER_OS in
+  Linux)
+    ROUTER_OS=linux
+    echo -e "$INFO Detected $ROUTER_OS platform."
     ;;
-  aarch64)
-    URL_ARCH=$URL_ARCH/armv8
-    DNSCRYPT_ARCH=linux_arm64
-    DNSCRYPT_ARCH_TAR=linux-arm64
-    echo -e "$INFO Detected ARMv8 architecture."
-    ;;
-  # mips)
-    # URL_ARCH=$URL_ARCH/mips
-    # DNSCRYPT_ARCH=linux_mipsle
-    # DNSCRYPT_ARCH_TAR=linux-mipsle
-    # echo -e "$INFO Detected MIPSEL architecture."
-    # echo -e "$WARNING FOR TESTING ONLY, MIGHT NOT WORK AT ALL"
-    # echo -e "$WARNING USE AT YOUR OWN RISK"
-    # ;;
   *)
     echo -e "$ERROR This is an unsupported platform, sorry."
     exit 1
     ;;
 esac
+
+case $ROUTER_ARCH in    
+  aarch64|arm64)
+    ROUTER_ARCH=arm64
+    URL_ARCH=$URL_ARCH/armv8
+    DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+    DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
+    echo -e "$INFO Detected ARMv8 architecture."
+    ;;
+  armv7l)
+    ROUTER_ARCH=arm
+    URL_ARCH=$URL_ARCH/armv7
+    DNSCRYPT_ARCH=${ROUTER_OS}_${ROUTER_ARCH}
+    DNSCRYPT_ARCH_TAR=${ROUTER_OS}-${ROUTER_ARCH}
+    echo -e "$INFO Detected ARMv7 architecture."
+    ;;
+  *)
+    echo -e "$ERROR This is an unsupported architecture, sorry."
+    exit 1
+    ;;
+esac
+
 
 check_jffs_enabled
 check_dns_environment
