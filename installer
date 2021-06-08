@@ -321,7 +321,6 @@ check_anonymized_support () {
 	      read_yesno "Do you want to use via=['*'] for wildcard relay support or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual
               eval toml_avars_write "$AVARS_ARGS"
             else
-              echo -e "$INFO Found $DNSCRYPT server."
 	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You can choose manually choose relays for $DNSCRYPT server or you may specify wild-card relay."
               read_yesno "Do you want to use via=['*'] for wildcard relay support or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next
             fi
