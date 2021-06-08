@@ -266,10 +266,10 @@ check_anonymized_automatic () {
     read_yesno "Do you still want to setup wildcard relay/server support?" && AUTOMATIC=true || AUTOMATIC=false
     if [ "$AUTOMATIC" == "true" ]; then
       local USE_BROKEN
-	  echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
+      echo -e "$INFO This allows for the use of server_name='*' as wildcard for servers used with relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
       read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
       toml_avars_prep skip_incompatible $USE_BROKEN
-      read_yesno "Do you want to via=['*'] for wildcard relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
+      read_yesno "Do you want to use via=['*'] for wildcard relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
     else
       echo -e "$INFO Continue without Relays Support"
       toml_avars_prep skip_incompatible false
@@ -279,7 +279,7 @@ check_anonymized_automatic () {
     echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
     read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
     toml_avars_prep skip_incompatible $USE_BROKEN
-	read_yesno "Do you want to via=['*'] for wild card relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
+    read_yesno "Do you want to use via=['*'] for wild card relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
   fi
 }
 
@@ -350,7 +350,7 @@ check_anonymized_support () {
         if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ]; then
           local AVARS_ARGS
           echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
-          read_yesno "Do you still want to setup Wild-Card Relay Support?" && check_anonymized_automatic 0 || check_anonymized_disabled
+          read_yesno "Do you still want to setup wildcard relay support?" && check_anonymized_automatic 0 || check_anonymized_disabled
           eval toml_avars_write "$AVARS_ARGS"
         fi
         ;;
