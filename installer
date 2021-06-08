@@ -350,7 +350,7 @@ check_anonymized_support () {
         if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ]; then
           local AVARS_ARGS
           echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
-          read_yesno "Do you still want to setup wildcard relay support?" && check_anonymized_automatic 0 || check_anonymized_disabled
+          read_yesno "Do you still want to setup wildcard relay/server support?" && check_anonymized_automatic 0 || check_anonymized_disabled
           eval toml_avars_write "$AVARS_ARGS"
         fi
         ;;
