@@ -695,7 +695,7 @@ choose_relays_manual () {
 }
 
 choose_relays_manual_wildcard () {
-	toml_avars_prep routes "\"[ { server_name='$SERVER', via=['*'] } ]\""
+  toml_avars_prep routes "\"[ { server_name='$SERVER', via=['*'] } ]\""
 }
 
 choose_relays_manual_next () {
@@ -729,7 +729,7 @@ choose_relays_manual_next () {
 }
 
 choose_relays_manual_next_wildcard () {
-	toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=['*'] } ]" $TOML_FILE
+  toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=['*'] } ]" $TOML_FILE
 }
 
 cleanup () {
