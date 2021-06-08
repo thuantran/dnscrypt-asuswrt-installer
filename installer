@@ -263,20 +263,20 @@ check_anonymized_automatic () {
   if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ]; then
     local AUTOMATIC
     echo -e "$INFO Servers that are potentially not compatible with relays are detected!\n$WARNING These servers might not work with relays.\n$WARNING Use at your own risk."
-    read_yesno "Do you still want to setup Wild-Card Relay/Server Support?" && AUTOMATIC=true || AUTOMATIC=false
+    read_yesno "Do you still want to setup wildcard relay/server support?" && AUTOMATIC=true || AUTOMATIC=false
     if [ "$AUTOMATIC" == "true" ]; then
       local USE_BROKEN
 	  echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
       read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
       toml_avars_prep skip_incompatible $USE_BROKEN
-      read_yesno "Do you want to via=['*'] for wild card relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
+      read_yesno "Do you want to via=['*'] for wildcard relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
     else
       echo -e "$INFO Continue without Relays Support"
       toml_avars_prep skip_incompatible false
     fi
   else
     local USE_BROKEN
-	echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
+    echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
     read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
     toml_avars_prep skip_incompatible $USE_BROKEN
 	read_yesno "Do you want to via=['*'] for wild card relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
@@ -318,13 +318,12 @@ check_anonymized_support () {
             if [ $COUNT -eq 0 ]; then
               local AVARS_ARGS
               echo -e "$INFO Found $DNSCRYPT server.\n$INFO You can choose manually choose relays for $DNSCRYPT server or you may specify wild-card relay."
-			  read_yesno "Do you want to use via=['*'] for wild card relay support or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual
+	      read_yesno "Do you want to use via=['*'] for wildcard relay support or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual
               eval toml_avars_write "$AVARS_ARGS"
             else
               echo -e "$INFO Found $DNSCRYPT server."
-			  echo -e "$INFO Found $DNSCRYPT server.\n$INFO You can choose manually choose relays for $DNSCRYPT server or you may specify wild-card relay."
-			  read_yesno "Do you want to use via=['*'] for wild card relay support or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next
-              choose_relays_manual_next
+	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You can choose manually choose relays for $DNSCRYPT server or you may specify wild-card relay."
+              read_yesno "Do you want to use via=['*'] for wildcard relay support or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next
             fi
             COUNT=$((COUNT + 1))
           fi
