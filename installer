@@ -279,7 +279,7 @@ check_anonymized_automatic () {
     echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
     read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
     toml_avars_prep skip_incompatible $USE_BROKEN
-    read_yesno "Do you want to use via=['*'] for wild card relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
+    read_yesno "Do you want to use via=['*'] for wildcard relay support?" && choose_relays_automatic_wildcard || choose_relays_automatic
   fi
 }
 
@@ -291,7 +291,7 @@ check_anonymized_disabled () {
 
 check_anonymized_support () {
   if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
-    echo -e "$INFO Checking for Anonymized Dnscrypt Support.\n..\n...\n....\n.....\n......\n$INFO You may specify Wild-card Relay Support (server_name "*") with option 1 (this supports only DNSCrypt Servers).\n$WARNING All DNSCRYPT Server traffic will be sent through same set of chosen Relays with Wild-Card Option.\n$INFO Option 2 gives you the choice to Setup Relays per Dnscrypt-Server.\n$INFO Option 3 allows you to skip relay configuration or remove old relays configurations.\n$WARNING Option 1 & 2 delete old relay configurations.\n$WARNING Issues may occur if you are not using same servers as defined in relays.\n$INFO What do you want to do:\n  1) All Servers with Wild-Card Relay Support.\n  2) Pick Relays for DNSCRYPT servers (Per Server).\n  3) Skip Setting-up/Modifying Relay Support."
+    echo -e "$INFO Checking for Anonymized Dnscrypt Support.\n..\n...\n....\n.....\n......\n$INFO You may specify wildcard relay/server support (via=['*'])/(server_name "*") with option 1 (this supports only DNSCrypt Servers).\n$WARNING All DNSCRYPT Server traffic will be sent through same set of chosen relays with wildcard Option.\n$INFO Option 2 gives you the choice to setup relays per Dnscrypt-Server.\n$INFO Option 3 allows you to skip relay configuration or remove old relays configurations.\n$WARNING Option 1 & 2 delete old relay configurations.\n$WARNING Issues may occur if you are not using same servers as defined in relays.\n$INFO What do you want to do:\n  1) All Servers with wildcard relay/server support.\n  2) Pick relays for DNSCRYPT servers (Per Server).\n  3) Skip setting-up/modifying relay support."
     read_input_num "Your choice" 1 3
     case $CHOSEN in
       1) 
@@ -317,11 +317,11 @@ check_anonymized_support () {
             echo -e "$INFO The installer detected support for Anonymized Dnscrypt\n$INFO Choose Relays for DNSCRYPT server"
             if [ $COUNT -eq 0 ]; then
               local AVARS_ARGS
-              echo -e "$INFO Found $DNSCRYPT server.\n$INFO You can choose manually choose relays for $DNSCRYPT server or you may specify wild-card relay."
+              echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay."
 	      read_yesno "Do you want to use via=['*'] for wildcard relay support or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual
               eval toml_avars_write "$AVARS_ARGS"
             else
-	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You can choose manually choose relays for $DNSCRYPT server or you may specify wild-card relay."
+	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay."
               read_yesno "Do you want to use via=['*'] for wildcard relay support or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next
             fi
             COUNT=$((COUNT + 1))
