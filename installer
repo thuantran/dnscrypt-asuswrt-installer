@@ -483,27 +483,29 @@ check_version () {
 }
 
 choose_dnscrypt_server () {
-  local USE_IPV6
-  read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
-  toml_gvars_prep ipv6_servers $USE_IPV6
-  echo -e "$INFO Choose DNS resolving load balancing strategy:\n  1) p2 (default)\n  2) ph\n  3) first\n  4) random"
-  read_input_num "Select your mode" 1 4
-  case $CHOSEN in
-    1)
-      toml_gvars_prep lb_strategy "\'p2\'"
-      ;;
-    2)
-      toml_gvars_prep lb_strategy "\'ph\'"
-      ;;
-    3)
-      toml_gvars_prep lb_strategy "\'first\'"
-      ;;
-    4)
-      toml_gvars_prep lb_strategy "\'random\'"
-      ;;
-  esac
-  read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE=true || USE_LBE=false
-  toml_gvars_prep lb_estimator $USE_LBE
+  if [ "$1" -eq 0 ]; then  
+    local USE_IPV6
+    read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
+    toml_gvars_prep ipv6_servers $USE_IPV6
+    echo -e "$INFO Choose DNS resolving load balancing strategy:\n  1) p2 (default)\n  2) ph\n  3) first\n  4) random"
+    read_input_num "Select your mode" 1 4
+    case $CHOSEN in
+      1)
+        toml_gvars_prep lb_strategy "\'p2\'"
+        ;;
+      2)
+        toml_gvars_prep lb_strategy "\'ph\'"
+        ;;
+      3)
+        toml_gvars_prep lb_strategy "\'first\'"
+        ;;
+      4)
+        toml_gvars_prep lb_strategy "\'random\'"
+        ;;
+    esac
+    read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE=true || USE_LBE=false
+    toml_gvars_prep lb_estimator $USE_LBE
+  fi
   echo -e "$INFO Choose how your DNS servers are selected:\n  1) Automatically\n  2) Manually\n  3) Static"
   read_input_num "Select your mode" 1 3
   case $CHOSEN in
@@ -601,33 +603,21 @@ choose_dnscrypt_server_manual () {
 choose_dnscrypt_server_static () {
   echo -e "$INFO This feature allows you to define a single server or multiple servers using the sdns stamp of the server.\n$INFO This assigns the server with a custom name you can specify as a static option.\n$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option.\n$INFO If you do not want to continue down this path please select option 3 to return to server selection menu.\n$INFO What do you want to do:\n  1) Setup Static Servers Only.\n  2) Setup Static Servers with Addition of Manually Chosen Servers.\n  3) Go back to server selection menu."
   read_input_num "Your choice" 1 3
-    case $CHOSEN in
-      1)
-        echo -e "$INFO You have specified to define a Static Server."
-        read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-        static_chosen 0
-        ;;
-      2)
-        echo -e "$INFO You have chosen select Manually Chosen Servers First."
-        read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-        static_choose_manual_addition
-        ;;
-      3)
-        echo -e "$INFO You have chosen to go back.\n$INFO Choose how your DNS servers are selected:\n  1) Automatically\n  2) Manually\n  3) Static"
-        read_input_num "Select your mode" 1 3
-        case $CHOSEN in
-          1)
-            choose_dnscrypt_server_auto
-            ;;
-          2)
-            choose_dnscrypt_server_manual
-            ;;
-          3)
-            choose_dnscrypt_server_static
-            ;;
-        esac
-        ;;
-    esac
+  case $CHOSEN in
+    1)
+      echo -e "$INFO You have specified to define a Static Server."
+      read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
+      static_chosen 0
+      ;;
+    2)
+      echo -e "$INFO You have chosen select Manually Chosen Servers First."
+      read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
+      static_choose_manual_addition
+      ;;
+    3)
+      choose_dnscrypt_server
+      ;;
+  esac
 }
 
 choose_relays_automatic () {
@@ -1315,7 +1305,7 @@ setup_dnscrypt_impl () {
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
     toml_gvar_enable dnscrypt_ephemeral_keys
     toml_gvar_enable tls_disable_session_tickets
-    choose_dnscrypt_server
+    choose_dnscrypt_server 0
     echo -e "$INFO Set the DNS server(s) for initializing dnscrypt-proxy\n$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 9.9.9.9
     read_input_dns_n "2nd Default is" 8.8.8.8
