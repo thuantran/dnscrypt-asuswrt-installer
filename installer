@@ -601,33 +601,42 @@ choose_dnscrypt_server_manual () {
 choose_dnscrypt_server_static () {
   echo -e "$INFO This feature allows you to define a single server or multiple servers using the sdns stamp of the server.\n$INFO This assigns the server with a custom name you can specify as a static option.\n$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option.\n$INFO If you do not want to continue down this path please select option 3 to return to server selection menu.\n$INFO What do you want to do:\n  1) Setup Static Servers Only.\n  2) Setup Static Servers with Addition of Manually Chosen Servers.\n  3) Go back to server selection menu."
   read_input_num "Your choice" 1 3
-    case $CHOSEN in
-      1)
-        echo -e "$INFO You have specified to define a Static Server."
-        read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-        static_chosen 0
-        ;;
-      2)
-        echo -e "$INFO You have chosen select Manually Chosen Servers First."
-        read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-        static_choose_manual_addition
-        ;;
-      3)
-        echo -e "$INFO You have chosen to go back.\n$INFO Choose how your DNS servers are selected:\n  1) Automatically\n  2) Manually\n  3) Static"
-        read_input_num "Select your mode" 1 3
-        case $CHOSEN in
-          1)
-            choose_dnscrypt_server_auto
-            ;;
-          2)
-            choose_dnscrypt_server_manual
-            ;;
-          3)
-            choose_dnscrypt_server_static
-            ;;
-        esac
-        ;;
-    esac
+  case $CHOSEN in
+    1)
+      echo -e "$INFO You have specified to define a Static Server."
+      read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
+      static_chosen 0
+      ;;
+    2)
+      echo -e "$INFO You have chosen select Manually Chosen Servers First."
+      read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
+      static_choose_manual_addition
+      ;;
+    3)
+      echo -e "$INFO You have chosen to go back.\n$INFO Choose how your DNS servers are selected:\n  1) Automatically\n  2) Manually\n  3) Static"
+      read_input_num "Select your mode" 1 3
+      case $CHOSEN in
+        1)
+          choose_dnscrypt_server_auto
+          read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED=true || CHOOSE_DISABLED=false
+          if [ "$CHOOSE_DISABLED" == "true" ]; then
+            choose_dnscrypt_server_disabled
+          elif [ "$CHOOSE_DISABLED" == "false" ]; then
+            echo -e "$INFO Continuing without disabling any DNS servers."
+            toml_gvar_disable disabled_server_names
+          fi
+          ;;
+        2)
+          toml_gvar_disable disabled_server_names
+          choose_dnscrypt_server_manual
+          ;;
+        3)
+          toml_gvar_disable disabled_server_names
+          choose_dnscrypt_server_static
+          ;;
+      esac
+      ;;
+  esac
 }
 
 choose_relays_automatic () {
