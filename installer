@@ -542,7 +542,7 @@ choose_dnscrypt_server_auto () {
 choose_dnscrypt_server_disabled () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RESOLVERS
     echo -e "$INFO Available DNS servers to disable: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
@@ -572,7 +572,7 @@ choose_dnscrypt_server_disabled () {
 choose_dnscrypt_server_manual () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RESOLVERS
     toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
@@ -623,7 +623,7 @@ choose_dnscrypt_server_static () {
 choose_relays_automatic () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RELAYS
     echo -e "$INFO Available Relay servers: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
@@ -657,7 +657,7 @@ choose_relays_automatic_wildcard () {
 choose_relays_manual () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RELAYS
     echo -e "$INFO Available Relay servers: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
@@ -691,7 +691,7 @@ choose_relays_manual_wildcard () {
 choose_relays_manual_next () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RELAYS
     echo -e "$INFO Available Relay servers: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
@@ -1219,7 +1219,7 @@ static_chosen_manual () {
 static_choose_manual_addition () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="ipv6"
+    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RESOLVERS
     toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
