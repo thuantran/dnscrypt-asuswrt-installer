@@ -320,7 +320,7 @@ check_anonymized_support () {
         local SERVER
         COUNT=0
         for DNSCRYPT in $VARSARGS; do
-          if [ "$(grep '^server_names = .*'${DNSCRYPT}'.*' $TOML_FILE)" ]; then
+          if [ "$(grep '^server_names = .*'${DNSCRYPT}'.*' $TOML_FILE | fgrep -c "'${DNSCRYPT}'")" -ne 0 ]; then
             SERVER=$(echo "$DNSCRYPT")
             echo -e "$INFO The installer detected support for Anonymized Dnscrypt\n$INFO Choose Relays for DNSCRYPT server"
             if [ $COUNT -eq 0 ]; then
@@ -336,7 +336,7 @@ check_anonymized_support () {
           fi
         done
         for ODOH in $OVARSARGS; do
-          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE)" ]; then
+          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE | fgrep -c "'${ODOH}'")" -ne 0 ]; then
             SERVER=$(echo "$ODOH")
             echo -e "$INFO The installer detected support for ODOH Relay\n$INFO Choose Relays for ODOH server"
             if [ $COUNT -eq 0 ]; then
@@ -358,7 +358,7 @@ check_anonymized_support () {
         local NUMFRAG
         NUMFRAG=0
         for BLOCKED in $FRAGSBLOCKED; do
-         if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE)" ]; then
+         if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE | fgrep -c "'${BLOCKED}'")" -ne 0 ]; then
             if [ "$NUMFRAG" -eq 0 ]; then
               local AVARS_ARGS=""
               local USE_BROKEN
@@ -393,7 +393,7 @@ check_anonymized_support () {
         local SERVER
         COUNT=0
         for ODOH in $VARSARGS; do
-          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE)" ]; then
+          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE | fgrep -c "'${ODOH}'")" -ne 0 ]; then
             SERVER=$(echo "$ODOH")
             echo -e "$INFO The installer detected support for ODOH Relay\n$INFO Choose Relays for ODOH server"
             if [ $COUNT -eq 0 ]; then
