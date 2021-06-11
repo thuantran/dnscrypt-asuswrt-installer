@@ -619,13 +619,13 @@ choose_dnscrypt_server_disabled () {
     if [ $? -eq 1 ]; then
 	  if [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
 	    read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false
-		if [ "$ODOH_DISABLED" == "true" ]; then
-		  choose_dnscrypt_server_disabled_odoh
-		elif [ "$ODOH_DISABLED" == "false" ]; then
-		  toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
-		fi
+            if [ "$ODOH_DISABLED" == "true" ]; then
+              choose_dnscrypt_server_disabled_odoh
+            elif [ "$ODOH_DISABLED" == "false" ]; then
+	      toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
+            fi
 	  else
-        toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
+            toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
 	  fi
       return
     fi
@@ -773,7 +773,6 @@ choose_relays_automatic () {
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
       if [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
-	ODOH_ENABLED
 	echo -e "$INFO Now to pick relays for ODOH SERVERS."
 	choose_relays_automatic_odoh
       else
