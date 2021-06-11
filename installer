@@ -1433,7 +1433,11 @@ static_chosen_manual () {
       read -r SDNSSTAMP
     elif [ "$ANOTHER" == "NO" ]; then
       echo -e "$INFO You have finished static setup."
-      toml_gvars_prep server_names "\"[${STATICRESOLVER}, $RESOLVERS]\""
+      if [ "$ODOH_ENABLE" == "true" ]; then
+        toml_gvars_prep server_names "\"[${STATICRESOLVER}, $ORESOLVERS, $RESOLVERS]\""
+      elif [ "$ODOH_ENABLE" == "false" ]; then
+        toml_gvars_prep server_names "\"[${STATICRESOLVER}, $RESOLVERS]\""
+      fi    
       return
     fi
   fi
@@ -1459,7 +1463,7 @@ static_choose_manual_addition () {
   if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RESOLVERS
-    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true odoh_servers false require_dnssec false require_nolog false require_nofilter false
+    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
@@ -1467,7 +1471,13 @@ static_choose_manual_addition () {
   else
     read_input_num "Please choose next DNS server or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then
-      static_chosen_manual 0
+      read_yesno "Do you want to choose which ODoH servers to enable?" && ODOH_ENABLE=true || ODOH_ENABLE=false
+      if [ "$ODOH_ENABLE" == "true" ]; then
+        static_choose_odoh
+      elif [ "$ODOH_ENABLE" == "false" ]; then
+	toml_gvars_prep odoh_servers false
+	static_chosen_manual 0
+      fi    
       return
     fi
   fi
@@ -1483,6 +1493,36 @@ static_choose_manual_addition () {
     fi
   fi
   static_choose_manual_addition "$INDEX"
+}
+
+static_choose_odoh () {
+  local INDEX=$1
+  if [ -z "$INDEX" ]; then
+    local ORESOLVERS
+    toml_gvars_prep odoh_servers true
+    echo -e "$INFO Available DNS servers: "
+    INDEX=$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' $TARG_DIR/odoh.md | wc -l)
+    awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/odoh.md
+    read_input_num "Please choose DNS server." 1 "$INDEX"
+  else
+    read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
+    if [ $? -eq 1 ]; then
+      static_chosen_manual 0
+      return
+    fi
+  fi
+  local OITEM
+  OITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md)
+  if [ "$(echo "$ORESOLVERS" | grep -F "'$OITEM'")" ]; then
+    echo -e "$INFO $OITEM is already set"
+  else
+    if [ "$ORESOLVERS" ]; then
+      ORESOLVERS="${ORESOLVERS%?}', '$OITEM'"
+    else
+      ORESOLVERS="'$OITEM'"
+    fi
+  fi
+  static_choose_odoh "$INDEX"
 }
 
 setup_dnscrypt () {
