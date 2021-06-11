@@ -336,7 +336,7 @@ check_anonymized_support () {
           fi
         done
         for ODOH in $OVARSARGS; do
-          if [ "$(grep '^server_names = .*'$ODOH'.*' $TOML_FILE)" ]; then
+          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE)" ]; then
             SERVER=$(echo "$ODOH")
             echo -e "$INFO The installer detected support for ODOH Relay\n$INFO Choose Relays for ODOH server"
             if [ $COUNT -eq 0 ]; then
