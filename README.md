@@ -10,7 +10,7 @@ To resolve all problems associated with installing Dnscrypt-Proxy with Entware (
 - No known issue
 
 # Current features:
-- [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with DoH and DNSCrypt version 2 protocols, multiple resolvers, and other features
+- [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with ODoH, DoH, and DNSCrypt version 2 protocols, multiple resolvers, and other features
 - Running as nobody through nonroot binary (using --user requires change to passwd)
 - Support ARM based routers
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
