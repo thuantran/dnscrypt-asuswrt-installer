@@ -1543,8 +1543,8 @@ setup_dnscrypt_impl () {
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
     toml_gvar_enable dnscrypt_ephemeral_keys
     toml_gvar_enable tls_disable_session_tickets
-	toml_gvar_enable disabled_server_names
-	toml_nvars_replace "# [sources.'odoh']" "[sources.'odoh']" $TOML_FILE
+    toml_gvar_enable disabled_server_names
+    toml_nvars_replace "# [sources.'odoh']" "[sources.'odoh']" $TOML_FILE
     toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" $TOML_FILE
     toml_nvars_replace "# cache_file = 'odoh.md'" "cache_file = 'odoh.md'" $TOML_FILE
     toml_nvars_replace "# minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" $TOML_FILE
