@@ -56,10 +56,10 @@ backup_restore () {
       read_yesno "Do you want to continue?(this will remove the old backup)" && USE_OLD=NO || USE_OLD=YES
       if [ "$USE_OLD" == "YES" ]; then
         echo -e "$INFO Leaving Old Backup."
-		end_op_message
+	end_op_message
       elif [ "$USE_OLD" == "NO" ]; then
-		echo -e "$INFO Removing Old Backup."
-		rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
+	echo -e "$INFO Removing Old Backup."
+	rm -rf $BASE_DIR/backup_dnscrypt.tar.gz
       fi
     fi
     tar -czvf $BASE_DIR/backup_dnscrypt.tar.gz -C $TARG_DIR ../dnscrypt/ >/dev/null 2>&1    
@@ -336,7 +336,7 @@ check_anonymized_support () {
           fi
         done
         for ODOH in $OVARSARGS; do
-          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE)" ]; then
+          if [ "$(grep '^server_names = .*'$ODOH'.*' $TOML_FILE)" ]; then
             SERVER=$(echo "$ODOH")
             echo -e "$INFO The installer detected support for ODOH Relay\n$INFO Choose Relays for ODOH server"
             if [ $COUNT -eq 0 ]; then
