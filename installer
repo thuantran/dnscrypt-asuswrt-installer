@@ -266,24 +266,22 @@ check_jffs_enabled () {
 check_anonymized_automatic () {
   if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*NextDNS-Custom.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ] || [ "$(grep '^server_names = .*Static.*' $TOML_FILE)" ]; then
     local AUTOMATIC
-    echo -e "$INFO Servers that are potentially not compatible with relays are detected!\n$WARNING These servers might not work with relays.\n$WARNING Use at your own risk."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && AUTOMATIC=true || AUTOMATIC=false
-    if [ "$AUTOMATIC" == "true" ]; then
-      local USE_BROKEN
-      echo -e "$INFO This allows for the use of server_name='*' as wildcard for servers used with relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
-      read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
-      toml_avars_prep skip_incompatible $USE_BROKEN
-      read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_automatic_wildcard || choose_relays_automatic
-    else
-      echo -e "$INFO Continue without Relays Support"
-      toml_avars_prep skip_incompatible false
-    fi  
+    echo -e "$INFO Custom Servers that are potentially not compatible with relays are detected!\n$WARNING These servers might not work with relays.\n$WARNING Use at your own risk."
+    local USE_BROKEN
+    echo -e "$INFO This allows for the use of server_name='*' as wildcard for servers used with relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
+    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+    [ "$USE_WILDCARD" == "YES"] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+    [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic
+    read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
+    toml_avars_prep skip_incompatible $USE_BROKEN
   else
     local USE_BROKEN
     echo -e "$INFO This allows for the use of server_name='*' as wildcard for relays.\n$INFO This means that this will be the default route for all servers.\n$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
+    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+    [ "$USE_WILDCARD" == "YES"] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+    [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic
     read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
     toml_avars_prep skip_incompatible $USE_BROKEN
-    read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_automatic_wildcard || choose_relays_automatic
   fi
 }
 
@@ -302,7 +300,7 @@ check_anonymized_support () {
       1) 
         local AVARS_ARGS
         toml_avar_enable routes
-        echo -e "$INFO This option allows you to setup wildcard relay support for all compatible servers."
+        echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
         check_anonymized_automatic 0
         eval toml_avars_write "$AVARS_ARGS"			
         ;;
@@ -325,12 +323,16 @@ check_anonymized_support () {
             echo -e "$INFO The installer detected support for Anonymized Dnscrypt\n$INFO Choose Relays for DNSCRYPT server"
             if [ $COUNT -eq 0 ]; then
               local AVARS_ARGS
-              echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay."
-	      read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual
+              echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay (via=['*'])."
+              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+              [ "$USE_WILDCARD" == "YES"] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual
               eval toml_avars_write "$AVARS_ARGS"
             else
-	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next
+	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay (via=['*'])."
+              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+              [ "$USE_WILDCARD" == "YES"] && choose_relays_manual_next_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_next
             fi
             COUNT=$((COUNT + 1))
           fi
@@ -338,15 +340,19 @@ check_anonymized_support () {
         for ODOH in $OVARSARGS; do
           if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE | fgrep -c "'${ODOH}'")" -ne 0 ]; then
             SERVER=$(echo "$ODOH")
-            echo -e "$INFO The installer detected support for ODOH Relay\n$INFO Choose Relays for ODOH server"
+            echo -e "$INFO The installer detected support for ODoH Relay\n$INFO Choose the required ODoH Relays for ODoH server"
             if [ $COUNT -eq 0 ]; then
               local AVARS_ARGS
-              echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay."
-	      read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual_odoh
+              echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
+              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+              [ "$USE_WILDCARD" == "YES"] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
               eval toml_avars_write "$AVARS_ARGS"
             else
-	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next_odoh
+	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
+              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+              [ "$USE_WILDCARD" == "YES"] && choose_relays_manual_next_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_next_odoh
             fi
             COUNT=$((COUNT + 1))
           fi
@@ -373,12 +379,12 @@ check_anonymized_support () {
         if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ]; then
           local AVARS_ARGS
           echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
-          read_yesno "Do you still want to setup wildcard relay/server support?" && check_anonymized_automatic 0 || check_anonymized_disabled
+          read_yesno "Do you still want to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
           eval toml_avars_write "$AVARS_ARGS"
         elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
           local AVARS_ARGS
-          echo -e "$INFO This option allows you to setup wildcard relay/support support required for ODoH servers."
-          read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_automatic_wildcard || choose_relays_automatic 0
+          echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
+          check_anonymized_automatic 0
           eval toml_avars_write "$AVARS_ARGS"         		
         fi
         ;;
@@ -395,26 +401,33 @@ check_anonymized_support () {
         for ODOH in $VARSARGS; do
           if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE | fgrep -c "'${ODOH}'")" -ne 0 ]; then
             SERVER=$(echo "$ODOH")
-            echo -e "$INFO The installer detected support for ODOH Relay\n$INFO Choose Relays for ODOH server"
+            echo -e "$INFO The installer detected support for ODoH Relay\n$INFO Choose the required ODoH Relays for ODoH server"
             if [ $COUNT -eq 0 ]; then
               local AVARS_ARGS
-              echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay."
-	      read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_manual_wildcard || choose_relays_manual_odoh
+              echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
+              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+              [ "$USE_WILDCARD" == "YES"] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
               eval toml_avars_write "$AVARS_ARGS"
             else
-	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_manual_next_wildcard || choose_relays_manual_next_odoh
+	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
+              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+              [ "$USE_WILDCARD" == "YES"] && choose_relays_manual_next_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_next_odoh
             fi
             COUNT=$((COUNT + 1))
           fi
         done
-	if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ]; then		  
+	if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ]; then
+          local AVARS_ARGS		  
           read_yesno "Do you want to remove any old relay setups (recommended)?" && check_anonymized_disabled || echo -e "$INFO You chose to continue without setting up relays or modifying relay support."
           eval toml_avars_write "$AVARS_ARGS"
         elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
           local AVARS_ARGS
-          echo -e "$INFO This option allows you to setup wildcard relay/support support required for ODoH servers."
-          read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_automatic_wildcard || choose_relays_automatic_odoh
+          echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
+          read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+          [ "$USE_WILDCARD" == "YES"] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
           eval toml_avars_write "$AVARS_ARGS"		
 	fi
         ;;
@@ -422,8 +435,10 @@ check_anonymized_support () {
   elif [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then #odoh relays
     local AVARS_ARGS
     toml_avar_enable routes
-    echo -e "$INFO This option allows you to setup wildcard elay/server support (via=['*'])/(server_name "*") required for ODoH servers."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option or do you want to manually choose relays?" && choose_relays_automatic_wildcard || choose_relays_automatic_odoh
+    echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
+    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+    [ "$USE_WILDCARD" == "YES"] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+    [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
     eval toml_avars_write "$AVARS_ARGS"
   else
     local AVARS_ARGS
