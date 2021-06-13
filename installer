@@ -427,7 +427,8 @@ check_anonymized_support () {
           echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
           read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
           [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
+          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic
+	  USE_DNSCRYPT=NO
           eval toml_avars_write "$AVARS_ARGS"		
 	fi
         ;;
@@ -793,7 +794,7 @@ choose_relays_automatic_odoh () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-      if [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
+      if [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] || [ "$USE_DNSCRYPT" == "NO"]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
       return
     fi
   fi
