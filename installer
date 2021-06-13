@@ -793,7 +793,7 @@ choose_relays_automatic_odoh () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-      [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] && toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\"" || RELAYS="${ORELAYS}, $RELAYS"
+      if [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
       return
     fi
   fi
