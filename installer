@@ -331,8 +331,8 @@ check_anonymized_support () {
             else
 	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay (via=['*'])."
               read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_next_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_next
+              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual
             fi
             COUNT=$((COUNT + 1))
           fi
@@ -351,8 +351,8 @@ check_anonymized_support () {
             else
 	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
               read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_next_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_next_odoh
+              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
             fi
             COUNT=$((COUNT + 1))
           fi
@@ -412,8 +412,8 @@ check_anonymized_support () {
             else
 	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
               read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_next_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_next_odoh
+              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
             fi
             COUNT=$((COUNT + 1))
           fi
@@ -605,7 +605,7 @@ choose_dnscrypt_server () {
       ;;
     3)
       toml_gvar_disable disabled_server_names
-      choose_dnscrypt_server_static
+      static_chosen 0
       ;;
   esac
 }
@@ -632,16 +632,9 @@ choose_dnscrypt_server_disabled () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then
-	  if [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
-	    read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false
-            if [ "$ODOH_DISABLED" == "true" ]; then
-              choose_dnscrypt_server_disabled_odoh
-            elif [ "$ODOH_DISABLED" == "false" ]; then
-	      toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
-            fi
-	  else
-            toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
-	  fi
+      [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ] && read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false
+      [ "$ODOH_DISABLED" == "true" ] && choose_dnscrypt_server_disabled_odoh
+      toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
       return
     fi
   fi
@@ -670,7 +663,7 @@ choose_dnscrypt_server_disabled_odoh () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then	  
-      toml_gvars_prep disabled_server_names "\"[${ORESOLVER}, $RESOLVERS]\""		
+      RESOLVERS="${ORESOLVERS}, $RESOLVERS"		
       return
     fi
   fi
@@ -702,12 +695,11 @@ choose_dnscrypt_server_manual () {
     read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
     if [ $? -eq 1 ]; then
       read_yesno "Do you want to choose which ODoH servers to enable?" && ODOH_ENABLE=true || ODOH_ENABLE=false
-      if [ "$ODOH_ENABLE" == "true" ]; then
-        choose_dnscrypt_server_odoh
-      elif [ "$ODOH_ENABLE" == "false" ]; then
-	toml_gvars_prep odoh_servers false
-        toml_gvars_prep server_names "\"[${RESOLVERS}]\"" 
-      fi
+      [ "$ODOH_ENABLE" == "true" ] && choose_dnscrypt_server_odoh
+      [ "$ODOH_ENABLE" == "false" ] && toml_gvars_prep odoh_servers false
+      read_yesno "Do you want to add any static servers?" && ADD_STATIC=YES || ADD_STATIC=NO
+      [ "$ADD_STATIC" == "YES" ] && static_chosen 0
+      toml_gvars_prep server_names "\"[${RESOLVERS}]\""
       return
     fi
   fi
@@ -737,7 +729,7 @@ choose_dnscrypt_server_odoh () {
   else
     read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
     if [ $? -eq 1 ]; then
-      toml_gvars_prep server_names "\"[${ORESOLVERS}, $RESOLVERS]\""
+      RESOLVERS="${ORESOLVERS}, $RESOLVERS"
       return
     fi
   fi
@@ -755,26 +747,6 @@ choose_dnscrypt_server_odoh () {
   choose_dnscrypt_server_odoh "$INDEX"
 }
 
-choose_dnscrypt_server_static () {
-  echo -e "$INFO This feature allows you to define a single server or multiple servers using the sdns stamp of the server.\n$INFO This assigns the server with a custom name you can specify as a static option.\n$INFO This is only necessary if the Server is not available as an option on the list of servers under manual option.\n$INFO If you do not want to continue down this path please select option 3 to return to server selection menu.\n$INFO What do you want to do:\n  1) Setup Static Servers Only.\n  2) Setup Static Servers with Addition of Manually Chosen Servers.\n  3) Go back to server selection menu."
-  read_input_num "Your choice" 1 3
-  case $CHOSEN in
-    1)
-      echo -e "$INFO You have specified to define a Static Server."
-      read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-      static_chosen 0
-      ;;
-    2)
-      echo -e "$INFO You have chosen select Manually Chosen Servers First."
-      read_yesno "Do you want to remove any old static configurations?" && toml_static_removal || echo -e "$INFO Continuing to static server configuration."
-      static_choose_manual_addition
-      ;;
-    3)
-      choose_dnscrypt_server
-      ;;
-  esac
-}
-
 choose_relays_automatic () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
@@ -787,12 +759,10 @@ choose_relays_automatic () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-      if [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
-	echo -e "$INFO Now to pick relays for ODOH SERVERS."
-	choose_relays_automatic_odoh
-      else
-        toml_avars_prep routes "\"[ { server_name='*', via=[$RELAYS] } ]\""
-      fi
+      [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ] && echo -e "$INFO Now to pick relays for ODOH SERVERS." && choose_relays_automatic_odoh
+      read_yesno "Do you want to add any static relays?" && ADD_STATIC=YES || ADD_STATIC=NO
+      [ "$ADD_STATIC" == "YES" ] && static_chosen_relays 0
+      toml_avars_prep routes "\"[ { server_name='*', via=[$RELAYS] } ]\""
       return
     fi
   fi
@@ -821,11 +791,7 @@ choose_relays_automatic_odoh () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-      if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ] && [ "$ODOH_ENABLE" == "true" ] ; then
-        toml_avars_prep routes "\"[ { server_name='*', via=[${ORELAYS}, $RELAYS] } ]\""
-      else
-        toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""
-      fi
+      [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] && toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\"" || RELAYS="${ORELAYS}, $RELAYS"
       return
     fi
   fi
@@ -859,7 +825,13 @@ choose_relays_manual () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-      toml_avars_prep routes "\"[ { server_name='$SERVER', via=$RELAYS } ]\"" 
+      read_yesno "Do you want to add any static relays?" && ADD_STATIC=YES || ADD_STATIC=NO
+      [ "$ADD_STATIC" == "YES" ] && static_chosen_relays 0
+      if [ $COUNT -eq 0 ]; then
+        toml_avars_prep routes "\"[ { server_name='$SERVER', via=[$RELAYS] } ]\""
+      else
+        toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=[$RELAYS] } ]" $TOML_FILE
+      fi
       return
     fi
   fi
@@ -869,9 +841,9 @@ choose_relays_manual () {
     echo -e "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
-      RELAYS="${RELAYS%?}, '$ITEM']"
+      RELAYS="${RELAYS%?}', '$ITEM'"
     else
-      RELAYS="['$ITEM']"
+      RELAYS="'$ITEM'"
     fi
   fi
   choose_relays_manual "$INDEX"
@@ -888,7 +860,13 @@ choose_relays_manual_odoh () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-       toml_avars_prep routes "\"[ { server_name='$SERVER', via=$RELAYS } ]\"" 
+      read_yesno "Do you want to add any static relays?" && ADD_STATIC=YES || ADD_STATIC=NO
+      [ "$ADD_STATIC" == "YES" ] && static_chosen_relays 0
+      if [ $COUNT -eq 0 ]; then
+        toml_avars_prep routes "\"[ { server_name='$SERVER', via=[$RELAYS] } ]\""
+      else
+        toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=[$RELAYS] } ]" $TOML_FILE
+      fi
       return
     fi
   fi
@@ -898,79 +876,20 @@ choose_relays_manual_odoh () {
     echo -e "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
-      RELAYS="${RELAYS%?}, '$ITEM']"
+      RELAYS="${RELAYS%?}', '$ITEM'"
     else
-      RELAYS="['$ITEM']"
+      RELAYS="'$ITEM'"
     fi
   fi
   choose_relays_manual_odoh "$INDEX"
 }
 
 choose_relays_manual_wildcard () {
-  toml_avars_prep routes "\"[ { server_name='$SERVER', via=['*'] } ]\""
-}
-
-choose_relays_manual_next () {
-  local INDEX=$1
-  if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
-    local RELAYS
-    echo -e "$INFO Available Relay servers: "
-    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/relays.md | wc -l)
-    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/relays.md
-    read_input_num "Please choose RELAY server" 1 "$INDEX"
+  if [ $COUNT -eq 0 ]; then
+    toml_avars_prep routes "\"[ { server_name='$SERVER', via=['*'] } ]\""
   else
-    read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
-    if [ $? -eq 1 ]; then
-      toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=$RELAYS } ]" $TOML_FILE 
-      return
-    fi
-  fi
-  local ITEM
-  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md)
-  if [ "$(echo "$RELAYS" | grep -F "'$ITEM'")" ]; then
-    echo -e "$INFO $ITEM is already set."
-  else
-    if [ "$RELAYS" ]; then
-      RELAYS="${RELAYS%?}, '$ITEM']"
-    else
-      RELAYS="['$ITEM']"
-    fi
-  fi
-  choose_relays_manual_next "$INDEX"
-}
-
-choose_relays_manual_next_odoh () {
-  local INDEX=$1
-  if [ -z "$INDEX" ]; then
-    local RELAYS
-    echo -e "$INFO Available Relay servers: "
-    INDEX=$(awk -v PATT="odoh-" '/^## / && ($0 !~ PATT)' $TARG_DIR/odoh.md | wc -l)
-    awk -v PATT="odoh-" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/odoh.md
-    read_input_num "Please choose RELAY server" 1 "$INDEX"
-  else
-    read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
-    if [ $? -eq 1 ]; then
-      toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=$RELAYS } ]" $TOML_FILE 
-      return
-    fi
-  fi
-  local ITEM
-  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md)
-  if [ "$(echo "$RELAYS" | grep -F "'$ITEM'")" ]; then
-    echo -e "$INFO $ITEM is already set."
-  else
-    if [ "$RELAYS" ]; then
-      RELAYS="${RELAYS%?}, '$ITEM']"
-    else
-      RELAYS="['$ITEM']"
-    fi
-  fi
-  choose_relays_manual_next_odoh "$INDEX"
-}
-
-choose_relays_manual_next_wildcard () {
-  toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=['*'] } ]" $TOML_FILE
+    toml_nvars_replace "} ]" "}, { server_name='$SERVER', via=['*'] } ]" $TOML_FILE
+  fi    
 }
 
 cleanup () {
@@ -1388,8 +1307,8 @@ static_chosen () {
   local SDNSSTAMP
   local STATICNAME
   if [ "$1" -eq 0 ]; then
-    local STATICRESOLVER
-    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true odoh_servers false require_dnssec false require_nolog false require_nofilter false
+    local STATICRESOLVERs
+    [ -z "$ADD-STATIC" ] && toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true odoh_servers false require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Please choose Static Server Name"
     echo -en "$INPUT Please enter staticname$NORM: "
     read -r STATICNAME
@@ -1399,6 +1318,7 @@ static_chosen () {
   else
     read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
     if [ "$ANOTHER" == "YES" ]; then
+      echo -e "$INFO Please choose Static Server Name"
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
       echo -e "$INFO Please enter Static Server SDNS stamp"
@@ -1406,138 +1326,69 @@ static_chosen () {
       read -r SDNSSTAMP
     elif [ "$ANOTHER" == "NO" ]; then
       echo -e "$INFO finished static setup."
-      toml_gvars_prep server_names "\"$STATICRESOLVER\""
+      [ "$ADD_STATIC" == "YES" ] && RESOLVERS="${STATICRESOLVERS}, $RESOLVERS"
+      [ -z "$ADD_STATIC" ] && toml_gvars_prep server_names "\"[$STATICRESOLVERS]\""
       return
     fi
   fi
 
   local STATIC
   STATIC="${STATICNAME}-Static"
-  if [ "$(echo "$STATICRESOLVER" | grep -F "$STATIC")" ]; then
+  if [ "$(echo "$STATICRESOLVERS" | grep -F "$STATIC")" ]; then
     echo -e "$INFO $STATIC is already set"
   else
     toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
     toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
-    if [ "$STATICRESOLVER" ]; then
-      STATICRESOLVER="${STATICRESOLVER%?}, '$STATIC']"
+    if [ "$STATICRESOLVERS" ]; then
+      STATICRESOLVERS="${STATICRESOLVERS%?}', '$STATIC'"
     else
-      STATICRESOLVER="['$STATIC']"
+      STATICRESOLVERS="'$STATIC'"
     fi
   fi
   static_chosen 1  
 }
 
-static_chosen_manual () {
+static_chosen_relays () {
   local SDNSSTAMP
   local STATICNAME
   if [ "$1" -eq 0 ]; then
-    local STATICRESOLVER
-    echo -e "$INFO Please choose Static Server Name"
+    local STATICRELAYS
+    echo -e "$INFO Please choose Static Relay Name"
     echo -en "$INPUT Please enter staticname$NORM: "
     read -r STATICNAME
-    echo -e "$INFO Please enter Static Server SDNS stamp"
+    echo -e "$INFO Please enter Static Relay SDNS stamp"
     echo -en "$INPUT Please enter sdnsstamp$NORM: "
     read -r SDNSSTAMP
   else
-    read_yesno "Do you want to set up another Static Server?" && ANOTHER=YES || ANOTHER=NO
+    read_yesno "Do you want to set up another Static Relay?" && ANOTHER=YES || ANOTHER=NO
     if [ "$ANOTHER" == "YES" ]; then
+      echo -e "$INFO Please choose Static Relay Name"
       echo -en "$INPUT Please enter staticname$NORM: "
       read -r STATICNAME
-      echo -e "$INFO Please enter Static Server SDNS stamp"
+      echo -e "$INFO Please enter Static Relay SDNS stamp"
       echo -en "$INPUT Please enter sdnsstamp$NORM: "
       read -r SDNSSTAMP
     elif [ "$ANOTHER" == "NO" ]; then
-      echo -e "$INFO You have finished static setup."
-      if [ "$ODOH_ENABLE" == "true" ]; then
-        toml_gvars_prep server_names "\"[${STATICRESOLVER}, $ORESOLVERS, $RESOLVERS]\""
-      elif [ "$ODOH_ENABLE" == "false" ]; then
-        toml_gvars_prep server_names "\"[${STATICRESOLVER}, $RESOLVERS]\""
-      fi    
+      echo -e "$INFO finished static setup."
+      RELAYS="${STATICRELAYS}, $RELAYS"
       return
     fi
   fi
 
   local STATIC
   STATIC="${STATICNAME}-Static"
-  if [ "$(echo "$STATICRESOLVER" | grep -F "$STATIC")" ]; then
-    echo -e "$INFO $STATIC is already set."
+  if [ "$(echo "$STATICRELAYS" | grep -F "$STATIC")" ]; then
+    echo -e "$INFO $STATIC is already set"
   else
     toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
     toml_nvars_insert "[static.'${STATICNAME}-Static']" "stamp = '$SDNSSTAMP'" $TOML_FILE
-    if [ "$STATICRESOLVER" ]; then
-      STATICRESOLVER="${STATICRESOLVER%?}', '$STATIC'"
+    if [ "$STATICRELAYS" ]; then
+      STATICRELAYS="${STATICRELAYS%?}', '$STATIC'"
     else
-      STATICRESOLVER="'$STATIC'"
+      STATICRELAYS="'$STATIC'"
     fi
   fi
-  static_chosen_manual 1
-}
-
-static_choose_manual_addition () {
-  local INDEX=$1
-  if [ -z "$INDEX" ]; then
-    [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
-    local RESOLVERS
-    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
-    echo -e "$INFO Available DNS servers: "
-    INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
-    awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
-    read_input_num "Please choose DNS server" 1 "$INDEX"
-  else
-    read_input_num "Please choose next DNS server or press n to stop" 1 "$INDEX" n
-    if [ $? -eq 1 ]; then
-      read_yesno "Do you want to choose which ODoH servers to enable?" && ODOH_ENABLE=true || ODOH_ENABLE=false
-      if [ "$ODOH_ENABLE" == "true" ]; then
-        static_choose_odoh
-      elif [ "$ODOH_ENABLE" == "false" ]; then
-	toml_gvars_prep odoh_servers false
-	static_chosen_manual 0
-      fi    
-      return
-    fi
-  fi
-  local ITEM
-  ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md)
-  if [ "$(echo "$RESOLVERS" | grep -F "'$ITEM'")" ]; then
-    echo -e "$INFO $ITEM is already set"
-  else
-    if [ "$RESOLVERS" ]; then
-      RESOLVERS="${RESOLVERS%?}', '$ITEM'"
-    else
-      RESOLVERS="'$ITEM'"
-    fi
-  fi
-  static_choose_manual_addition "$INDEX"
-}
-
-static_choose_odoh () {
-  local INDEX=$1
-  if [ -z "$INDEX" ]; then
-    local ORESOLVERS
-    toml_gvars_prep odoh_servers true
-    echo -e "$INFO Available DNS servers: "
-    INDEX=$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' $TARG_DIR/odoh.md | wc -l)
-    awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/odoh.md
-    read_input_num "Please choose DNS server." 1 "$INDEX"
-  else
-    read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
-    if [ $? -eq 1 ]; then
-      static_chosen_manual 0
-      return
-    fi
-  fi
-  local OITEM
-  OITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md)
-  if [ "$(echo "$ORESOLVERS" | grep -F "'$OITEM'")" ]; then
-    echo -e "$INFO $OITEM is already set"
-  else
-    if [ "$ORESOLVERS" ]; then
-      ORESOLVERS="${ORESOLVERS%?}', '$OITEM'"
-    else
-      ORESOLVERS="'$OITEM'"
-    fi
-  fi
-  static_choose_odoh "$INDEX"
+  static_chosen_relays 1
 }
 
 setup_dnscrypt () {
