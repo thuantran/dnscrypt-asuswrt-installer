@@ -632,7 +632,7 @@ choose_dnscrypt_server_disabled () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then
-      [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ] && read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false
+      if [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false; fi
       [ "$ODOH_DISABLED" == "true" ] && choose_dnscrypt_server_disabled_odoh
       toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
       return
