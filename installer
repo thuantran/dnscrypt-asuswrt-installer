@@ -424,11 +424,11 @@ check_anonymized_support () {
           eval toml_avars_write "$AVARS_ARGS"
         elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
           local AVARS_ARGS
+	  USE_DNSCRYPT=NO
           echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
           read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
           [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic
-	  USE_DNSCRYPT=NO
+          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
           eval toml_avars_write "$AVARS_ARGS"		
 	fi
         ;;
