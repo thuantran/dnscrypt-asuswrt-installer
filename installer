@@ -383,6 +383,7 @@ check_anonymized_support () {
           eval toml_avars_write "$AVARS_ARGS"
         elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
           local AVARS_ARGS
+	  COUNT=$((COUNT + 1))
           echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
           check_anonymized_automatic 0
           eval toml_avars_write "$AVARS_ARGS"         		
@@ -427,8 +428,7 @@ check_anonymized_support () {
           echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
           read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
           [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic
-	  USE_DNSCRYPT=NO
+          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
           eval toml_avars_write "$AVARS_ARGS"		
 	fi
         ;;
@@ -613,9 +613,7 @@ choose_dnscrypt_server () {
 
 choose_dnscrypt_server_auto () {
   toml_gvar_disable server_names
-  read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && ODOH_ENABLE=true || ODOH_ENABLE=false
-  [ "$ODOH_ENABLE" == "true" ] && toml_gvars_prep odoh_servers true
-  [ "$ODOH_ENABLE" == "false" ] && toml_gvars_prep odoh_servers false   
+  read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && toml_gvars_prep odoh_servers true || toml_gvars_prep odoh_servers false   
   read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true || toml_gvars_prep dnscrypt_servers false dnscrypt_ephemeral_keys false
   read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true tls_disable_session_tickets true || toml_gvars_prep doh_servers false tls_disable_session_tickets false
   read_yesno "Use only servers that support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
@@ -635,7 +633,7 @@ choose_dnscrypt_server_disabled () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ $? -eq 1 ]; then
-      if [ "$ODOH_ENABLE" == "true" ]; then read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false; fi
+      read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false
       [ "$ODOH_DISABLED" == "true" ] && choose_dnscrypt_server_disabled_odoh
       toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
       return
@@ -794,7 +792,7 @@ choose_relays_automatic_odoh () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n      
     if [ $? -eq 1 ]; then
-      if [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] || [ "$USE_DNSCRYPT" == "NO"]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
+      if [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] || [ "$COUNT" -eq 0 ]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
       return
     fi
   fi
@@ -830,6 +828,7 @@ choose_relays_manual () {
     if [ $? -eq 1 ]; then
       read_yesno "Do you want to add any static relays?" && ADD_STATIC=YES || ADD_STATIC=NO
       [ "$ADD_STATIC" == "YES" ] && static_chosen_relays 0
+      
       if [ $COUNT -eq 0 ]; then
         toml_avars_prep routes "\"[ { server_name='$SERVER', via=[$RELAYS] } ]\""
       else
