@@ -1369,8 +1369,9 @@ setup_dnscrypt_impl () {
     toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write "$GVARS_ARGS"
-    echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
+    echo -e "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
     check_relays
+    echo -e "$INFO Checking dnscrypt-proxy configuration..."
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
       echo -e "$INFO Writing dnscrypt-proxy configuration failed \n$INFO Please send $TOML_ERR file and screen log of \n$INFO all operations you have made to this script dev"
