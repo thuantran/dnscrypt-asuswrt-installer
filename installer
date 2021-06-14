@@ -373,7 +373,7 @@ check_relays () {
             eval toml_avars_write "$AVARS_ARGS"
             COUNT=$((COUNT + 1))
           elif [ "$COUNT" -gt 0 ]; then
-            read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD=YES || USE_WILDCARD=NO
             [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
             [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
           fi
