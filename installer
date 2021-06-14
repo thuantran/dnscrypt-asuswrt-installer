@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.4                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.5                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.2.4"
+DI_VERSION="v2.2.5"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -340,9 +340,9 @@ check_relays () {
   NUMFRAG=0
   for SERVER in $VARSARGS; do
     if [ "$(grep '^server_names = .*'${SERVER}'.*' $TOML_FILE | fgrep -c "'${SERVER}'")" -ne 0 ]; then
-      [ -n "$(echo "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT=$SERVER
-      [ -n "$(echo "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH=$SERVER
-      [ -n "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED=$SERVER
+      [ -n "$(echo "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT=$SERVER # Martineau Ugly Hack
+      [ -n "$(echo "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH=$SERVER # Martineau Ugly Hack
+      [ -n "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED=$SERVER # Martineau Ugly Hack
       case $SERVER in
         $DNSCRYPT)  
           read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS=YES || ADD_RELAYS=NO
@@ -516,11 +516,8 @@ choose_dnscrypt_server () {
     1)
       choose_dnscrypt_server_auto
       read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED=true || CHOOSE_DISABLED=false
-      if [ "$CHOOSE_DISABLED" == "true" ]; then
-        choose_dnscrypt_server_disabled
-      elif [ "$CHOOSE_DISABLED" == "false" ]; then
-        toml_gvar_disable disabled_server_names
-      fi
+      [ "$CHOOSE_DISABLED" == "true" ] && choose_dnscrypt_server_disabled
+      [ "$CHOOSE_DISABLED" == "false" ] && toml_gvar_disable disabled_server_names
       ;;
     2)
       toml_gvar_disable disabled_server_names
@@ -536,8 +533,8 @@ choose_dnscrypt_server () {
 choose_dnscrypt_server_auto () {
   toml_gvar_disable server_names
   read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && toml_gvars_prep odoh_servers true || toml_gvars_prep odoh_servers false   
-  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true || toml_gvars_prep dnscrypt_servers false dnscrypt_ephemeral_keys false
-  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true tls_disable_session_tickets true || toml_gvars_prep doh_servers false tls_disable_session_tickets false
+  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true || toml_gvars_prep dnscrypt_servers false
+  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true || toml_gvars_prep doh_servers false
   read_yesno "Use only servers that support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
   read_yesno "Use only servers that do not log user's queries" && toml_gvars_prep require_nolog true || toml_gvars_prep require_nolog false
   read_yesno "Use only servers that do not filter result" && toml_gvars_prep require_nofilter true || toml_gvars_prep require_nofilter false
@@ -1356,8 +1353,6 @@ setup_dnscrypt_impl () {
     fi
     local GVARS_ARGS
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
-    toml_gvar_enable dnscrypt_ephemeral_keys
-    toml_gvar_enable tls_disable_session_tickets
     toml_gvar_enable disabled_server_names
     toml_nvars_replace "# [sources.'odoh']" "[sources.'odoh']" $TOML_FILE
     toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" $TOML_FILE
@@ -1371,7 +1366,7 @@ setup_dnscrypt_impl () {
     read_input_dns_n "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write "$GVARS_ARGS"
     echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
