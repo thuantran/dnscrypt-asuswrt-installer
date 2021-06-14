@@ -339,7 +339,7 @@ check_relays () {
   NUMFRAG=0
   for SERVER in $VARSARGS; do
     if [ "$(grep '^server_names = .*'${SERVER}'.*' $TOML_FILE | fgrep -c "'${SERVER}'")" -ne 0 ]; then
-      eval "
+      eval '
       case $SERVER in
         $DNSCRYPT)  
           read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS=YES || ADD_RELAYS=NO
@@ -388,7 +388,7 @@ check_relays () {
           NUMFRAG=$((NUMFRAG + 1))
           ;;
       esac
-      "
+      '
     fi
   done
   if [ $COUNT -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
