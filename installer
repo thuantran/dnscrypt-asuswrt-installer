@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.4                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.5                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.2.4"
+DI_VERSION="v2.2.5"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -291,163 +291,6 @@ check_anonymized_disabled () {
   echo -e "$INFO Continue without Relays Support"
 }
 
-check_anonymized_support () {
-  echo -e "$INFO Checking for Anonymized Dnscrypt Support.\n..\n...\n....\n.....\n......"
-  if [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then   # Checking for Anonymized Relays.
-    echo -e "$INFO You may specify wildcard relay/server support (via=['*'])/(server_name "*") with option 1.\n$INFO Option 2 gives you the choice to setup relays per Dnscrypt/ODOH Server.\n$INFO Option 3 allows you to skip relay configuration for DNSCRYPT Servers only (ODoH requires relays) or remove old relays configurations.\n$WARNING Option 1 & 2 delete old relay configurations.\n$INFO What do you want to do:\n  1) All Servers with wildcard relay/server support.\n  2) Pick relays for DNSCRYPT servers (Per Server).\n  3) Skip setting-up/modifying relay support."
-    read_input_num "Your choice" 1 3
-    case $CHOSEN in
-      1) 
-        local AVARS_ARGS
-        toml_avar_enable routes
-        echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
-        check_anonymized_automatic 0
-        eval toml_avars_write "$AVARS_ARGS"			
-        ;;
-      2)
-        local AVARS_ARGS
-        toml_avar_enable routes
-        eval toml_avars_write "$AVARS_ARGS"
-        local VARSARGS
-        VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri"
-        local OVARSARGS
-        OVARSARGS="odoh-cloudflare odoh-crypto-sx odoh-id-gmail odoh-jp.tiar.app odoh-jp.tiarap.org odoh-tiarap.org"		
-        local COUNT
-        local DNSCRYPT
-	local ODOH
-        local SERVER
-        COUNT=0
-        for DNSCRYPT in $VARSARGS; do
-          if [ "$(grep '^server_names = .*'${DNSCRYPT}'.*' $TOML_FILE | fgrep -c "'${DNSCRYPT}'")" -ne 0 ]; then
-            SERVER=$(echo "$DNSCRYPT")
-            echo -e "$INFO The installer detected support for Anonymized Dnscrypt\n$INFO Choose Relays for DNSCRYPT server"
-            if [ $COUNT -eq 0 ]; then
-              local AVARS_ARGS
-              echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay (via=['*'])."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual
-              eval toml_avars_write "$AVARS_ARGS"
-            else
-	      echo -e "$INFO Found $DNSCRYPT server.\n$INFO You may manually choose relays for $DNSCRYPT server or you may specify wildcard relay (via=['*'])."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual
-            fi
-            COUNT=$((COUNT + 1))
-          fi
-        done
-        for ODOH in $OVARSARGS; do
-          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE | fgrep -c "'${ODOH}'")" -ne 0 ]; then
-            SERVER=$(echo "$ODOH")
-            echo -e "$INFO The installer detected support for ODoH Relay\n$INFO Choose the required ODoH Relays for ODoH server"
-            if [ $COUNT -eq 0 ]; then
-              local AVARS_ARGS
-              echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
-              eval toml_avars_write "$AVARS_ARGS"
-            else
-	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
-            fi
-            COUNT=$((COUNT + 1))
-          fi
-        done			
-        local FRAGSBLOCKED
-        FRAGSBLOCKED="cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 cleanbrowsing-adult cleanbrowsing-adult-ipv6 cleanbrowsing-family cleanbrowsing-family-ipv6 cleanbrowsing-security cleanbrowsing-security-ipv6"
-        local BLOCKED
-        local FRAG
-        local NUMFRAG
-        NUMFRAG=0
-        for BLOCKED in $FRAGSBLOCKED; do
-         if [ "$(grep '^server_names = .*'${BLOCKED}'.*' $TOML_FILE | fgrep -c "'${BLOCKED}'")" -ne 0 ]; then
-            if [ "$NUMFRAG" -eq 0 ]; then
-              local AVARS_ARGS=""
-              local USE_BROKEN
-              echo -e "$WARNING Found Incompatible Server(s)."
-              read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
-              toml_avars_prep skip_incompatible $USE_BROKEN
-              eval toml_avars_write "$AVARS_ARGS"
-            fi
-            NUMFRAG=$((NUMFRAG + 1))
-          fi          
-        done
-        if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ]; then
-          local AVARS_ARGS
-          echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
-          read_yesno "Do you still want to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
-          eval toml_avars_write "$AVARS_ARGS"
-        elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
-          local AVARS_ARGS
-	  COUNT=$((COUNT + 1))
-          echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
-          check_anonymized_automatic 0
-          eval toml_avars_write "$AVARS_ARGS"         		
-        fi
-        ;;
-      3)
-        local AVARS_ARGS
-        toml_avar_enable routes
-        eval toml_avars_write "$AVARS_ARGS"
-        local VARSARGS
-        VARSARGS="odoh-cloudflare odoh-crypto-sx odoh-id-gmail odoh-jp.tiar.app odoh-jp.tiarap.org odoh-tiarap.org"
-        local COUNT
-        local ODOH
-        local SERVER
-        COUNT=0
-        for ODOH in $VARSARGS; do
-          if [ "$(grep '^server_names = .*'${ODOH}'.*' $TOML_FILE | fgrep -c "'${ODOH}'")" -ne 0 ]; then
-            SERVER=$(echo "$ODOH")
-            echo -e "$INFO The installer detected support for ODoH Relay\n$INFO Choose the required ODoH Relays for ODoH server"
-            if [ $COUNT -eq 0 ]; then
-              local AVARS_ARGS
-              echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
-              eval toml_avars_write "$AVARS_ARGS"
-            else
-	      echo -e "$INFO Found $ODOH server.\n$INFO You may manually choose relays for $ODOH server or you may specify wildcard relay (via=['*'])."
-              read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-              [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-              [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
-            fi
-            COUNT=$((COUNT + 1))
-          fi
-        done
-	if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ]; then
-          local AVARS_ARGS		  
-          read_yesno "Do you want to remove any old relay setups (recommended)?" && check_anonymized_disabled || echo -e "$INFO You chose to continue without setting up relays or modifying relay support."
-          eval toml_avars_write "$AVARS_ARGS"
-        elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then
-          local AVARS_ARGS
-          echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
-          read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-          [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-          [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
-          eval toml_avars_write "$AVARS_ARGS"		
-	fi
-        ;;
-    esac
-  elif [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ]; then #odoh relays
-    local AVARS_ARGS
-    toml_avar_enable routes
-    echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-    [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
-    [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
-    eval toml_avars_write "$AVARS_ARGS"
-  else
-    local AVARS_ARGS
-    check_anonymized_disabled
-    eval toml_avars_write "$AVARS_ARGS"
-  fi
-}
-
 check_opendns () {
   if [ "$(grep '^server_names = .*cisco.*' $TOML_FILE)" ]; then
     if [ -f $CONF_FILE ]; then
@@ -478,20 +321,99 @@ check_opendns () {
   fi
 }
 
-check_nextdns () {
-  if [ "$(grep '^server_names = .*nextdns.*' $TOML_FILE)" ]; then
-    echo -e "$INFO The installer detected a NextDNS Server Selection\n$INFO If you have a NextDNS Account visit https://my.nextdns.io/login enter your setup and copy your DNS STAMP\n$INFO What do you want to do:\n  1) Setup Your SDNS STAMP\n  2) Skip dont have account"
-    read_input_num "Your choice" 1 2
-    case $CHOSEN in
-       1)
-        echo -e "$INFO You have specified to define NextDNS-Custom"
-        nextdns_authen 1
-        ;;
-       2)
-        echo -e "$INFO You have chosen to skip NextDNS-Custom"
-        nextdns_authen 0
-        ;;
-    esac
+check_relays () {
+  local VARSARGS
+  local DNSCRYPT_ARGS
+  local DNSCRYPT
+  local ODOH_ARGS
+  local ODOH
+  local FRAGSBLOCKED_ARGS
+  local FRAGSBLOCKED
+  local SERVER
+  local COUNT
+  local NUMFRAG
+  VARSARGS="sth-dnscrypt-se ams-dnscrypt-noads-nl dnswarden-dc2 af-dnswarden-dc3 opennic-eleix dnscrypt-jp-blahdns-ipv4 dnscrypt-fi-blahdns-ipv6 af-dnswarden-dc2-ipv6 geekdns-north opennic-R4SAS yandex ventricle.us freetsa.org cs-mo opennic-R4SAS-ipv6 geekdns-hk opennic-rico4514 qag.me captnemo-in ev-to cs-usdc geekdns-south cs-it arvind-io ibksturm dnscrypt-de-blahdns-ipv4 af-dnswarden-dc1-ipv6 ads-dnswarden-dc1-ipv6-ecs ads-dnswarden-dc2 cs-ro dnscrypt-fi-blahdns-ipv4 ev-va adguard-dns-family-ipv6 cs-usor dnscrypt.ca-1-ipv6 mrkaran scaleway-ams-ipv6 dnswarden-dc3-ipv6 dnswarden-dc2-ipv6 doh-fi-blahdns dnscrypt.eu-nl ads-dnswarden-dc2-ipv6 af-dnswarden-dc1-ipv6-ecs af-dnswarden-dc2-ipv6-ecs adguard-dns-family cs-de cs-uswa d0wn-is-ns2 scaleway-ams af-dnswarden-dc3-ipv6-ecs v.dnscrypt.uk-ipv4 cs-fr v.dnscrypt.uk-ipv6 opennic-luggs ads-dnswarden-dc3 ffmuc.net sea-dnscrypt-us ads-dnswarden-dc2-ecs jp.tiar.app cs-usga qualityology.com dnscrypt.nl-ns0 dnscrypt.eu-dk cs-nl2 d0wn-tz-ns1-ipv6 publicarray-au ads-dnswarden-dc3-ipv6 cs-ch jp.tiar.app-ipv6 dnsforfamily dnsforfamily-v6 dnscrypt-jp-blahdns-ipv6 ads-dnswarden-dc1 id-gmail securedns-ipv6 cs-fi af-dnswarden-dc2-ecs af-dnswarden-dc1-ecs dnswarden-dc1 oszx af-dnswarden-dc2 dnswarden-dc1-ipv6 scaleway-fr ads-dnswarden-dc2-ipv6-ecs dnscrypt.one-ipv6 opennic-luggs-ipv6 cs-ustx dnscrypt.uk-ipv4 dnscrypt.one opennic-luggs2-ipv6 ads-dnswarden-dc1-ipv6 securedns sfw.scaleway-fr adguard-dns cs-ca2 af-dnswarden-dc3-ecs ffmuc.net-v6 cs-usnc dnscrypt.uk-ipv6 dnscrypt.eu-dk-ipv6 cs-lv publicarray-au2 cs-usil adguard-dns-ipv6 dnswarden-dc3 geekdns-west soltysiak af-dnswarden-dc3-ipv6 cs-swe dnscrypt.ca-2-ipv6 ads-dnswarden-dc3-ipv6-ecs ads-dnswarden-dc3-ecs cs-ca dnscrypt-de-blahdns-ipv6 ams-dnscrypt-nl dnscrypt.ca-1 comodo-02 af-dnswarden-dc1 ads-dnswarden-dc1-ecs cs-usca opennic-luggs2 dnscrypt.ca-2 d0wn-tz-ns1 cs-nl opennic-bongobow id-gmail-ipv6 cs-pl quad9-dnscrypt-ip4-filter-alt quad9-dnscrypt-ip4-filter-pri quad9-dnscrypt-ip4-nofilter-alt quad9-dnscrypt-ip4-nofilter-pri quad9-dnscrypt-ip6-filter-alt quad9-dnscrypt-ip6-filter-pri quad9-dnscrypt-ip6-nofilter-alt quad9-dnscrypt-ip6-nofilter-pri odoh-cloudflare odoh-crypto-sx odoh-id-gmail odoh-jp.tiar.app odoh-jp.tiarap.org odoh-tiarap.org cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 cleanbrowsing-adult cleanbrowsing-adult-ipv6 cleanbrowsing-family cleanbrowsing-family-ipv6 cleanbrowsing-security cleanbrowsing-security-ipv6"
+  DNSCRYPT_ARGS="sth-dnscrypt-se|ams-dnscrypt-noads-nl|dnswarden-dc2|af-dnswarden-dc3|opennic-eleix|dnscrypt-jp-blahdns-ipv4|dnscrypt-fi-blahdns-ipv6|af-dnswarden-dc2-ipv6|geekdns-north|opennic-R4SAS|yandex|ventricle.us|freetsa.org|cs-mo|opennic-R4SAS-ipv6|geekdns-hk|opennic-rico4514|qag.me|captnemo-in|ev-to|cs-usdc|geekdns-south|cs-it|arvind-io|ibksturm|dnscrypt-de-blahdns-ipv4|af-dnswarden-dc1-ipv6|ads-dnswarden-dc1-ipv6-ecs|ads-dnswarden-dc2|cs-ro|dnscrypt-fi-blahdns-ipv4|ev-va|adguard-dns-family-ipv6|cs-usor|dnscrypt.ca-1-ipv6|mrkaran|scaleway-ams-ipv6|dnswarden-dc3-ipv6|dnswarden-dc2-ipv6|doh-fi-blahdns|dnscrypt.eu-nl|ads-dnswarden-dc2-ipv6|af-dnswarden-dc1-ipv6-ecs|af-dnswarden-dc2-ipv6-ecs|adguard-dns-family|cs-de|cs-uswa|d0wn-is-ns2|scaleway-ams|af-dnswarden-dc3-ipv6-ecs|v.dnscrypt.uk-ipv4|cs-fr|v.dnscrypt.uk-ipv6|opennic-luggs|ads-dnswarden-dc3|ffmuc.net|sea-dnscrypt-us|ads-dnswarden-dc2-ecs|jp.tiar.app|cs-usga|qualityology.com|dnscrypt.nl-ns0|dnscrypt.eu-dk|cs-nl2|d0wn-tz-ns1-ipv6|publicarray-au|ads-dnswarden-dc3-ipv6|cs-ch|jp.tiar.app-ipv6|dnsforfamily|dnsforfamily-v6|dnscrypt-jp-blahdns-ipv6|ads-dnswarden-dc1|id-gmail|securedns-ipv6|cs-fi|af-dnswarden-dc2-ecs|af-dnswarden-dc1-ecs|dnswarden-dc1|oszx|af-dnswarden-dc2|dnswarden-dc1-ipv6|scaleway-fr|ads-dnswarden-dc2-ipv6-ecs|dnscrypt.one-ipv6|opennic-luggs-ipv6|cs-ustx|dnscrypt.uk-ipv4|dnscrypt.one|opennic-luggs2-ipv6|ads-dnswarden-dc1-ipv6|securedns|sfw.scaleway-fr|adguard-dns|cs-ca2 af-dnswarden-dc3-ecs|ffmuc.net-v6|cs-usnc|dnscrypt.uk-ipv6|dnscrypt.eu-dk-ipv6|cs-lv|publicarray-au2|cs-usil|adguard-dns-ipv6|dnswarden-dc3|geekdns-west|soltysiak|af-dnswarden-dc3-ipv6|cs-swe|dnscrypt.ca-2-ipv6|ads-dnswarden-dc3-ipv6-ecs|ads-dnswarden-dc3-ecs|cs-ca|dnscrypt-de-blahdns-ipv6|ams-dnscrypt-nl|dnscrypt.ca-1|comodo-02|af-dnswarden-dc1|ads-dnswarden-dc1-ecs|cs-usca|opennic-luggs2|dnscrypt.ca-2|d0wn-tz-ns1|cs-nl|opennic-bongobow|id-gmail-ipv6|cs-pl|quad9-dnscrypt-ip4-filter-alt|quad9-dnscrypt-ip4-filter-pri|quad9-dnscrypt-ip4-nofilter-alt|quad9-dnscrypt-ip4-nofilter-pri|quad9-dnscrypt-ip6-filter-alt|quad9-dnscrypt-ip6-filter-pri|quad9-dnscrypt-ip6-nofilter-alt|quad9-dnscrypt-ip6-nofilter-pri"
+  ODOH_ARGS="odoh-cloudflare|odoh-crypto-sx|odoh-id-gmail|odoh-jp.tiar.app|odoh-jp.tiarap.org|odoh-tiarap.org"
+  FRAGSBLOCKED_ARGS="cisco|cisco-ipv6|cisco-familyshield|cisco-familyshield-ipv6|cleanbrowsing-adult|cleanbrowsing-adult-ipv6|cleanbrowsing-family|cleanbrowsing-family-ipv6|cleanbrowsing-security|cleanbrowsing-security-ipv6"
+  COUNT=0
+  NUMFRAG=0
+  for SERVER in $VARSARGS; do
+    if [ "$(grep '^server_names = .*'${SERVER}'.*' $TOML_FILE | fgrep -c "'${SERVER}'")" -ne 0 ]; then
+      [ -n "$(echo "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT=$SERVER # Martineau Ugly Hack
+      [ -n "$(echo "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH=$SERVER # Martineau Ugly Hack
+      [ -n "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED=$SERVER # Martineau Ugly Hack
+      case $SERVER in
+        $DNSCRYPT)  
+          read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS=YES || ADD_RELAYS=NO
+          [ "$ADD_RELAYS" == "YES" ] && echo -e "$INFO You may manually choose relays for $SERVER or you may specify wildcard relay (via=['*'])."
+          if [ "$COUNT" -eq 0 ] && [ "$ADD_RELAYS" == "YES" ]; then
+            local AVARS_ARGS
+            toml_avar_enable routes
+            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+            [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+            [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual
+            eval toml_avars_write "$AVARS_ARGS"
+            COUNT=$((COUNT + 1))
+          elif [ "$COUNT" -gt 0 ] && [ "$ADD_RELAYS" == "YES" ]; then
+            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+            [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+            [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual
+          elif [ "$ADD_RELAYS" == "NO" ]; then
+            echo -e "$INFO Skipping relays for $SERVER."
+          fi
+          ;;
+        $ODOH)
+          echo -e "$INFO Found $SERVER, ODoH relays are required for ODoH servers.\n$INFO You may manually choose relays for $SERVER server or you may specify wildcard relay (via=['*'])."
+          if [ "$COUNT" -eq 0 ]; then
+            local AVARS_ARGS
+            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+            [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+            [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
+            eval toml_avars_write "$AVARS_ARGS"
+            COUNT=$((COUNT + 1))
+          elif [ "$COUNT" -gt 0 ]; then
+            read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+            [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+            [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
+          fi
+          ;;
+        $FRAGSBLOCKED)
+          if [ "$NUMFRAG" -eq 0 ]; then
+            local AVARS_ARGS
+            local USE_BROKEN
+            echo -e "$WARNING Found Incompatible Server(s)."
+            read_yesno "Do you want to skip using incompatible resolvers instead of using them directly?" && USE_BROKEN=true || USE_BROKEN=false
+            toml_avars_prep skip_incompatible $USE_BROKEN
+            eval toml_avars_write "$AVARS_ARGS"
+          fi
+          NUMFRAG=$((NUMFRAG + 1))
+          ;;
+      esac
+    fi
+  done
+  if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
+    local AVARS_ARGS
+    echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
+    read_yesno "Do you still want to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
+    eval toml_avars_write "$AVARS_ARGS"
+  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
+    local AVARS_ARGS
+    COUNT=$((COUNT + 1))
+    echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
+    check_anonymized_automatic 0
+    eval toml_avars_write "$AVARS_ARGS"
+  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ]; then
+    local AVARS_ARGS
+    echo -e "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") required for ODoH servers."
+    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+    [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
+    [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
+    eval toml_avars_write "$AVARS_ARGS"
+  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ]; then
+    local AVARS_ARGS		  
+    check_anonymized_disabled
+    eval toml_avars_write "$AVARS_ARGS"
   fi
 }
 
@@ -594,11 +516,8 @@ choose_dnscrypt_server () {
     1)
       choose_dnscrypt_server_auto
       read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED=true || CHOOSE_DISABLED=false
-      if [ "$CHOOSE_DISABLED" == "true" ]; then
-        choose_dnscrypt_server_disabled
-      elif [ "$CHOOSE_DISABLED" == "false" ]; then
-        toml_gvar_disable disabled_server_names
-      fi
+      [ "$CHOOSE_DISABLED" == "true" ] && choose_dnscrypt_server_disabled
+      [ "$CHOOSE_DISABLED" == "false" ] && toml_gvar_disable disabled_server_names
       ;;
     2)
       toml_gvar_disable disabled_server_names
@@ -614,8 +533,8 @@ choose_dnscrypt_server () {
 choose_dnscrypt_server_auto () {
   toml_gvar_disable server_names
   read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && toml_gvars_prep odoh_servers true || toml_gvars_prep odoh_servers false   
-  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true || toml_gvars_prep dnscrypt_servers false dnscrypt_ephemeral_keys false
-  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true tls_disable_session_tickets true || toml_gvars_prep doh_servers false tls_disable_session_tickets false
+  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true || toml_gvars_prep dnscrypt_servers false
+  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true || toml_gvars_prep doh_servers false
   read_yesno "Use only servers that support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
   read_yesno "Use only servers that do not log user's queries" && toml_gvars_prep require_nolog true || toml_gvars_prep require_nolog false
   read_yesno "Use only servers that do not filter result" && toml_gvars_prep require_nofilter true || toml_gvars_prep require_nofilter false
@@ -687,7 +606,7 @@ choose_dnscrypt_server_manual () {
   if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RESOLVERS
-    toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true require_dnssec false require_nolog false require_nofilter false
+    toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
@@ -1110,21 +1029,6 @@ manager_monitor_restart () {
   fi
   $TARG_DIR/manager monitor-start
 }
-
-nextdns_authen () {
-  local SDNS
-  if [ "$1" -eq 0 ]; then
-    return
-  fi
-  echo -en "$INPUT Please enter sdns$NORM: "
-  read -r SDNS
-  local GVARS_ARGS
-  toml_gvars_prep server_names "\"['NextDNS-Custom']\""
-  eval toml_gvars_write "$GVARS_ARGS"
-  toml_static_removal
-  toml_nvars_insert "[static]" "[static.'NextDNS-Custom']" $TOML_FILE
-  toml_nvars_insert "[static.'NextDNS-Custom']" "stamp = '$SDNS'" $TOML_FILE
-}
   
 opendns_authen () {
   local USERNAME
@@ -1310,7 +1214,7 @@ static_chosen () {
   local STATICNAME
   if [ "$1" -eq 0 ]; then
     local STATICRESOLVERS
-    [ -z "$ADD-STATIC" ] && toml_gvars_prep dnscrypt_servers true dnscrypt_ephemeral_keys true doh_servers true tls_disable_session_tickets true odoh_servers false require_dnssec false require_nolog false require_nofilter false
+    [ -z "$ADD-STATIC" ] && toml_gvars_prep dnscrypt_servers true doh_servers true odoh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Please choose Static Server Name"
     echo -en "$INPUT Please enter staticname$NORM: "
     read -r STATICNAME
@@ -1449,8 +1353,6 @@ setup_dnscrypt_impl () {
     fi
     local GVARS_ARGS
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
-    toml_gvar_enable dnscrypt_ephemeral_keys
-    toml_gvar_enable tls_disable_session_tickets
     toml_gvar_enable disabled_server_names
     toml_nvars_replace "# [sources.'odoh']" "[sources.'odoh']" $TOML_FILE
     toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" $TOML_FILE
@@ -1464,12 +1366,12 @@ setup_dnscrypt_impl () {
     read_input_dns_n "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'"
+    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     eval toml_gvars_write "$GVARS_ARGS"
-    echo -e "$INFO Evaluating other possibilities for dnscrypt-proxy configuration..."
-    check_nextdns
-    check_anonymized_support
+    echo -e "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
+    check_relays
+    echo -e "$INFO Checking dnscrypt-proxy configuration..."
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
       echo -e "$INFO Writing dnscrypt-proxy configuration failed \n$INFO Please send $TOML_ERR file and screen log of \n$INFO all operations you have made to this script dev"
