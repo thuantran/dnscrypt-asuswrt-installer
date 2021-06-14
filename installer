@@ -358,7 +358,7 @@ check_relays () {
           elif [ "$ADD_RELAYS" == "NO" ]; then
             echo -e "$INFO Skipping relays for $SERVER."
           fi
-        ;;
+          ;;
         odoh-cloudflare|odoh-crypto-sx|odoh-id-gmail|odoh-jp.tiar.app|odoh-jp.tiarap.org|odoh-tiarap.org)
           echo -e "$INFO Found $SERVER, ODoH relays are required for ODoH servers.\n$INFO You may manually choose relays for $SERVER server or you may specify wildcard relay (via=['*'])."
           if [ $COUNT -eq 0 ]; then
@@ -374,7 +374,7 @@ check_relays () {
             [ "$USE_WILDCARD" == "YES" ] && choose_relays_manual_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
             [ "$USE_WILDCARD" == "NO" ] && choose_relays_manual_odoh
           fi
-        ;;
+          ;;
         cisco|cisco-ipv6|cisco-familyshield|cisco-familyshield-ipv6|cleanbrowsing-adult|cleanbrowsing-adult-ipv6|cleanbrowsing-family|cleanbrowsing-family-ipv6|cleanbrowsing-security|cleanbrowsing-security-ipv6)
           if [ $NUMFRAG -eq 0 ]; then
             local AVARS_ARGS
@@ -385,11 +385,13 @@ check_relays () {
             eval toml_avars_write "$AVARS_ARGS"
           fi
           NUMFRAG=$((NUMFRAG + 1))
-        ;;
+          ;;
+	*)
+	  ;;
       esac
     fi
   done
-  elif [ -z "$RESOLVERS" ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
+  if [ -z "$RESOLVERS" ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
     local AVARS_ARGS
     echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
     read_yesno "Do you still want to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
