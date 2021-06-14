@@ -407,7 +407,7 @@ check_relays () {
     [ "$USE_WILDCARD" == "YES" ] && choose_relays_automatic_wildcard || echo -e "$INFO You chose not to use wildcard for relay selection.\n$INFO Instead you will manually choose relays from a list."
     [ "$USE_WILDCARD" == "NO" ] && choose_relays_automatic_odoh
     eval toml_avars_write "$AVARS_ARGS"
-  else [ -z "$RESOLVERS" ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ]; then
+  elif [ -z "$RESOLVERS" ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*false.*' $TOML_FILE)" ]; then
     local AVARS_ARGS		  
     check_anonymized_disabled
     eval toml_avars_write "$AVARS_ARGS"
