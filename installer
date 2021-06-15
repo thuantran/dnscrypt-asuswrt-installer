@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.5                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.6                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.2.5"
+DI_VERSION="v2.2.6"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -86,6 +86,7 @@ backup_restore () {
       local RURL
       RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
       local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
+      local CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
       echo -e "$INFO Please hold on while the latest local files are updated.."
       download_file $TARG_DIR 755 $RURL
       download_file $TARG_DIR 755 "$URL_GEN"/manager
@@ -95,8 +96,10 @@ backup_restore () {
         $RESOLVERS_URL_PREFIX/relays.md.minisig \
         $RESOLVERS_URL_PREFIX/odoh.md \
         $RESOLVERS_URL_PREFIX/odoh.md.minisig
+      download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
+      download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv.minisig
     fi 
-    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv $TARG_DIR/dnscrypt-resolvers.csv.minisig
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -125,6 +128,7 @@ backup_restore () {
     local RURL
     RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
     local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
+    local CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
     echo -e "$INFO Please wait a moment."
     tar -xzvf $BASE_DIR/backup_dnscrypt.tar.gz -C $BASE_DIR >/dev/null 2>&1
     chown "$(nvram get http_username)":root $TARG_DIR/*
@@ -137,7 +141,9 @@ backup_restore () {
       $RESOLVERS_URL_PREFIX/relays.md.minisig \
       $RESOLVERS_URL_PREFIX/odoh.md \
       $RESOLVERS_URL_PREFIX/odoh.md.minisig
-    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig
+    download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
+    download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv.minisig
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv $TARG_DIR/dnscrypt-resolvers.csv.minisig
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -332,10 +338,25 @@ check_relays () {
   local SERVER
   local COUNT
   local NUMFRAG
-  DNSCRYPT_ARGS="acsacsar-ams-ipv4|acsacsar-ams-ipv6|adguard-dns|adguard-dns-family|adguard-dns-family-ipv6|adguard-dns-ipv6|adguard-dns-unfiltered|adguard-dns-unfiltered-ipv6|ads-dnswarden-dc1|ads-dnswarden-dc1-ecs|ads-dnswarden-dc1-ipv6|ads-dnswarden-dc1-ipv6-ecs|ads-dnswarden-dc2|ads-dnswarden-dc2-ecs|ads-dnswarden-dc2-ipv6|ads-dnswarden-dc2-ipv6-ecs|ads-dnswarden-dc3|ads-dnswarden-dc3-ecs|ads-dnswarden-dc3-ipv6|ads-dnswarden-dc3-ipv6-ecs|af-dnswarden-dc1|af-dnswarden-dc1-ecs|af-dnswarden-dc1-ipv6|af-dnswarden-dc1-ipv6-ecs|af-dnswarden-dc2|af-dnswarden-dc2-ecs|af-dnswarden-dc2-ipv6|af-dnswarden-dc2-ipv6-ecs|af-dnswarden-dc3|af-dnswarden-dc3-ecs|af-dnswarden-dc3-ipv6|af-dnswarden-dc3-ipv6-ecs|altername|ams-dnscrypt-nl|ams-dnscrypt-nl-ipv6|ams-dnscrypt-noads-nl|arvind-io|bcn-dnscrypt|captnemo-in|comodo-02|comss.one|cs-austria|cs-barcelona|cs-belgium|cs-bulgaria|cs-ca|cs-ca2|cs-ch|cs-czech|cs-dc|cs-de|cs-dk|cs-dus1|cs-dus2|cs-dus3|cs-dus4|cs-fi|cs-finland|cs-fr|cs-ga|cs-hungary|cs-il|cs-ireland|cs-is|cs-it|cs-la|cs-london|cs-lv|cs-madrid|cs-manchester|cs-milan|cs-mo|cs-montreal|cs-nc|cs-nl|cs-nl2|cs-norway|cs-nv|cs-nyc1|cs-nyc2|cs-ore|cs-pl|cs-poland|cs-pt|cs-ro|cs-rome|cs-serbia|cs-sk|cs-slovakia|cs-swe|cs-tx|cs-usca|cs-usdc|cs-usga|cs-usil|cs-usnc|cs-usor|cs-ustx|cs-uswa|cs-vancouver|d0wn-is-ns2|d0wn-tz-ns1|d0wn-tz-ns1-ipv6|dama.noosl-s04|dama.nosa-a80|dct-ru1|dct-ru2|decloudus-nogoogle-tst|decloudus-nogoogle-tstipv6|deffer-dns.au|dnscrypt-ch-blahdns-ipv4|dnscrypt-ch-blahdns-ipv6|dnscrypt-de-blahdns-ipv4|dnscrypt-de-blahdns-ipv6|dnscrypt-fi-blahdns-ipv4|dnscrypt-fi-blahdns-ipv6|dnscrypt-jp-blahdns-ipv4|dnscrypt-jp-blahdns-ipv6|dnscrypt-sg-blahdns-ipv4|dnscrypt-sg-blahdns-ipv6|dnscrypt.be|dnscrypt.ca-1|dnscrypt.ca-1-ipv6|dnscrypt.ca-2|dnscrypt.ca-2-ipv6|dnscrypt.eu-dk|dnscrypt.eu-dk-ipv6|dnscrypt.eu-nl|dnscrypt.eu-nl-ipv6|dnscrypt.nl-ns0|dnscrypt.one|dnscrypt.one-ipv6|dnscrypt.pl|dnscrypt.pl-guardian|dnscrypt.uk-ipv4|dnscrypt.uk-ipv6|dnsforfamily|dnsforfamily-no-safe-search|dnsforfamily-v6|dnswarden-dc1|dnswarden-dc1-ipv6|dnswarden-dc2|dnswarden-dc2-ipv6|dnswarden-dc3|dnswarden-dc3-ipv6|doh-fi-blahdns|east.comss.one|ev-to|ev-va|faelix-ch-ipv4|faelix-ch-ipv6|faelix-uk-ipv4|faelix-uk-ipv6|ffmuc.net|ffmuc.net-v6|freetsa.org|freetsa.org-ipv6|geekdns-hk|geekdns-north|geekdns-south|geekdns-west|ibksturm|id-gmail|id-gmail-ipv6|jp.tiar.app|jp.tiar.app-ipv6|meganerd|meganerd-ipv6|moulticast-ca-ipv4|moulticast-ca-ipv6|moulticast-de-ipv4|moulticast-fr-ipv4|moulticast-sg-ipv4|moulticast-sg-ipv6|moulticast-uk-ipv4|mrkaran|opennic-R4SAS|opennic-R4SAS-ipv6|opennic-bongobow|opennic-eleix|opennic-luggs|opennic-luggs-ipv6|opennic-luggs2|opennic-luggs2-ipv6|opennic-rico4514|oszx|pf-dnscrypt|plan9-ns1|plan9-ns2|pryv8boi|publicarray-au|publicarray-au2|pwoss.org-dnscrypt|qag.me|quad9-dnscrypt-ip4-filter-alt|quad9-dnscrypt-ip4-filter-pri|quad9-dnscrypt-ip4-nofilter-alt|quad9-dnscrypt-ip4-nofilter-pri|quad9-dnscrypt-ip6-filter-alt|quad9-dnscrypt-ip6-filter-pri|quad9-dnscrypt-ip6-nofilter-alt|quad9-dnscrypt-ip6-nofilter-pri|qualityology.com|safesurfer|saldns01-conoha-ipv4|saldns02-conoha-ipv4|saldnssg01-conoha-ipv4|scaleway-ams|scaleway-ams-ipv6|scaleway-fr|scaleway-fr-ipv6|sea-dnscrypt-us|securedns|securedns-ipv6|serbica|sfw.scaleway-fr|sicher-surfen-de|soltysiak|sth-dnscrypt-se|userspace-australia|userspace-australia-ipv6|v.dnscrypt.uk-ipv4|v.dnscrypt.uk-ipv6|ventricle.us|wevpn-adblock-singapore|wevpn-adblock-uk|wevpn-adblock-useast|wevpn-adblock-uswest|wevpn-singapore|wevpn-uk|wevpn-useast|wevpn-uswest|yandex|zackptg5-us-il-ipv4|zackptg5-us-il-ipv6|zackptg5-us-pit-ipv4|zackptg5-us-pit-ipv6"
-  ODOH_ARGS="odoh-cloudflare|odoh-crypto-sx|odoh-id-gmail|odoh-jp.tiar.app|odoh-jp.tiarap.org|odoh-tiarap.org"
-  FRAGSBLOCKED_ARGS="cisco|cisco-ipv6|cisco-familyshield|cisco-familyshield-ipv6|cleanbrowsing-adult|cleanbrowsing-adult-ipv6|cleanbrowsing-family|cleanbrowsing-family-ipv6|cleanbrowsing-security|cleanbrowsing-security-ipv6" 
-  VARSARGS="$(echo "${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}" | sed 's/|/ /g; q' )"
+  local NUMCRYPT
+  local CRYPT
+  FRAGSBLOCKED_ARGS="cisco|cisco-ipv6|cisco-familyshield|cisco-familyshield-ipv6|cleanbrowsing-adult|cleanbrowsing-adult-ipv6|cleanbrowsing-family|cleanbrowsing-family-ipv6|cleanbrowsing-security|cleanbrowsing-security-ipv6"
+  NUMCRYPT=0
+  while read CRYPT; do
+    CRYPT="$(echo "$CRYPT" | cut -d',' -f1)"
+    if [ "$NUMCRYPT" -eq 0 ]; then
+      NUMCRYPT=1
+      continue
+    fi
+    if [ "$NUMCRYPT" -eq 1 ]; then
+      [ -z "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
+    elif [ "$NUMCRYPT" -gt 1 ]; then
+      [ -z "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
+    fi
+    NUMCRYPT=$((NUMCRYPT + 1))
+  done < $TARG_DIR/dnscrypt-resolvers.csv
+  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' $TARG_DIR/odoh.md | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
+  VARSARGS="$(echo "${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}" | sed 's/|/ /g; q')"
   VARSARGS=$VARSARGS
   COUNT=0
   NUMFRAG=0
@@ -921,6 +942,7 @@ end_op_message () {
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
   local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
+  local CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
   local RURL
   RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
   local NW_STATE
@@ -994,7 +1016,9 @@ inst_dnscrypt () {
     $RESOLVERS_URL_PREFIX/relays.md.minisig \
     $RESOLVERS_URL_PREFIX/odoh.md \
     $RESOLVERS_URL_PREFIX/odoh.md.minisig
-  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig
+  download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
+  download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv.minisig
+  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv $TARG_DIR/dnscrypt-resolvers.csv.minisig
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   setup_dnscrypt
