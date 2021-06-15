@@ -97,8 +97,9 @@ backup_restore () {
         $RESOLVERS_URL_PREFIX/odoh.md \
         $RESOLVERS_URL_PREFIX/odoh.md.minisig
       download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
+      download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv.minisig
     fi 
-    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv $TARG_DIR/dnscrypt-resolvers.csv.minisig
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -141,7 +142,8 @@ backup_restore () {
       $RESOLVERS_URL_PREFIX/odoh.md \
       $RESOLVERS_URL_PREFIX/odoh.md.minisig
     download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
-    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv
+    download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv.minisig
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv $TARG_DIR/dnscrypt-resolvers.csv.minisig
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -336,26 +338,24 @@ check_relays () {
   local SERVER
   local COUNT
   local NUMFRAG
-  local CRYPT
   local NUMCRYPT
-  local BLOCKED
-  FRAGSBLOCKED_ARGS="cisco cisco-ipv6 cisco-familyshield cisco-familyshield-ipv6 cleanbrowsing-adult cleanbrowsing-adult-ipv6 cleanbrowsing-family cleanbrowsing-family-ipv6 cleanbrowsing-security cleanbrowsing-security-ipv6"
+  local CRYPT
+  FRAGSBLOCKED_ARGS="cisco|cisco-ipv6|cisco-familyshield|cisco-familyshield-ipv6|cleanbrowsing-adult|cleanbrowsing-adult-ipv6|cleanbrowsing-family|cleanbrowsing-family-ipv6|cleanbrowsing-security|cleanbrowsing-security-ipv6"
+  NUMCRYPT=0
   while read CRYPT; do
-    if [ $NUMCRYPT -eq 0 ]; then
+    CRYPT="$(echo "$CRYPT" | cut -d',' -f1)"
+    if [ "$NUMCRYPT" -eq 0 ]; then
       NUMCRYPT=1
       continue
     fi
-    for BLOCKED in $FRAGSBLOCKED_ARGS; do
-      if [ $NUMCRTPT -eq 1 ] && [ "$CRYPT" != "$BLOCKED" ]; then
-        DNSCRYPT_ARGS="$(echo $CRYPT | cut -d',' -f1)"
-      elif [ $NUMCRYPT -gt 1 ] && [ "$CRYPT" != "$BLOCKED" ]; then
-        DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|$(echo $CRYPT | cut -d',' -f1)"
-      fi
-    done
-    NUMCRYPT=$((NUMCRYPT+1))
+    if [ "$NUMCRYPT" -eq 1 ]; then
+      [ -z "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
+    elif [ "$NUMCRYPT" -gt 1 ]; then
+      [ -z "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
+    fi
+    NUMCRYPT=$((NUMCRYPT + 1))
   done < $TARG_DIR/dnscrypt-resolvers.csv
-  ODOH_ARGS="$(echo "$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' $TARG_DIR/odoh.md | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')")"
-  FRAGSBLOCKED_ARGS="$(echo "${FRAGSBLOCKED_ARGS}" | sed 's/ /|/g; q')" 
+  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' $TARG_DIR/odoh.md | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
   VARSARGS="$(echo "${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}" | sed 's/|/ /g; q')"
   VARSARGS=$VARSARGS
   COUNT=0
@@ -1017,7 +1017,8 @@ inst_dnscrypt () {
     $RESOLVERS_URL_PREFIX/odoh.md \
     $RESOLVERS_URL_PREFIX/odoh.md.minisig
   download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
-  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv
+  download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv.minisig
+  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv $TARG_DIR/dnscrypt-resolvers.csv.minisig
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   setup_dnscrypt
