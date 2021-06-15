@@ -86,6 +86,7 @@ backup_restore () {
       local RURL
       RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
       local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
+      local CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
       echo -e "$INFO Please hold on while the latest local files are updated.."
       download_file $TARG_DIR 755 $RURL
       download_file $TARG_DIR 755 "$URL_GEN"/manager
@@ -95,8 +96,9 @@ backup_restore () {
         $RESOLVERS_URL_PREFIX/relays.md.minisig \
         $RESOLVERS_URL_PREFIX/odoh.md \
         $RESOLVERS_URL_PREFIX/odoh.md.minisig
+      download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
     fi 
-    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -125,6 +127,7 @@ backup_restore () {
     local RURL
     RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
     local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
+    local CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
     echo -e "$INFO Please wait a moment."
     tar -xzvf $BASE_DIR/backup_dnscrypt.tar.gz -C $BASE_DIR >/dev/null 2>&1
     chown "$(nvram get http_username)":root $TARG_DIR/*
@@ -137,7 +140,8 @@ backup_restore () {
       $RESOLVERS_URL_PREFIX/relays.md.minisig \
       $RESOLVERS_URL_PREFIX/odoh.md \
       $RESOLVERS_URL_PREFIX/odoh.md.minisig
-    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig
+    download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
+    chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -921,6 +925,7 @@ end_op_message () {
 inst_dnscrypt () {
   local DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
   local RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
+  local CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
   local RURL
   RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
   local NW_STATE
@@ -994,7 +999,8 @@ inst_dnscrypt () {
     $RESOLVERS_URL_PREFIX/relays.md.minisig \
     $RESOLVERS_URL_PREFIX/odoh.md \
     $RESOLVERS_URL_PREFIX/odoh.md.minisig
-  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig
+  download_file $TARG_DIR 644 $CRYPT_RESOLVERS/dnscrypt-resolvers.csv
+  chown nobody:nobody $TARG_DIR/public-resolvers.md $TARG_DIR/public-resolvers.md.minisig $TARG_DIR/relays.md $TARG_DIR/relays.md.minisig $TARG_DIR/odoh.md $TARG_DIR/odoh.md.minisig $TARG_DIR/dnscrypt-resolvers.csv
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   setup_dnscrypt
