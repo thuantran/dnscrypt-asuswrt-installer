@@ -115,20 +115,27 @@ check_dnscrypt_toml () {
 }
 
 check_dns_environment () {
+  if [ -f /opt/etc/init.d/S61stubby ] || [ -f "/opt/sbin/stubby" ] || [ -f /opt/bin/install_stubby ] || [ -f /jffs/scripts/install_stubby.sh ];
+    echo -e "$ERROR Potential stubby installation detected.\n$ERROR Please remove before attempting to continue.\n$ERROR Exiting..."
+    exit 1
+  fi    
   local DNSPRIV=$(nvram get dnspriv_enable)
   if [ "$DNSPRIV" -ne 0 ]; then
     echo -e "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
     nvram commit
+    killall -q -9 stubby
     service restart_dnsmasq >/dev/null 2>&1
     echo -e "$INFO DNS Environment is Ready."
   else
     echo -e "$INFO DNS Environment is Ready."
   fi
+
 }
 
 check_dns_filter () {
   local DNSFIL=$(nvram get dnsfilter_enable_x)
+  local USE_SOME
   if [ "$1" -eq 0 ] && [ "$DNSFIL" -ne 0 ]; then
     nvram set dnsfilter_enable_x="0"
     nvram commit
@@ -137,37 +144,20 @@ check_dns_filter () {
     return
   fi
   if [ "$1" -eq 1 ] && [ "$DNSFIL" -ne 1 ]; then
-    nvram set dnsfilter_custom1=""
-    nvram set dnsfilter_custom2=""
-    nvram set dnsfilter_custom3=""
     nvram set dnsfilter_enable_x="1"
-    nvram set dnsfilter_mode="11"
-    nvram set dnsfilter_rulelist=""
-    nvram set dnsfilter_rulelist1=""
-    nvram set dnsfilter_rulelist2=""
-    nvram set dnsfilter_rulelist3=""
-    nvram set dnsfilter_rulelist4=""
-    nvram set dnsfilter_rulelist5=""
-    nvram set dhcp_dns1_x=""
-    nvram set dhcp_dns2_x=""
-    nvram commit
-    service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
-    echo -e "$INFO DNSFilter is set to Control DNS."
+    USE_SOME=1
   elif [ "$1" -eq 1 ] && [ "$DNSFIL" -ne 0 ]; then
     echo -e "$INFO DNSFilter is Already on.\n$INFO You can choose to keep any custom dnsfilter values and only redirect non-custom traffic or send all traffic through this proxy."
-    read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && check_dns_filter_some 0 || check_dns_filter_some 1
+    read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && USE_SOME=0 || USE_SOME=1
   fi
-}
-
-check_dns_filter_some () {
-  if [ "$1" -eq 0 ]; then
+  if [ "$USE_SOME" -eq 0 ]; then
     nvram set dnsfilter_mode="11"
     nvram commit
     service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
     echo -e "$INFO DNSFilter is set to control DNS through this proxy, while leaving any Custom Rules and Values."
     return
   fi
-  if [ "$1" -eq 1 ]; then
+  if [ "$USE_SOME" -eq 1 ]; then
     nvram set dnsfilter_custom1=""
     nvram set dnsfilter_custom2=""
     nvram set dnsfilter_custom3=""
@@ -180,6 +170,7 @@ check_dns_filter_some () {
     nvram set dnsfilter_rulelist5=""
     nvram set dhcp_dns1_x=""
     nvram set dhcp_dns2_x=""
+    nvram set dhcpd_dns_router="1"
     nvram commit
     service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1
     echo -e "$INFO DNS is set to redirect All DNS resolutions through this proxy."
@@ -434,25 +425,25 @@ check_version () {
 choose_dnscrypt_server () {  
   local USE_IPV6
   read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
-  toml_gvars_prep ipv6_servers $USE_IPV6
+  toml_avars_prep ipv6_servers $USE_IPV6
   echo -e "$INFO Choose DNS resolving load balancing strategy:\n  1) p2 (default)\n  2) ph\n  3) first\n  4) random"
   read_input_num "Select your mode" 1 4
   case $CHOSEN in
     1)
-      toml_gvars_prep lb_strategy "\'p2\'"
+      toml_avars_prep lb_strategy "\'p2\'"
       ;;
     2)
-      toml_gvars_prep lb_strategy "\'ph\'"
+      toml_avars_prep lb_strategy "\'ph\'"
       ;;
     3)
-      toml_gvars_prep lb_strategy "\'first\'"
+      toml_avars_prep lb_strategy "\'first\'"
       ;;
     4)
-      toml_gvars_prep lb_strategy "\'random\'"
+      toml_avars_prep lb_strategy "\'random\'"
       ;;
   esac
   read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE=true || USE_LBE=false
-  toml_gvars_prep lb_estimator $USE_LBE
+  toml_avars_prep lb_estimator $USE_LBE
   echo -e "$INFO Choose how your DNS servers are selected:\n  1) Automatically\n  2) Manually\n  3) Static"
   read_input_num "Select your mode" 1 3
   case $CHOSEN in
@@ -460,27 +451,27 @@ choose_dnscrypt_server () {
       choose_dnscrypt_server_auto
       read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED=true || CHOOSE_DISABLED=false
       [ "$CHOOSE_DISABLED" == "true" ] && choose_dnscrypt_server_disabled
-      [ "$CHOOSE_DISABLED" == "false" ] && toml_gvar_disable disabled_server_names
+      [ "$CHOOSE_DISABLED" == "false" ] && toml_avar_disable disabled_server_names
       ;;
     2)
-      toml_gvar_disable disabled_server_names
+      toml_avar_disable disabled_server_names
       choose_dnscrypt_server_manual
       ;;
     3)
-      toml_gvar_disable disabled_server_names
+      toml_avar_disable disabled_server_names
       static_chosen 0
       ;;
   esac
 }
 
 choose_dnscrypt_server_auto () {
-  toml_gvar_disable server_names
-  read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && toml_gvars_prep odoh_servers true || toml_gvars_prep odoh_servers false   
-  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_gvars_prep dnscrypt_servers true || toml_gvars_prep dnscrypt_servers false
-  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_gvars_prep doh_servers true || toml_gvars_prep doh_servers false
-  read_yesno "Use only servers that support DNSSEC" && toml_gvars_prep require_dnssec true || toml_gvars_prep require_dnssec false
-  read_yesno "Use only servers that do not log user's queries" && toml_gvars_prep require_nolog true || toml_gvars_prep require_nolog false
-  read_yesno "Use only servers that do not filter result" && toml_gvars_prep require_nofilter true || toml_gvars_prep require_nofilter false
+  toml_avar_disable server_names
+  read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && toml_avars_prep odoh_servers true || toml_avars_prep odoh_servers false   
+  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_avars_prep dnscrypt_servers true || toml_avars_prep dnscrypt_servers false
+  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_avars_prep doh_servers true || toml_avars_prep doh_servers false
+  read_yesno "Use only servers that support DNSSEC" && toml_avars_prep require_dnssec true || toml_avars_prep require_dnssec false
+  read_yesno "Use only servers that do not log user's queries" && toml_avars_prep require_nolog true || toml_avars_prep require_nolog false
+  read_yesno "Use only servers that do not filter result" && toml_avars_prep require_nofilter true || toml_avars_prep require_nofilter false
 }
 
 choose_dnscrypt_server_disabled () {
@@ -497,7 +488,7 @@ choose_dnscrypt_server_disabled () {
     if [ $? -eq 1 ]; then
       read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED=true || ODOH_DISABLED=false
       [ "$ODOH_DISABLED" == "true" ] && choose_dnscrypt_server_disabled_odoh
-      toml_gvars_prep disabled_server_names "\"[${RESOLVERS}]\""
+      toml_avars_prep disabled_server_names "\"[${RESOLVERS}]\""
       return
     fi
   fi
@@ -549,7 +540,7 @@ choose_dnscrypt_server_manual () {
   if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" == "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
     local RESOLVERS
-    toml_gvars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
+    toml_avars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Available DNS servers: "
     INDEX=$(awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT)' $TARG_DIR/public-resolvers.md | wc -l)
     awk -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/public-resolvers.md
@@ -559,10 +550,10 @@ choose_dnscrypt_server_manual () {
     if [ $? -eq 1 ]; then
       read_yesno "Do you want to choose which ODoH servers to enable?" && ODOH_ENABLE=true || ODOH_ENABLE=false
       [ "$ODOH_ENABLE" == "true" ] && choose_dnscrypt_server_odoh
-      [ "$ODOH_ENABLE" == "false" ] && toml_gvars_prep odoh_servers false
+      [ "$ODOH_ENABLE" == "false" ] && toml_avars_prep odoh_servers false
       read_yesno "Do you want to add any static servers?" && ADD_STATIC=YES || ADD_STATIC=NO
       [ "$ADD_STATIC" == "YES" ] && static_chosen 0
-      toml_gvars_prep server_names "\"[${RESOLVERS}]\""
+      toml_avars_prep server_names "\"[${RESOLVERS}]\""
       return
     fi
   fi
@@ -584,7 +575,7 @@ choose_dnscrypt_server_odoh () {
   local INDEX=$1
   if [ -z "$INDEX" ]; then
     local ORESOLVERS
-    toml_gvars_prep odoh_servers true
+    toml_avars_prep odoh_servers true
     echo -e "$INFO Available DNS servers: "
     INDEX=$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' $TARG_DIR/odoh.md | wc -l)
     awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' $TARG_DIR/odoh.md
@@ -1160,7 +1151,7 @@ static_chosen () {
   local STATICNAME
   if [ "$1" -eq 0 ]; then
     local STATICRESOLVERS
-    [ -z "$ADD-STATIC" ] && toml_gvars_prep dnscrypt_servers true doh_servers true odoh_servers true require_dnssec false require_nolog false require_nofilter false
+    [ -z "$ADD-STATIC" ] && toml_avars_prep dnscrypt_servers true doh_servers true odoh_servers true require_dnssec false require_nolog false require_nofilter false
     echo -e "$INFO Please choose Static Server Name"
     echo -en "$INPUT Please enter staticname$NORM: "
     read -r STATICNAME
@@ -1179,7 +1170,7 @@ static_chosen () {
     elif [ "$ANOTHER" == "NO" ]; then
       echo -e "$INFO finished static setup."
       [ "$ADD_STATIC" == "YES" ] && RESOLVERS="${STATICRESOLVERS}, $RESOLVERS"
-      [ -z "$ADD_STATIC" ] && toml_gvars_prep server_names "\"[$STATICRESOLVERS]\""
+      [ -z "$ADD_STATIC" ] && toml_avars_prep server_names "\"[$STATICRESOLVERS]\""
       return
     fi
   fi
@@ -1299,7 +1290,7 @@ setup_dnscrypt_impl () {
       cp -f $TOML_ORI $TOML_FILE
     fi    
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
-    toml_gvar_enable disabled_server_names
+    toml_avar_enable disabled_server_names
     toml_nvars_replace "# [sources.'odoh']" "[sources.'odoh']" $TOML_FILE
     toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" $TOML_FILE
     toml_nvars_replace "# cache_file = 'odoh.md'" "cache_file = 'odoh.md'" $TOML_FILE
@@ -1314,7 +1305,7 @@ setup_dnscrypt_impl () {
     read_input_dns_n "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_gvars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+    toml_avars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     echo -e "$INFO Writing dnscrypt-proxy configuration..."
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
@@ -1371,7 +1362,8 @@ toml_avars_prep () {
 
 toml_avars_write () {
   local IDX_NX_AVAR=$(awk 'END {print NR}' $TOML_FILE)
-  local IDX_GLB_INS=$(awk -v VAR="#.*Anonymized DNS        #*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
+  local IDX_GLB_INS=$(awk -v VAR="#.*Global settings.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
+  #local IDX_GLB_INS=$(awk -v VAR="#.*Anonymized DNS        #*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
   local VAR
   local VALUE
   local TO
@@ -1399,53 +1391,7 @@ toml_avars_write () {
   sed -i "${SED_CMD%;}" $TOML_FILE
 }
 
-toml_gvar_disable () {
-  local VAR=$1
-  local IDX_NX_GVAR=$(awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE)
-  sed -i "1,$IDX_NX_GVAR{s/\(^$VAR = .*\)/# \1/}" $TOML_FILE
-}
 
-toml_gvar_enable () {
-  local VAR=$1
-  local IDX_NX_GVAR=$(awk '/^\[.*\]$/ {print NR;exit}' $TOML_FILE)
-  sed -i "1,$IDX_NX_GVAR{/^#.*$VAR = .*$/s/^#\ //}" $TOML_FILE
-}
-
-toml_gvars_prep () {
-  local GVARS_ARGS=""
-  GVARS_ARGS="$GVARS_ARGS $@"
-  eval toml_gvars_write "$GVARS_ARGS"
-}
-
-toml_gvars_write () {
-  local IDX_NX_GVAR=$(awk '/\[.+\]/ && !/(#| = )/ {print NR;exit}' $TOML_FILE)
-  local IDX_GLB_INS=$(awk -v VAR="#.*Global settings.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
-  local VAR
-  local VALUE
-  local TO
-  local INDEX
-  local HAS_GLB_INS
-  local SED_CMD
-  while [ $# -gt 0 ]; do
-    VAR=$1; shift
-    VALUE=$1; shift
-    TO=$(_quote "$VAR = $VALUE")
-    INDEX=$(awk -v IDX="$IDX_NX_GVAR" -v VAR="^$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE)
-    if [ "$INDEX" ]; then
-      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
-      continue
-    fi
-    INDEX=$(awk -v IDX="$IDX_NX_GVAR" -v VAR="#.*$VAR = " '($0 ~ VAR) && (NR < IDX) {print NR; exit}' $TOML_FILE)
-    if [ "$INDEX" ]; then
-      SED_CMD="${INDEX}{s/.*/${TO}/};${SED_CMD}"
-      continue
-    fi
-    [ -z $HAS_GLB_INS ] && SED_CMD="${SED_CMD}${IDX_GLB_INS}{s/^/\n${TO}\n" || SED_CMD="${SED_CMD}${TO}\n"
-    HAS_GLB_INS=1
-  done
-  [ "$HAS_GLB_INS" ] && SED_CMD="${SED_CMD}/}"
-  sed -i "${SED_CMD%;}" $TOML_FILE
-}
 
 toml_nvars_insert () {
   PATTERN=$(_quote "$1")
@@ -1591,10 +1537,10 @@ clear
 sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
-  RT-AX56U|RT-AX58U|RT-AX3000)
-    echo -e "$ERROR This is an unsupported router, sorry."
-    exit 1
-    ;;
+  #RT-AX56U|RT-AX58U|RT-AX3000)
+  #  echo -e "$ERROR This is an unsupported router, sorry."
+  #  exit 1
+  #  ;;
   *)
     echo -e "$INFO Detected $ROUTER_MODEL router."
     ;;
@@ -1602,7 +1548,6 @@ esac
 
 case $ROUTER_OS in
   Linux)
-    ROUTER_OS=linux
     echo -e "$INFO Detected $ROUTER_OS platform."
     ;;
   *)
@@ -1631,7 +1576,6 @@ case $ROUTER_ARCH in
     exit 1
     ;;
 esac
-
 
 check_jffs_enabled
 check_dns_environment
