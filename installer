@@ -1363,7 +1363,6 @@ toml_avars_prep () {
 toml_avars_write () {
   local IDX_NX_AVAR=$(awk 'END {print NR}' $TOML_FILE)
   local IDX_GLB_INS=$(awk -v VAR="#.*Global settings.*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
-  #local IDX_GLB_INS=$(awk -v VAR="#.*Anonymized DNS        #*" '($0 ~ VAR) {while (getline) {if ($0 ~ "^$") break} print NR;exit}' $TOML_FILE)
   local VAR
   local VALUE
   local TO
