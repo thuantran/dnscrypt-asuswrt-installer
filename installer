@@ -115,7 +115,7 @@ check_dnscrypt_toml () {
 }
 
 check_dns_environment () {
-  if [ -f /opt/etc/init.d/S61stubby ] || [ -f "/opt/sbin/stubby" ] || [ -f /opt/bin/install_stubby ] || [ -f /jffs/scripts/install_stubby.sh ];
+  if [ -f /opt/etc/init.d/S61stubby ] || [ -f "/opt/sbin/stubby" ] || [ -f /opt/bin/install_stubby ] || [ -f /jffs/scripts/install_stubby.sh ]; then
     echo -e "$ERROR Potential stubby installation detected.\n$ERROR Please remove before attempting to continue.\n$ERROR Exiting..."
     exit 1
   fi    
