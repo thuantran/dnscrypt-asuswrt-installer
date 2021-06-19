@@ -346,7 +346,7 @@ check_relays () {
     fi
   done
   if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
-    echo -e "$WARNING No compatible servers detected.\n$INFO To continue you may still select relays for Wild-Card Support."
+    echo -e "$INFO To continue you may still select relays for Wild-Card Server Support."
     read_yesno "Do you still want to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
   elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' $TOML_FILE)" ] && [ "$(grep '^dnscrypt_servers = .*true.*' $TOML_FILE)" ]; then
     COUNT=$((COUNT + 1))
