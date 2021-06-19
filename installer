@@ -1305,7 +1305,7 @@ setup_dnscrypt_impl () {
     toml_nvars_replace "# minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" $TOML_FILE
     toml_nvars_replace "# refresh_delay = 24" "refresh_delay = 24" $TOML_FILE
     toml_nvars_replace "# prefix = ''" "prefix = ''" $TOML_FILE
-    choose_dnscrypt_server 0
+    choose_dnscrypt_server
     echo -e "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
     check_relays
     echo -e "$INFO Set the DNS server(s) for initializing dnscrypt-proxy\n$INFO and router services (e.g. ntp) at boot"
