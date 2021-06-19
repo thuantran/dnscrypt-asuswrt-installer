@@ -1591,10 +1591,10 @@ clear
 sed -n '2,24p' "$0"
 
 case $ROUTER_MODEL in
-  #RT-AX56U|RT-AX58U|RT-AX3000)
-  #  echo -e "$INFO Detected $ROUTER_MODEL router."
-  #  CONDITIONAL_ARCH=TRUE
-  #  ;;
+  RT-AX56U|RT-AX58U|RT-AX3000)
+    echo -e "$ERROR This is an unsupported router, sorry."
+    exit 1
+    ;;
   *)
     echo -e "$INFO Detected $ROUTER_MODEL router."
     ;;
