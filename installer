@@ -424,7 +424,7 @@ check_version () {
 
 choose_dnscrypt_server () {  
   local USE_IPV6
-  read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false
+  if [ "$(nvram get ipv6_service)" != "disabled" ]; then read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6=true || USE_IPV6=false; else USE_IPV6=false; fi 
   toml_avars_prep ipv6_servers $USE_IPV6
   echo -e "$INFO Choose DNS resolving load balancing strategy:\n  1) p2 (default)\n  2) ph\n  3) first\n  4) random"
   read_input_num "Select your mode" 1 4
