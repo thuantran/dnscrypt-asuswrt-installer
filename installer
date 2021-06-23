@@ -235,7 +235,7 @@ check_anonymized_automatic () {
     local USE_WILDCARD
     PTXT "$INFO Custom Servers that are potentially not compatible with relays are detected!" \
       "$WARNING These servers might not work with relays." \
-      "$WARNING Use at your own risk."
+      "$WARNING Use at your own risk." \
       "$INFO This allows for the use of server_name='*' as wildcard for servers used with relays." \
       "$INFO This means that this will be the default route for all servers." \
       "$INFO Additionally routes can be distinctly selected using via=['*'] as relay wildcard."
