@@ -1161,7 +1161,7 @@ read_input_dns () {
     PTXT "$ERROR Invalid DNS server address entered"
     read_input_dns "$@"
   else
-    if [ $BOOTSTRAP ]; then
+    if [ "$BOOTSTRAP" ]; then
       BOOTSTRAP="$BOOTSTRAP, '$DNS_SERVER:53'"
     else
       BOOTSTRAP="'$DNS_SERVER:53'"
