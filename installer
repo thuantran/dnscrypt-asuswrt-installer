@@ -522,9 +522,9 @@ choose_dnscrypt_server () {
 
 choose_dnscrypt_server_auto () {
   toml_avar_disable server_names
-  read_yesno "Use only servers that support the ODoH protocol (this will only use ODoH)" && toml_avars_prep odoh_servers true || toml_avars_prep odoh_servers false
-  read_yesno "Use only servers that support the DNSCrypt protocol" && toml_avars_prep dnscrypt_servers true || toml_avars_prep dnscrypt_servers false
-  read_yesno "Use only servers that support the DNS-over-HTTPS protocol" && toml_avars_prep doh_servers true || toml_avars_prep doh_servers false
+  read_yesno "Use servers that support the ODoH protocol" && toml_avars_prep odoh_servers true || toml_avars_prep odoh_servers false
+  read_yesno "Use servers that support the DNSCrypt protocol" && toml_avars_prep dnscrypt_servers true || toml_avars_prep dnscrypt_servers false
+  read_yesno "Use servers that support the DNS-over-HTTPS protocol" && toml_avars_prep doh_servers true || toml_avars_prep doh_servers false
   read_yesno "Use only servers that support DNSSEC" && toml_avars_prep require_dnssec true || toml_avars_prep require_dnssec false
   read_yesno "Use only servers that do not log user's queries" && toml_avars_prep require_nolog true || toml_avars_prep require_nolog false
   read_yesno "Use only servers that do not filter result" && toml_avars_prep require_nofilter true || toml_avars_prep require_nofilter false
@@ -1162,15 +1162,10 @@ read_input_dns () {
     PTXT "$ERROR Invalid DNS server address entered"
     read_input_dns "$@"
   fi
-}
-
-read_input_dns_n () {
-  printf "%s" "$INPUT $1 ${BOLD}$2: $NORM"
-  read NDNS_SERVER
-  [ -z "$NDNS_SERVER" ] && NDNS_SERVER=$2
-  if [ "$(echo "$NDNS_SERVER" | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}')" ]; then
-    PTXT "$ERROR Invalid DNS server address entered"
-    read_input_dns "$@"
+  if [ $BOOTSTRAP ]; then
+    BOOTSTRAP="$BOOTSTRAP, '$DNS_SERVER:53'"
+  else
+    BOOTSTRAP="'$DNS_SERVER:53'"
   fi
 }
 
@@ -1373,10 +1368,10 @@ setup_dnscrypt_impl () {
     PTXT "$INFO Set the DNS server(s) for initializing dnscrypt-proxy" \
       "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 9.9.9.9
-    read_input_dns_n "2nd Default is" 8.8.8.8
+    read_input_dns "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-    toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = ['$DNS_SERVER:53', '$NDNS_SERVER:53']" $TOML_FILE
-    toml_avars_prep bootstrap_resolvers "\"['$DNS_SERVER:53', '$NDNS_SERVER:53']\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+    toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP]" $TOML_FILE
+    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     PTXT "$INFO Writing dnscrypt-proxy configuration..."
     check_dnscrypt_toml
     if [ $? -ne 0 ]; then
