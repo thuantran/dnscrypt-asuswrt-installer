@@ -1174,23 +1174,18 @@ read_input_dns () {
 }
 
 read_input_num () {
-  if [ -z "$4" ] && [ -z "$5" ] && [ -z "$6" ]; then
-    printf "%s" "$INPUT $1, ${BOLD}[$2-$3]${NORM}: "
-  elif [ -n "$4" ] && [ -z "$5" ] && [ -z "$6" ]; then 
-    printf "%s" "$INPUT $1, ${BOLD}[$2-$3/$4]${NORM}: "
-  elif [ -n "$4" ] && [ -n "$5" ] && [ -z "$6" ]; then 
-    printf "%s" "$INPUT $1, ${BOLD}[$2-$3/$4/$5]${NORM}: "
-  elif [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ]; then 
-    printf "%s" "$INPUT $1, ${BOLD}[$2-$3/$4/$5/$6]${NORM}: "  
-  fi
+  local RANGE
+  [ -z "$4" ] && [ -z "$5" ] && [ -z "$6" ] && RANGE="[$2-$3]"
+  [ -n "$4" ] && [ -z "$5" ] && [ -z "$6" ] && RANGE="[$2-$3/$4]"
+  [ -n "$4" ] && [ -n "$5" ] && [ -z "$6" ] && RANGE="[$2-$3/$4/$5]"
+  [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ] && RANGE="[$2-$3/$4/$5/$6]"  
+  printf "%s" "$INPUT $1, ${BOLD}${RANGE}${NORM}: "
   read CHOSEN
-  if [ "$CHOSEN" ] && [ "$CHOSEN" = "$4" ]; then
-    return 1
-  elif [ "$CHOSEN" ] && [ "$CHOSEN" = "$5" ]; then
-    return 1
-  elif [ "$CHOSEN" ] && [ "$CHOSEN" = "$6" ]; then
-    return 1
-  fi
+  case "$CHOSEN" in
+    $4|$5|$6)
+      return 1
+      ;;
+  esac
   if [ -z "$(echo "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
     PTXT "$ERROR Invalid character entered! Retrying..."
     read_input_num "$@"
