@@ -1186,6 +1186,11 @@ read_input_num () {
       return 1
       ;;
   esac
+  case "$1" in
+    "Set log level, default is 2, 0 is the most verbose")
+      [ -z $CHOSEN ] && CHOSEN=2
+      ;;
+  esac
   if [ -z "$(echo "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
     PTXT "$ERROR Invalid character entered! Retrying..."
     read_input_num "$@"
