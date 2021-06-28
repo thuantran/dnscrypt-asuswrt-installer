@@ -327,12 +327,12 @@ check_relays () {
     NUMCRYPT=$((NUMCRYPT + 1))
   done < $TARG_DIR/dnscrypt-resolvers.csv
   ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' $TARG_DIR/odoh.md | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
-  VARSARGS="$(echo "${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}" | sed 's/|/ /g; q')"
+  VARSARGS="${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}"
   VARSARGS=$VARSARGS
   COUNT=0
   NUMFRAG=0
   [ "$NUMFRAG" -eq 0 ] && toml_avars_prep skip_incompatible false
-  for SERVER in $VARSARGS; do
+  for SERVER in ${VARSARGS//|/ }; do
     if [ "$(grep '^server_names = .*'${SERVER}'.*' $TOML_FILE | fgrep -c "'${SERVER}'")" -ne 0 ]; then
       [ -n "$(echo "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT=$SERVER # Martineau Ugly Hack
       [ -n "$(echo "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH=$SERVER # Martineau Ugly Hack
