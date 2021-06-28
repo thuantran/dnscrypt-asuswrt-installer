@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.6                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.7                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.2.6"
+DI_VERSION="v2.2.7"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -314,15 +314,15 @@ check_relays () {
   FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' $TOML_ORI | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
   NUMCRYPT=0
   while read CRYPT; do
-    CRYPT="$(echo "$CRYPT" | cut -d',' -f1)"
+    CRYPT="$(PTXT "$CRYPT" | cut -d',' -f1)"
     if [ "$NUMCRYPT" -eq 0 ]; then
       NUMCRYPT=1
       continue
     fi
     if [ "$NUMCRYPT" -eq 1 ]; then
-      [ -z "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
+      [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
     elif [ "$NUMCRYPT" -gt 1 ]; then
-      [ -z "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
+      [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
     fi
     NUMCRYPT=$((NUMCRYPT + 1))
   done < $TARG_DIR/dnscrypt-resolvers.csv
@@ -334,9 +334,9 @@ check_relays () {
   [ "$NUMFRAG" -eq 0 ] && toml_avars_prep skip_incompatible false
   for SERVER in ${VARSARGS//|/ }; do
     if [ "$(grep '^server_names = .*'${SERVER}'.*' $TOML_FILE | fgrep -c "'${SERVER}'")" -ne 0 ]; then
-      [ -n "$(echo "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT=$SERVER # Martineau Ugly Hack
-      [ -n "$(echo "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH=$SERVER # Martineau Ugly Hack
-      [ -n "$(echo "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED=$SERVER # Martineau Ugly Hack
+      [ -n "$(PTXT "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT=$SERVER # Martineau Ugly Hack
+      [ -n "$(PTXT "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH=$SERVER # Martineau Ugly Hack
+      [ -n "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED=$SERVER # Martineau Ugly Hack
       case $SERVER in
         "$DNSCRYPT")  
           read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS=YES || ADD_RELAYS=NO
@@ -480,7 +480,7 @@ choose_dnscrypt_server () {
     "  2) ph" \
     "  3) first" \
     "  4) random"
-  read_input_num "Select your mode" 1 4
+  read_input_num "Select your strategy" 1 4
   case $CHOSEN in
     1)
       toml_avars_prep lb_strategy "\'p2\'"
@@ -498,7 +498,7 @@ choose_dnscrypt_server () {
   read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE=true || USE_LBE=false
   toml_avars_prep lb_estimator $USE_LBE
   PTXT "$INFO Choose how your DNS servers are selected:" \
-    "  1) Automatically" \
+    "  1) Automatically (default)" \
     "  2) Manually" \
     "  3) Static"
   read_input_num "Select your mode" 1 3
@@ -550,7 +550,7 @@ choose_dnscrypt_server_disabled () {
   fi
   local ITEM
   ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md)
-  if [ -n "$(echo "$RESOLVERS" | grep -oF "'$ITEM'")" ]; then
+  if [ -n "$(PTXT "$RESOLVERS" | grep -oF "'$ITEM'")" ]; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RESOLVERS" ]; then
@@ -579,7 +579,7 @@ choose_dnscrypt_server_disabled_odoh () {
   fi
   local OITEM
   OITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md)
-  if [ -n "$(echo "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
+  if [ -n "$(PTXT "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
     PTXT "$INFO $OITEM is already set."
   else
     if [ "$ORESOLVERS" ]; then
@@ -615,7 +615,7 @@ choose_dnscrypt_server_manual () {
   fi
   local ITEM
   ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/public-resolvers.md)
-  if [ -n "$(echo "$RESOLVERS" | grep -oF "'$ITEM'")" ]; then
+  if [ -n "$(PTXT "$RESOLVERS" | grep -oF "'$ITEM'")" ]; then
     PTXT "$INFO $ITEM is already set"
   else
     if [ "$RESOLVERS" ]; then
@@ -645,7 +645,7 @@ choose_dnscrypt_server_odoh () {
   fi
   local OITEM
   OITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md)
-  if [ -n "$(echo "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
+  if [ -n "$(PTXT "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
     PTXT "$INFO $OITEM is already set"
   else
     if [ "$ORESOLVERS" ]; then
@@ -678,7 +678,7 @@ choose_relays_automatic () {
   fi
   local ITEM
   ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md)
-  if [ -n "$(echo "$RELAYS" | grep -oF "'$ITEM'")" ]; then
+  if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
@@ -707,7 +707,7 @@ choose_relays_automatic_odoh () {
   fi
   local OITEM
   OITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md)
-  if [ -n "$(echo "$ORELAYS" | grep -oF "'$OITEM'")" ]; then
+  if [ -n "$(PTXT "$ORELAYS" | grep -oF "'$OITEM'")" ]; then
     PTXT "$INFO $OITEM is already set."
   else
     if [ "$ORELAYS" ]; then
@@ -748,7 +748,7 @@ choose_relays_manual () {
   fi
   local ITEM
   ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/relays.md) 
-  if [ -n "$(echo "$RELAYS" | grep -oF "'$ITEM'")" ]; then
+  if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
@@ -783,7 +783,7 @@ choose_relays_manual_odoh () {
   fi
   local ITEM
   ITEM=$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' $TARG_DIR/odoh.md) 
-  if [ -n "$(echo "$RELAYS" | grep -oF "'$ITEM'")" ]; then
+  if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
@@ -873,7 +873,7 @@ download_file () {
     FILENAME="$(basename "$URL")"
     MD5SUM_OLD="$([ -f "$TARG"/"$FILENAME" ] && md5sum "$TARG"/"$FILENAME" | cut -d' ' -f1)"
     MD5SUM_CURR="$(curl -fsL "$URL" | md5sum | awk '{print $1}')"
-    if [ "$(echo -n "$MD5SUM_CURR" | wc -c)" -eq 32 ] && [ "$MD5SUM_CURR" = "$MD5SUM_OLD" ]; then
+    if [ "$(PTXT -n "$MD5SUM_CURR" | wc -c)" -eq 32 ] && [ "$MD5SUM_CURR" = "$MD5SUM_OLD" ]; then
       PTXT "$INFO $FILENAME is up to date. Skipping..."
     else
       local COUNT=0
@@ -1094,8 +1094,8 @@ inst_random () {
 inst_ran_dev () {
   if [ -c /dev/ttyACM0 ]; then
     local PRODSTR=$(awk '{ print }' /sys/class/tty/ttyACM0/device/uevent | grep ^PRODUCT\=)
-    local VID=$(echo "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 1)
-    local PID=$(echo "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 2)
+    local VID=$(PTXT "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 1)
+    local PID=$(PTXT "$PRODSTR" | cut -d '=' -f 2 | cut -d '/' -f 2)
     if [ "$VID" = "4d8" ] && [ "$PID" = "f5fe" ]; then
       PTXT "$INFO Found TrueRNG USB HW RNG"
       RNG_DEV=ttyACM0
@@ -1159,7 +1159,7 @@ read_input_dns () {
   local DNS_SERVER
   read DNS_SERVER
   [ -z $DNS_SERVER ] && DNS_SERVER=$2
-  if [ "$(echo "$DNS_SERVER" | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}')" ]; then
+  if [ "$(PTXT "$DNS_SERVER" | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}')" ]; then
     PTXT "$ERROR Invalid DNS server address entered"
     read_input_dns "$@"
   fi
@@ -1181,17 +1181,20 @@ read_input_num () {
   [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ] && RANGE="[$2-$3/$4/$5/$6]"  
   printf "%s" "$INPUT $1, ${BOLD}${RANGE}${NORM}: "
   read CHOSEN
+  case "$1" in
+    "Set log level, default is 2, 0 is the most verbose")
+      [ -z $CHOSEN ] && CHOSEN=2
+      ;;
+    "Select your strategy"|"Select your mode")
+      [ -z $CHOSEN ] && CHOSEN=1
+      ;;
+  esac
   case "$CHOSEN" in
     $4|$5|$6)
       return 1
       ;;
   esac
-  case "$1" in
-    "Set log level, default is 2, 0 is the most verbose")
-      [ -z $CHOSEN ] && CHOSEN=2
-      ;;
-  esac
-  if [ -z "$(echo "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
+  if [ -z "$(PTXT "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
     PTXT "$ERROR Invalid character entered! Retrying..."
     read_input_num "$@"
     return
@@ -1248,7 +1251,7 @@ static_chosen () {
 
   local STATIC
   STATIC="${STATICNAME}-Static"
-  if [ -n "$(echo "$STATICRESOLVERS" | grep -oF "$STATIC")" ]; then
+  if [ -n "$(PTXT "$STATICRESOLVERS" | grep -oF "$STATIC")" ]; then
     PTXT "$INFO $STATIC is already set"
   else
     toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
@@ -1287,7 +1290,7 @@ static_chosen_relays () {
 
   local STATIC
   STATIC="${STATICNAME}-Static"
-  if [ -n "$(echo "$STATICRELAYS" | grep -oF "$STATIC")" ]; then
+  if [ -n "$(PTXT "$STATICRELAYS" | grep -oF "$STATIC")" ]; then
     PTXT "$INFO $STATIC is already set"
   else
     toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" $TOML_FILE
