@@ -157,7 +157,8 @@ check_dns_environment () {
       "$ERROR Exiting..."
     exit 1
   fi    
-  local DNSPRIV="$(nvram get dnspriv_enable)"
+  local DNSPRIV
+  DNSPRIV="$(nvram get dnspriv_enable)"
   if [ "$DNSPRIV" -ne 0 ]; then
     PTXT "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
@@ -172,7 +173,8 @@ check_dns_environment () {
 }
 
 check_dns_filter () {
-  local DNSFIL="$(nvram get dnsfilter_enable_x)"
+  local DNSFIL
+  DNSFIL="$(nvram get dnsfilter_enable_x)"
   local USE_SOME
   if [ "$1" -eq 0 ] && [ "$DNSFIL" -ne 0 ]; then
     nvram set dnsfilter_enable_x="0"
@@ -411,7 +413,8 @@ check_relays () {
 }
 
 check_swap () {
-  local SWAP_SIZE="$(awk '/SwapTotal/ {print $2}' /proc/meminfo)"
+  local SWAP_SIZE
+  SWAP_SIZE="$(awk '/SwapTotal/ {print $2}' /proc/meminfo)"
   if [ "$SWAP_SIZE" -gt 0 ]; then
     PTXT "$INFO Swap file is already setup"
     end_op_message 0
