@@ -1209,6 +1209,7 @@ read_input_dns () {
   case "$1" in
     "Default is")
       BOOTSTRAP="'$DNS_SERVER:53'"
+      PROBE=$DNS_SERVER:53
       ;;
     "2nd Default is")
       BOOTSTRAP="$BOOTSTRAP, '$DNS_SERVER:53'"
@@ -1421,7 +1422,7 @@ setup_dnscrypt_impl () {
     read_input_dns "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP]" "$TOML_FILE"
-    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$DNS_SERVER:53\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     PTXT "$INFO Writing dnscrypt-proxy configuration..."
     check_dnscrypt_toml
     if [ "$?" -ne 0 ]; then
