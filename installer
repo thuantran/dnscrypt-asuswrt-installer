@@ -385,20 +385,20 @@ check_relays () {
           fi
           ;;
         "$FRAGSBLOCKED")
-          if [ "$NUMFRAG" -eq 0 ]; then
+          if [ "$NUMFRAG" -eq 0 ] && [ "$COUNT" -gt 0 ]; then
             local USE_BROKEN
             read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
             toml_avars_prep skip_incompatible $USE_BROKEN
+	    NUMFRAG="$((NUMFRAG + 1))"
           fi
-          NUMFRAG="$((NUMFRAG + 1))"
           ;;
       esac
     fi
   done
-  if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
+  if [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
     PTXT "$INFO To continue you may still select relays for Wild-Card Server Support."
     read_yesno "Do you still want to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
+  elif [ "$COUNT" -eq 0 ] && [ "$NUMFRAG" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
     COUNT="$((COUNT + 1))"
     PTXT "$INFO This option allows you to setup wildcard relay/server support (via=['*'])/(server_name "*") for all compatible servers."
     check_anonymized_automatic 0
