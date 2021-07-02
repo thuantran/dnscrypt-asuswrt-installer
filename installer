@@ -385,12 +385,12 @@ check_relays () {
           fi
           ;;
         "$FRAGSBLOCKED")
-          if [ "$NUMFRAG" -eq 0 ]; then
+          if [ "$NUMFRAG" -eq 0 ] && [ "$COUNT" -gt 0 ]; then
             local USE_BROKEN
             read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
             toml_avars_prep skip_incompatible $USE_BROKEN
+	    NUMFRAG="$((NUMFRAG + 1))"
           fi
-          NUMFRAG="$((NUMFRAG + 1))"
           ;;
       esac
     fi
