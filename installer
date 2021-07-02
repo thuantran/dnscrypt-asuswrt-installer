@@ -1438,16 +1438,35 @@ set_timezone () {
   local TMP
   TMP="/root"
   local TZ_DATA
-  TZ_DATA="tzdata-2018c-1-any.pkg.tar.bz2"
+  local INDEX
+  local TZ_ARCH
+  TZ_ARCH="$(uname -m)"
+  case $TZ_ARCH in
+    "aarch64"|"arm64")
+      TZ_ARCH="aarch64"
+    ;;
+    "armv7l")
+      TZ_ARCH="arm"
+    ;;
+    *)
+      local USE_ANY
+      USE_ANY="TRUE"
+    ;;
+  esac
+  [ "$USE_ANY" = "TRUE" ] && TZ_DATA="tzdata-2018c-1-any.pkg.tar.bz2"
+  [ -z "$USE_ANY" ] && TZ_DATA="tzdata-2021a-1-${TZ_ARCH}.pkg.tar.bz2"
   download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
   download_file "$TMP" 644 "${URL_GEN}/${TZ_DATA}"
   local INDEX
-  INDEX="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l)"
+  [ "$USE_ANY" = "TRUE" ] && INDEX="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l)"
+  [ -z "$USE_ANY" ] && INDEX="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && /\/posix\//' | wc -l)"
   PTXT "$INFO Available timezones/locations:"
-  tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
+  [ "$USE_ANY" = "TRUE" ] && tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
+  [ -z "$USE_ANY" ] && tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && /\/posix\//' | sort | cut -d'/' -f2- | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
   read_input_num "Select your timezone/location" 1 "$INDEX"
   local TZ_FILE 
-  TZ_FILE="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
+  [ "$USE_ANY" = "TRUE" ] && TZ_FILE="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
+  [ -z "$USE_ANY" ] && TZ_FILE="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ &&  /\/posix\//' | sort | cut -d'.' -d'/' -f2- | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
   PTXT "$INFO $(basename "$TZ_FILE") selected"
   tar xjf "${TMP}/${TZ_DATA}" -C "$TMP" usr/share/zoneinfo/posix
   mv "${TMP}/${TZ_FILE}" "${TARG_DIR}/localtime"
@@ -1456,7 +1475,6 @@ set_timezone () {
     end_op_message
     return
   fi
-
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
   ln -sf $TARG_DIR/localtime /etc/localtime
