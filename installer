@@ -1107,7 +1107,7 @@ inst_random () {
   case "$CHOSEN" in
     1)
       rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-      killall -q -9 haveged
+      killall -q -9 haveged jitterentropy-rngd rngd
       download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_GEN}/manager"
       write_conf RAN_PRV haveged
       ${TARG_DIR}/haveged -w 1024 -d 32 -i 32 -v 1
@@ -1115,7 +1115,7 @@ inst_random () {
     2)
       local RNG_DEV
       rm -f "${TARG_DIR}/haveged"
-      killall -q -9 rngd
+      killall -q -9 haveged jitterentropy-rngd rngd
       download_file "$TARG_DIR" 755 "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
       inst_ran_dev || return
       write_conf RAN_PRV rngd
