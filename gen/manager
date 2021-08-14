@@ -31,9 +31,11 @@ dnsmasq_params () {
 
 init_hwrng () {
   local COUNT=0
+  killall -q -9 haveged jitterentropy-rngd rngd
   while [ ! -c $RNG_DEV ]; do
     if [ $COUNT -gt 120 ]; then
-      logger "ERROR: Unable to find HWRNG device. Aborting..."
+      logger "ERROR: Unable to find HWRNG device. Aborting, using haveged instead..."
+      /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
       exit 1
     fi
     COUNT=$((COUNT+1))
@@ -143,6 +145,7 @@ case $1 in
     timezone
     case $RAN_PRV in
       haveged)
+        killall -q -9 haveged jitterentropy-rngd rngd
         /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
         ;;
       rngd)
