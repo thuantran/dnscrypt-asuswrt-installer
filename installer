@@ -23,7 +23,7 @@
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.2.7"
+DI_VERSION="v2.2.8"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -94,16 +94,20 @@ backup_restore () {
       "${TARG_DIR}/public-resolvers.md.minisig" \
       "${TARG_DIR}/relays.md" \
       "${TARG_DIR}/relays.md.minisig" \
-      "${TARG_DIR}/odoh.md" \
-      "${TARG_DIR}/odoh.md.minisig" \
+      "${TARG_DIR}/odoh-servers.md" \
+      "${TARG_DIR}/odoh-servers.md.minisig" \
+      "${TARG_DIR}/odoh-relays.md" \
+      "${TARG_DIR}/odoh-relays.md.minisig" \
       "${TARG_DIR}/dnscrypt-resolvers.csv" \
       "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     chown nobody:nobody "${TARG_DIR}/public-resolvers.md" \
       "${TARG_DIR}/public-resolvers.md.minisig" \
       "${TARG_DIR}/relays.md" \
       "${TARG_DIR}/relays.md.minisig" \
-      "${TARG_DIR}/odoh.md" \
-      "${TARG_DIR}/odoh.md.minisig" \
+      "${TARG_DIR}/odoh-servers.md" \
+      "${TARG_DIR}/odoh-servers.md.minisig" \
+      "${TARG_DIR}/odoh-relays.md" \
+      "${TARG_DIR}/odoh-relays.md.minisig" \            
       "${TARG_DIR}/dnscrypt-resolvers.csv" \
       "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
@@ -342,7 +346,7 @@ check_relays () {
     fi
     NUMCRYPT="$((NUMCRYPT + 1))"
   done < $TARG_DIR/dnscrypt-resolvers.csv
-  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' "${TARG_DIR}/odoh.md" | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
+  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' "${TARG_DIR}/odoh-servers.md" | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
   VARSARGS="${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}"
   COUNT="0"
   NUMFRAG="0"
@@ -585,8 +589,8 @@ choose_dnscrypt_server_disabled_odoh () {
   if [ -z "$INDEX" ]; then
     local ORESOLVERS
     PTXT "$INFO Available DNS servers to disable: "
-    INDEX="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh.md" | wc -l)"
-    awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh.md"
+    INDEX="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh-servers.md" | wc -l)"
+    awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh-servers.md"
     read_input_num "Please choose DNS server to disable" 1 "$INDEX"
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
@@ -596,7 +600,7 @@ choose_dnscrypt_server_disabled_odoh () {
     fi
   fi
   local OITEM
-  OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh.md")"
+  OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-servers.md")"
   if [ -n "$(PTXT "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
     PTXT "$INFO $OITEM is already set."
   else
@@ -653,8 +657,8 @@ choose_dnscrypt_server_odoh () {
     local ORESOLVERS
     toml_avars_prep odoh_servers true
     PTXT "$INFO Available DNS servers: "
-    INDEX="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh.md" | wc -l)"
-    awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh.md"
+    INDEX="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh-servers.md" | wc -l)"
+    awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh-servers.md"
     read_input_num "Please choose DNS server." 1 "$INDEX"
   else
     read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
@@ -664,7 +668,7 @@ choose_dnscrypt_server_odoh () {
     fi
   fi
   local OITEM
-  OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh.md")"
+  OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-servers.md")"
   if [ -n "$(PTXT "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
     PTXT "$INFO $OITEM is already set"
   else
@@ -717,8 +721,8 @@ choose_relays_automatic_odoh () {
   if [ -z "$INDEX" ]; then
     local ORELAYS
     PTXT "$INFO Available Relay servers: "
-    INDEX="$(awk -v PATT="odoh-" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh.md" | wc -l)"
-    awk -v PATT="odoh-" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh.md"
+    INDEX="$(awk -v PATT="odoh-" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh-relays.md" | wc -l)"
+    awk -v PATT="odoh-" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh-relays.md"
     read_input_num "Please choose RELAY server" 1 "$INDEX"
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n
@@ -728,7 +732,7 @@ choose_relays_automatic_odoh () {
     fi
   fi
   local OITEM
-  OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh.md")"
+  OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-relays.md")"
   if [ -n "$(PTXT "$ORELAYS" | grep -oF "'$OITEM'")" ]; then
     PTXT "$INFO $OITEM is already set."
   else
@@ -789,8 +793,8 @@ choose_relays_manual_odoh () {
   if [ -z "$INDEX" ]; then
     local RELAYS
     PTXT "$INFO Available Relay servers: "
-    INDEX="$(awk -v PATT="odoh-" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh.md" | wc -l)"
-    awk -v PATT="odoh-" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh.md"
+    INDEX="$(awk -v PATT="odoh-" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh-relays.md" | wc -l)"
+    awk -v PATT="odoh-" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh-relays.md"
     read_input_num "Please choose RELAY server" 1 "$INDEX"
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n
@@ -806,7 +810,7 @@ choose_relays_manual_odoh () {
     fi
   fi
   local ITEM
-  ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh.md")"
+  ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-relays.md")"
   if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
     PTXT "$INFO $ITEM is already set."
   else
@@ -1018,16 +1022,20 @@ inst_dnscrypt () {
     "${RESOLVERS_URL_PREFIX}/public-resolvers.md.minisig" \
     "${RESOLVERS_URL_PREFIX}/relays.md" \
     "${RESOLVERS_URL_PREFIX}/relays.md.minisig" \
-    "${RESOLVERS_URL_PREFIX}/odoh.md" \
-    "${RESOLVERS_URL_PREFIX}/odoh.md.minisig"
+    "${RESOLVERS_URL_PREFIX}/odoh-servers.md" \
+    "${RESOLVERS_URL_PREFIX}/odoh-servers.md.minisig" \
+    "${RESOLVERS_URL_PREFIX}/odoh-relays.md" \
+    "${RESOLVERS_URL_PREFIX}/odoh-relays.md.minisig"
   download_file "$TARG_DIR" 644 "${CRYPT_RESOLVERS}/dnscrypt-resolvers.csv" \
     "${CRYPT_RESOLVERS}/dnscrypt-resolvers.csv.minisig"
   chown nobody:nobody "${TARG_DIR}/public-resolvers.md" \
     "${TARG_DIR}/public-resolvers.md.minisig" \
     "${TARG_DIR}/relays.md" \
     "${TARG_DIR}/relays.md.minisig" \
-    "${TARG_DIR}/odoh.md" \
-    "${TARG_DIR}/odoh.md.minisig" \
+    "${TARG_DIR}/odoh-servers.md" \
+    "${TARG_DIR}/odoh-servers.md.minisig" \
+    "${TARG_DIR}/odoh-relays.md" \
+    "${TARG_DIR}/odoh-relays.md.minisig" \   
     "${TARG_DIR}/dnscrypt-resolvers.csv" \
     "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
@@ -1107,16 +1115,15 @@ inst_random () {
   case "$CHOSEN" in
     1)
       rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-      killall -q -9 haveged
+      killall -q -9 haveged jitterentropy-rngd rngd
       download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_GEN}/manager"
       write_conf RAN_PRV haveged
       ${TARG_DIR}/haveged -w 1024 -d 32 -i 32 -v 1
       ;;
     2)
       local RNG_DEV
-      rm -f "${TARG_DIR}/haveged"
-      killall -q -9 rngd
-      download_file "$TARG_DIR" 755 "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
+      killall -q -9 haveged jitterentropy-rngd rngd
+      download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
       inst_ran_dev || return
       write_conf RAN_PRV rngd
       ${TARG_DIR}/stty raw -echo -ixoff -F "/dev/${RNG_DEV}" speed 115200
@@ -1407,12 +1414,15 @@ setup_dnscrypt_impl () {
     fi    
     read_yesno "Do you want to redirect all DNS resolutions on your network through this proxy?" && check_dns_filter 1 || check_dns_filter 0
     toml_avar_enable disabled_server_names
-    toml_nvars_replace "# [sources.'odoh']" "[sources.'odoh']" "$TOML_FILE"
-    toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh.md']" "$TOML_FILE"
-    toml_nvars_replace "# cache_file = 'odoh.md'" "cache_file = 'odoh.md'" "$TOML_FILE"
-    toml_nvars_replace "# minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "$TOML_FILE"
-    toml_nvars_replace "# refresh_delay = 24" "refresh_delay = 24" "$TOML_FILE"
-    toml_nvars_replace "# prefix = ''" "prefix = ''" "$TOML_FILE"
+    local PHX
+    for PHX in servers relays; do 
+      toml_nvars_replace "# [sources.'odoh-${PHX}']" "[sources.'odoh-${PHX}']" "$TOML_FILE"
+      toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "$TOML_FILE"
+      toml_nvars_replace "# cache_file = 'odoh-${PHX}.md'" "cache_file = 'odoh-${PHX}.md'" "$TOML_FILE"
+      toml_nvars_replace "# minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "$TOML_FILE"
+      toml_nvars_replace "# refresh_delay = 24" "refresh_delay = 24" "$TOML_FILE"
+      toml_nvars_replace "# prefix = ''" "prefix = ''" "$TOML_FILE"
+    done
     choose_dnscrypt_server
     PTXT "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
     check_relays
