@@ -1114,9 +1114,8 @@ inst_random () {
       ;;
     2)
       local RNG_DEV
-      rm -f "${TARG_DIR}/haveged"
       killall -q -9 haveged jitterentropy-rngd rngd
-      download_file "$TARG_DIR" 755 "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
+      download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
       inst_ran_dev || return
       write_conf RAN_PRV rngd
       ${TARG_DIR}/stty raw -echo -ixoff -F "/dev/${RNG_DEV}" speed 115200
