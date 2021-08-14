@@ -39,6 +39,7 @@ init_hwrng () {
     COUNT=$((COUNT+1))
     sleep 1
   done
+  killall -q -9 haveged jitterentropy-rngd rngd
   /jffs/dnscrypt/stty raw -echo -ixoff -F $RNG_DEV speed 115200
   /jffs/dnscrypt/rngd -r $RNG_DEV
   [ $? -eq 0 ] && logger "rngd: Started for $RNG_DEV"
@@ -143,6 +144,7 @@ case $1 in
     timezone
     case $RAN_PRV in
       haveged)
+        killall -q -9 haveged jitterentropy-rngd rngd
         /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
         ;;
       rngd)
