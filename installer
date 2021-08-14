@@ -346,7 +346,7 @@ check_relays () {
     fi
     NUMCRYPT="$((NUMCRYPT + 1))"
   done < $TARG_DIR/dnscrypt-resolvers.csv
-  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' "${TARG_DIR}/odoh.md" | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
+  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' "${TARG_DIR}/odoh-servers.md" | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
   VARSARGS="${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}"
   COUNT="0"
   NUMFRAG="0"
