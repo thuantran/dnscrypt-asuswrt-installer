@@ -34,8 +34,8 @@ init_hwrng () {
   killall -q -9 haveged jitterentropy-rngd rngd
   while [ ! -c $RNG_DEV ]; do
     if [ $COUNT -gt 120 ]; then
-      logger "ERROR: Unable to find HWRNG device. Aborting, using haveged instead..."
-      /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
+      logger "ERROR: Unable to find HWRNG device. Aborting..."
+      [ -f "/jffs/dnscrypt/haveged" ] && /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1 && logger "Haveged: Using available haveged instead..."
       exit 1
     fi
     COUNT=$((COUNT+1))
