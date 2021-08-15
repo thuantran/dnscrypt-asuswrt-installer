@@ -6,7 +6,7 @@ append_on_demand () {
   TARGET="$1"
   shift
   for LINE in "$@"; do
-    if [ -z "`grep -F \"$LINE\" $TARGET`" ]; then
+    if [ -z "$(grep -F \"$LINE\" $TARGET)" ]; then
       echo "$LINE" >> $TARGET
     fi
   done
@@ -34,8 +34,8 @@ init_hwrng () {
   killall -q -9 haveged jitterentropy-rngd rngd
   while [ ! -c $RNG_DEV ]; do
     if [ $COUNT -gt 120 ]; then
-      logger "ERROR: Unable to find HWRNG device. Aborting, using haveged instead..."
-      /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
+      logger "ERROR: Unable to find HWRNG device. Aborting..."
+      [ -f "/jffs/dnscrypt/haveged" ] && /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1 && logger "Haveged: Using available haveged instead..."
       exit 1
     fi
     COUNT=$((COUNT+1))
@@ -56,13 +56,13 @@ start_dnscrypt () {
 
 start_monitor () {
   trap "" 1
-  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  while [ "$(nvram get ntp_ready)" -eq 0 ]; do sleep 1; done
   local NW_STATE
   local RES_STATE
   local COUNT=0
   local RANDOM=0
   while true; do  
-    if [ $COUNT -eq 90 ]; then
+    if [ "$COUNT" -eq 90 ]; then
       COUNT=0
       timezone
       $0 opendns-update
@@ -72,14 +72,14 @@ start_monitor () {
     NW_STATE=$?
     nslookup google.com >/dev/null 2>&1
     RES_STATE=$?
-    if [ -f /jffs/dnscrypt/dnscrypt-proxy ]; then
-      if [ -z "`pidof dnscrypt-proxy`" ]; then
+    if [ -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
+      if [ -z "$(pidof dnscrypt-proxy)" ]; then
         logger "Warning: dnscrypt-proxy is dead"
         start_dnscrypt
-      elif [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
+      elif [ "$NW_STATE" -eq 0 ] && [ "$RES_STATE" -ne 0 ]; then
         logger "Warning: dnscrypt-proxy is not responding"
         start_dnscrypt
-      elif [ $RANDOM -eq 4320 ]; then
+      elif [ "$RANDOM" -eq 4320 ]; then
         RANDOM=0
         logger "Randomization: Health Check."
         start_dnscrypt
@@ -96,19 +96,19 @@ timezone () {
   local TIMEZONE
   local TARGET
   local LINK
-  SANITY=$(date -u -r $0 '+%s')
-  NOW=$(date -u '+%s')
-  TIMEZONE=/jffs/dnscrypt/localtime
-  TARGET=/etc/localtime
-  LINK=$(readlink $TARGET)
-  if [ -f $TIMEZONE ] && [ "$LINK" = "$TIMEZONE" ]; then
-      if [ $NOW -ge $SANITY ]; then
+  SANITY="$(date -u -r $0 '+%s')"
+  NOW="$(date -u '+%s')"
+  TIMEZONE="/jffs/dnscrypt/localtime"
+  TARGET="/etc/localtime"
+  LINK="$(readlink $TARGET)"
+  if [ -f "$TIMEZONE" ] && [ "$LINK" = "$TIMEZONE" ]; then
+      if [ "$NOW" -ge "$SANITY" ]; then
         touch "$0"
       fi
-  elif [ -f $TIMEZONE ]; then
+  elif [ -f "$TIMEZONE" ]; then
     ln -sf $TIMEZONE $TARGET
-    if [ $NOW -le $SANITY ]; then
-      date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
+    if [ "$NOW" -le "$SANITY" ]; then
+      date -u -s "$(date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S')"
     fi
   fi
 }
@@ -118,7 +118,7 @@ update_opendns () {
     return
   fi
   sleep 5
-  RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
+  RET="$(curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname=")"
   case "$RET" in
     good*)
       logger "OpenDNS: Update IP succeeded"
