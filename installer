@@ -107,7 +107,7 @@ backup_restore () {
       "${TARG_DIR}/odoh-servers.md" \
       "${TARG_DIR}/odoh-servers.md.minisig" \
       "${TARG_DIR}/odoh-relays.md" \
-      "${TARG_DIR}/odoh-relays.md.minisig" \            
+      "${TARG_DIR}/odoh-relays.md.minisig" \
       "${TARG_DIR}/dnscrypt-resolvers.csv" \
       "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
@@ -1035,7 +1035,7 @@ inst_dnscrypt () {
     "${TARG_DIR}/odoh-servers.md" \
     "${TARG_DIR}/odoh-servers.md.minisig" \
     "${TARG_DIR}/odoh-relays.md" \
-    "${TARG_DIR}/odoh-relays.md.minisig" \   
+    "${TARG_DIR}/odoh-relays.md.minisig" \
     "${TARG_DIR}/dnscrypt-resolvers.csv" \
     "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
