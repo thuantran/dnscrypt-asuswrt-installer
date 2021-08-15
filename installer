@@ -107,7 +107,7 @@ backup_restore () {
       "${TARG_DIR}/odoh-servers.md" \
       "${TARG_DIR}/odoh-servers.md.minisig" \
       "${TARG_DIR}/odoh-relays.md" \
-      "${TARG_DIR}/odoh-relays.md.minisig" \            
+      "${TARG_DIR}/odoh-relays.md.minisig" \
       "${TARG_DIR}/dnscrypt-resolvers.csv" \
       "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
@@ -1035,7 +1035,7 @@ inst_dnscrypt () {
     "${TARG_DIR}/odoh-servers.md" \
     "${TARG_DIR}/odoh-servers.md.minisig" \
     "${TARG_DIR}/odoh-relays.md" \
-    "${TARG_DIR}/odoh-relays.md.minisig" \   
+    "${TARG_DIR}/odoh-relays.md.minisig" \
     "${TARG_DIR}/dnscrypt-resolvers.csv" \
     "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
@@ -1416,12 +1416,12 @@ setup_dnscrypt_impl () {
     toml_avar_enable disabled_server_names
     local PHX
     for PHX in servers relays; do 
-      toml_nvars_replace "# [sources.'odoh-${PHX}']" "[sources.'odoh-${PHX}']" "$TOML_FILE"
-      toml_nvars_replace "# urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "$TOML_FILE"
-      toml_nvars_replace "# cache_file = 'odoh-${PHX}.md'" "cache_file = 'odoh-${PHX}.md'" "$TOML_FILE"
-      toml_nvars_replace "# minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "$TOML_FILE"
-      toml_nvars_replace "# refresh_delay = 24" "refresh_delay = 24" "$TOML_FILE"
-      toml_nvars_replace "# prefix = ''" "prefix = ''" "$TOML_FILE"
+      toml_nvars_replace "# [sources.'odoh-${PHX}']" " [sources.'odoh-${PHX}']" "$TOML_FILE"
+      toml_nvars_replace "#   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "$TOML_FILE"
+      toml_nvars_replace "#   cache_file = 'odoh-${PHX}.md'" "   cache_file = 'odoh-${PHX}.md'" "$TOML_FILE"
+      toml_nvars_replace "#   minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "   minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "$TOML_FILE"
+      toml_nvars_replace "#   refresh_delay = 24" "   refresh_delay = 24" "$TOML_FILE"
+      toml_nvars_replace "#   prefix = ''" "   prefix = ''" "$TOML_FILE"
     done
     choose_dnscrypt_server
     PTXT "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
