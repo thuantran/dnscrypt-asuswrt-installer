@@ -682,7 +682,7 @@ choose_dnscrypt_server_odoh () {
 }
 
 choose_relays_automatic () {
-  local 
+  local INDEX
   INDEX="$1"
   if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" = "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
