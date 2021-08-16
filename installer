@@ -408,9 +408,9 @@ check_relays () {
       check_anonymized_disabled
     fi
   elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
-    COUNT="$((COUNT + 1))"
     PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
-    check_anonymized_automatic 0
+    read_yesno "Do you only want relays for ODOH Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
+    [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
   elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then
     PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) required for ODoH servers."
     read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
