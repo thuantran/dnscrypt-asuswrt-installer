@@ -358,7 +358,6 @@ check_relays () {
       [ -n "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED="$SERVER" # Martineau Ugly Hack
       case "$SERVER" in
         "$DNSCRYPT")
-	  local CRYPT_COUNT
 	  CRYPT_COUNT="1"
           read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS="YES" || ADD_RELAYS="NO"
           [ "$ADD_RELAYS" = "YES" ] && PTXT "$INFO You may manually choose relays for $SERVER or you may specify wildcard relay (via=['*'])."
@@ -530,7 +529,6 @@ choose_dnscrypt_server () {
   read_input_num "Select your mode" 1 3
   case "$CHOSEN" in
     1)
-      local CRYPT_COUNT
       CRYPT_COUNT="1"
       choose_dnscrypt_server_auto
       read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED="true" || CHOOSE_DISABLED="false"
