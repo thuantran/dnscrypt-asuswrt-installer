@@ -537,7 +537,9 @@ choose_dnscrypt_server () {
       ;;
     2)
       toml_avar_disable disabled_server_names
-      choose_dnscrypt_server_manual
+      read_yesno "Do you only want to use the Oblivious DNS-over-HTTPS protocol?" && ODOH_ONLY="true" || ODOH_ONLY="false"
+      [ "$ODOH_ONLY" = "true" ] && choose_dnscrypt_server_odoh
+      [ "$ODOH_ONLY" = "false" ] && choose_dnscrypt_server_manual
       ;;
     3)
       toml_avar_disable disabled_server_names
@@ -548,16 +550,16 @@ choose_dnscrypt_server () {
 
 choose_dnscrypt_server_auto () {
   toml_avar_disable server_names
-  read_yesno "Use servers that support the ODoH protocol" && toml_avars_prep odoh_servers true || toml_avars_prep odoh_servers false
   read_yesno "Use servers that support the DNSCrypt protocol" && toml_avars_prep dnscrypt_servers true || toml_avars_prep dnscrypt_servers false
   read_yesno "Use servers that support the DNS-over-HTTPS protocol" && toml_avars_prep doh_servers true || toml_avars_prep doh_servers false
+  read_yesno "Use servers that support the Oblivious DNS-over-HTTPS protocol" && toml_avars_prep odoh_servers true || toml_avars_prep odoh_servers false
   read_yesno "Use only servers that support DNSSEC" && toml_avars_prep require_dnssec true || toml_avars_prep require_dnssec false
   read_yesno "Use only servers that do not log user's queries" && toml_avars_prep require_nolog true || toml_avars_prep require_nolog false
   read_yesno "Use only servers that do not filter result" && toml_avars_prep require_nofilter true || toml_avars_prep require_nofilter false
 }
 
 choose_dnscrypt_server_disabled () {
-  local INDEX 
+  local INDEX
   INDEX="$1"
   if [ -z "$INDEX" ]; then
     [ "$USE_IPV6" = "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
@@ -669,7 +671,8 @@ choose_dnscrypt_server_odoh () {
   else
     read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      RESOLVERS="${ORESOLVERS}, $RESOLVERS"
+      [ "$ODOH_ONLY" = "true" ] && toml_avars_prep server_names "\"[${ORESOLVERS}]\"" dnscrypt_servers false doh_servers false require_dnssec false require_nolog false require_nofilter false
+      [ "$ODOH_ONLY" = "false" ] && RESOLVERS="${ORESOLVERS}, $RESOLVERS"
       return
     fi
   fi
