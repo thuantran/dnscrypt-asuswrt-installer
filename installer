@@ -253,16 +253,16 @@ check_anonymized_automatic () {
       "$WARNING These servers might not work with relays." \
       "$WARNING Use at your own risk."
   fi
-    local USE_BROKEN
-    local USE_WILDCARD
-    PTXT "$INFO This allows for the use of server_name='*' as wildcard option for all servers compatible with relays." \
-      "$INFO This will be the default route for all compatible servers." \
-      "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-    [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-    [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic
-    read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
-    toml_avars_prep skip_incompatible $USE_BROKEN
+  local USE_BROKEN
+  local USE_WILDCARD
+  PTXT "$INFO This allows for the use of server_name='*' as wildcard option for all servers compatible with relays." \
+    "$INFO This will be the default route for all compatible servers." \
+    "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
+  read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
+  [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+  [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic
+  read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
+  toml_avars_prep skip_incompatible $USE_BROKEN
 }
 
 check_anonymized_disabled () {
@@ -323,7 +323,7 @@ check_relays () {
   if [ "$ADD_STATIC" = "YES" ] && [ "$ODOH_ENABLE" = "true" ]; then
     COUNT="0"
     PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
-    read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
+    read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
     [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
   else
     FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' "$TOML_ORI" | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
