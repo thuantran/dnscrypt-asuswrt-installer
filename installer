@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.2.9                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.0                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.2.9"
+DI_VERSION="v2.3.0"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -249,31 +249,20 @@ check_jffs_enabled () {
 
 check_anonymized_automatic () {
   if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*Static.*' "$TOML_FILE")" ]; then
-    local USE_BROKEN
-    local USE_WILDCARD
     PTXT "$INFO Custom servers that are potentially not compatible with relays are detected!" \
       "$WARNING These servers might not work with relays." \
-      "$WARNING Use at your own risk." \
-      "$INFO This allows for the use of server_name='*' as wildcard option for all servers compatible with relays." \
-      "$INFO This will be the default route for all compatible servers." \
-      "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-    [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-    [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic
-    read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
-    toml_avars_prep skip_incompatible $USE_BROKEN
-  else
-    local USE_BROKEN
-    local USE_WILDCARD
-    PTXT "$INFO This allows for the use of server_name='*' as wildcard option for all servers compatible with relays." \
-      "$INFO This will be the default route for all compatible servers." \
-      "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-    [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-    [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic
-    read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
-    toml_avars_prep skip_incompatible $USE_BROKEN
+      "$WARNING Use at your own risk."
   fi
+  local USE_BROKEN
+  local USE_WILDCARD
+  PTXT "$INFO This allows for the use of server_name='*' as wildcard option for all servers compatible with relays." \
+    "$INFO This will be the default route for all compatible servers." \
+    "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
+  read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
+  [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+  [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic
+  read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
+  toml_avars_prep skip_incompatible $USE_BROKEN
 }
 
 check_anonymized_disabled () {
@@ -331,93 +320,100 @@ check_relays () {
   local NUMFRAG
   local NUMCRYPT
   local CRYPT
-  FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' "$TOML_ORI" | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
-  NUMCRYPT="0"
-  while read CRYPT; do
-    CRYPT="$(PTXT "$CRYPT" | cut -d',' -f1)"
-    if [ "$NUMCRYPT" -eq 0 ]; then
-      NUMCRYPT="1"
-      continue
-    fi
-    if [ "$NUMCRYPT" -eq 1 ]; then
-      [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
-    elif [ "$NUMCRYPT" -gt 1 ]; then
-      [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
-    fi
-    NUMCRYPT="$((NUMCRYPT + 1))"
-  done < $TARG_DIR/dnscrypt-resolvers.csv
-  ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' "${TARG_DIR}/odoh-servers.md" | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
-  VARSARGS="${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}"
-  COUNT="0"
-  NUMFRAG="0"
-  [ "$NUMFRAG" -eq 0 ] && toml_avars_prep skip_incompatible false
-  for SERVER in ${VARSARGS//|/ }; do
-    if [ "$(grep '^server_names = .*'"${SERVER}"'.*' "$TOML_FILE" | grep -cF "'${SERVER}'")" -ne 0 ]; then
-      [ -n "$(PTXT "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT="$SERVER" # Martineau Ugly Hack
-      [ -n "$(PTXT "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH="$SERVER" # Martineau Ugly Hack
-      [ -n "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED="$SERVER" # Martineau Ugly Hack
-      case "$SERVER" in
-        "$DNSCRYPT")
-	  CRYPT_COUNT="1"
-          read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS="YES" || ADD_RELAYS="NO"
-          [ "$ADD_RELAYS" = "YES" ] && PTXT "$INFO You may manually choose relays for $SERVER or you may specify wildcard relay (via=['*'])."
-          if [ "$COUNT" -eq 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
-            toml_avar_enable routes
-            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-            [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-            [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual
-            COUNT=$((COUNT + 1))
-          elif [ "$COUNT" -gt 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
-            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-            [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-            [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual
-          elif [ "$ADD_RELAYS" = "NO" ]; then
-            PTXT "$INFO Skipping relays for $SERVER."
-          fi
-          ;;
-        "$ODOH")
-          PTXT "$INFO Found $SERVER, ODoH relays are required for ODoH servers." \
-            "$INFO You may manually choose relays for $SERVER server or you may specify wildcard relay (via=['*'])."
-          if [ "$COUNT" -eq 0 ]; then
-            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-            [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-            [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual_odoh
-            COUNT="$((COUNT + 1))"
-          elif [ "$COUNT" -gt 0 ]; then
-            read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
-            [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-            [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual_odoh
-          fi
-          ;;
-        "$FRAGSBLOCKED")
-          if [ "$NUMFRAG" -eq 0 ] && [ "$COUNT" -gt 0 ]; then
-            local USE_BROKEN
-            read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
-            toml_avars_prep skip_incompatible $USE_BROKEN
-	    NUMFRAG="$((NUMFRAG + 1))"
-          fi
-          ;;
-      esac
-    fi
-  done
-  if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
-    if [ "$CRYPT_COUNT" -gt 0 ] || [ "$(grep '^server_names = .*Static.*' "$TOML_FILE")" ]; then
-      PTXT "$INFO To continue, you may still define a default route for all compatible dnscrypt servers by selecting wildcard option for servers and/or relays."
-      read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible dnscrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
-    else
+  if [ "$ADD_STATIC" = "YES" ] && [ "$ODOH_ENABLE" = "true" ]; then
+    COUNT="0"
+    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
+    read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
+    [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
+  else
+    FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' "$TOML_ORI" | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
+    NUMCRYPT="0"
+    while read CRYPT; do
+      CRYPT="$(PTXT "$CRYPT" | cut -d',' -f1)"
+      if [ "$NUMCRYPT" -eq 0 ]; then
+        NUMCRYPT="1"
+        continue
+      fi
+      if [ "$NUMCRYPT" -eq 1 ]; then
+        [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
+      elif [ "$NUMCRYPT" -gt 1 ]; then
+        [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
+      fi
+      NUMCRYPT="$((NUMCRYPT + 1))"
+    done < $TARG_DIR/dnscrypt-resolvers.csv
+    ODOH_ARGS="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "";printf ""$2"";getline;print}' "${TARG_DIR}/odoh-servers.md" | tr '\n' ' ' | sed 's/[ \t]*$//' | sed 's/ /|/g')"
+    VARSARGS="${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}"
+    COUNT="0"
+    NUMFRAG="0"
+    [ "$NUMFRAG" -eq 0 ] && toml_avars_prep skip_incompatible false
+    for SERVER in ${VARSARGS//|/ }; do
+      if [ "$(grep '^server_names = .*'"${SERVER}"'.*' "$TOML_FILE" | grep -cF "'${SERVER}'")" -ne 0 ]; then
+        [ -n "$(PTXT "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT="$SERVER" # Martineau Ugly Hack
+        [ -n "$(PTXT "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH="$SERVER" # Martineau Ugly Hack
+        [ -n "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED="$SERVER" # Martineau Ugly Hack
+        case "$SERVER" in
+          "$DNSCRYPT")
+	    CRYPT_COUNT="1"
+            read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS="YES" || ADD_RELAYS="NO"
+            [ "$ADD_RELAYS" = "YES" ] && PTXT "$INFO You may manually choose relays for $SERVER or you may specify wildcard relay (via=['*'])."
+            if [ "$COUNT" -eq 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
+              toml_avar_enable routes
+              read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
+              [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual
+              COUNT=$((COUNT + 1))
+            elif [ "$COUNT" -gt 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
+              read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
+              [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual
+            elif [ "$ADD_RELAYS" = "NO" ]; then
+              PTXT "$INFO Skipping relays for $SERVER."
+            fi
+            ;;
+          "$ODOH")
+            PTXT "$INFO Found $SERVER, Oblivious DNS-over-HTTPS relays are required for Oblivious DNS-over-HTTPS servers." \
+              "$INFO You may manually choose relays for $SERVER server or you may specify wildcard relay (via=['*'])."
+            if [ "$COUNT" -eq 0 ]; then
+              read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
+              [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual_odoh
+              COUNT="$((COUNT + 1))"
+            elif [ "$COUNT" -gt 0 ]; then
+              read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
+              [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+              [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual_odoh
+            fi
+            ;;
+          "$FRAGSBLOCKED")
+            if [ "$NUMFRAG" -eq 0 ] && [ "$COUNT" -gt 0 ]; then
+              local USE_BROKEN
+              read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
+              toml_avars_prep skip_incompatible $USE_BROKEN
+	      NUMFRAG="$((NUMFRAG + 1))"
+            fi
+            ;;
+        esac
+      fi
+    done
+    if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
+      if [ "$CRYPT_COUNT" -gt 0 ] || [ "$(grep '^server_names = .*Static.*' "$TOML_FILE")" ]; then
+        PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers by selecting wildcard option for servers and/or relays."
+        read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible DNSCrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
+      else
+        check_anonymized_disabled
+      fi
+    elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
+      PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
+      read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
+      [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
+    elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then
+      PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) required for Oblivious DNS-over-HTTPS servers."
+      read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+      [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
+      [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic_odoh
+    elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then		  
       check_anonymized_disabled
     fi
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
-    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
-    read_yesno "Do you only want relays for ODOH Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
-    [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then
-    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) required for ODoH servers."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
-    [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
-    [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic_odoh
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then		  
-    check_anonymized_disabled
   fi
 }
 
@@ -571,7 +567,7 @@ choose_dnscrypt_server_disabled () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      read_yesno "Do you want to choose which ODoH servers to disable?" && ODOH_DISABLED="true" || ODOH_DISABLED="false"
+      read_yesno "Do you want to choose which Oblivious DNS-over-HTTPS DNS servers to disable?" && ODOH_DISABLED="true" || ODOH_DISABLED="false"
       [ "$ODOH_DISABLED" = "true" ] && choose_dnscrypt_server_disabled_odoh
       toml_avars_prep disabled_server_names "\"[${RESOLVERS}]\""
       return
@@ -635,9 +631,9 @@ choose_dnscrypt_server_manual () {
   else
     read_input_num "Please choose next DNS server or press n to stop." 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      read_yesno "Do you want to choose which ODoH servers to enable?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
+      read_yesno "Do you want to choose which Oblivious DNS-over-HTTPS DNS servers to enable?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
       [ "$ODOH_ENABLE" = "true" ] && choose_dnscrypt_server_odoh
-      [ "$ODOH_ENABLE" = "false" ] && toml_avars_prep odoh_servers false
+      [ "$ODOH_ENABLE" = "false" ] && toml_avars_prep odoh_servers $ODOH_ENABLE
       read_yesno "Do you want to add any static servers?" && ADD_STATIC="YES" || ADD_STATIC="NO"
       [ "$ADD_STATIC" = "YES" ] && static_chosen 0
       toml_avars_prep server_names "\"[${RESOLVERS}]\""
@@ -663,7 +659,8 @@ choose_dnscrypt_server_odoh () {
   INDEX="$1"
   if [ -z "$INDEX" ]; then
     local ORESOLVERS
-    toml_avars_prep odoh_servers true
+    [ -z "$ODOH_ENABLE" ] && ODOH_ENABLE="true"
+    toml_avars_prep odoh_servers $ODOH_ENABLE
     PTXT "$INFO Available DNS servers: "
     INDEX="$(awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/odoh-servers.md" | wc -l)"
     awk -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/odoh-servers.md"
@@ -703,7 +700,7 @@ choose_relays_automatic () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && PTXT "$INFO Now to pick relays for ODOH SERVERS." && choose_relays_automatic_odoh
+      [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && PTXT "$INFO Now to pick relays for Oblivious DNS-over-HTTPS DNS servers." && choose_relays_automatic_odoh
       read_yesno "Do you want to add any static relays?" && ADD_STATIC="YES" || ADD_STATIC="NO"
       [ "$ADD_STATIC" = "YES" ] && static_chosen_relays 0
       toml_avars_prep routes "\"[ { server_name='*', via=[$RELAYS] } ]\""
@@ -1289,7 +1286,14 @@ static_chosen () {
   local STATICNAME
   if [ "$1" -eq 0 ]; then
     local STATICRESOLVERS
-    [ -z "$ADD_STATIC" ] && toml_avars_prep dnscrypt_servers true doh_servers true odoh_servers true require_dnssec false require_nolog false require_nofilter false
+    if [ -z "$ODOH_ENABLE" ] || [ "$ODOH_ENABLE" = "false" ]; then
+      read_yesno "Will any static servers use the Oblivious DNS-over-HTTPS protocol?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
+    fi
+    if [ -z "$ADD_STATIC" ]; then
+      toml_avars_prep dnscrypt_servers true doh_servers true odoh_servers $ODOH_ENABLE require_dnssec false require_nolog false require_nofilter false
+    else
+      toml_avars_prep odoh_servers $ODOH_ENABLE
+    fi
     PTXT -n "$INPUT Please choose Static Server Name${NORM}: "
     read -r STATICNAME
     PTXT -n "$INPUT Please enter Static Server SDNS stamp${NORM}: "
