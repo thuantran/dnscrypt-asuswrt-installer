@@ -1287,7 +1287,7 @@ static_chosen () {
   if [ "$1" -eq 0 ]; then
     local STATICRESOLVERS
     if [ -z "$ODOH_ENABLE" ] || [ "$ODOH_ENABLE" = "false" ]; then
-      read_yesno "Will any static servers use the Oblivious DNS-over-HTTPS protocol" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
+      read_yesno "Will any static servers use the Oblivious DNS-over-HTTPS protocol?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
     fi
     if [ -z "$ADD_STATIC" ]; then
       toml_avars_prep dnscrypt_servers true doh_servers true odoh_servers $ODOH_ENABLE require_dnssec false require_nolog false require_nofilter false
