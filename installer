@@ -396,7 +396,7 @@ check_relays () {
     fi
   done
   if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
-    if [ "$CRYPT_COUNT" -gt 0 ] || [ "$(grep '^server_names = .*Static.*' "$TOML_FILE")" ]; then
+    if [ "$CRYPT_COUNT" -gt 0 ]; then
       PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers by selecting wildcard option for servers and/or relays."
       read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible DNSCrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
     else
@@ -523,9 +523,9 @@ choose_dnscrypt_server () {
     "  3) Static"
   read_input_num "Select your mode" 1 3
   case "$CHOSEN" in
-    1)
-      CRYPT_COUNT="1"
+    1)      
       choose_dnscrypt_server_auto
+      [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ] && CRYPT_COUNT="1"
       read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED="true" || CHOOSE_DISABLED="false"
       [ "$CHOOSE_DISABLED" = "true" ] && choose_dnscrypt_server_disabled
       [ "$CHOOSE_DISABLED" = "false" ] && toml_avar_disable disabled_server_names
