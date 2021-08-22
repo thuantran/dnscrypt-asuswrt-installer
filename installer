@@ -19,11 +19,11 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.0                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.1                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.3.0"
+DI_VERSION="v2.3.1"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -1318,7 +1318,7 @@ static_chosen () {
       STATICRESOLVERS="'$STATIC'"
     fi
   fi
-  read_yesno "Is $STATIC a Dnscrypt Server?" && DNSCRYPT_STATIC="true" || DNSCRYPT_STATIC="false"
+  read_yesno "Is $STATIC a DNSCrypt Server?" && DNSCRYPT_STATIC="true" || DNSCRYPT_STATIC="false"
   if [ "$DNSCRYPT_STATIC" = "true" ]; then
     if [ -z "$STAT_CRYPT" ]; then
       STAT_CRYPT="${STATIC}"
