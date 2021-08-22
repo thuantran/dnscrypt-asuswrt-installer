@@ -1286,14 +1286,7 @@ static_chosen () {
   local STATICNAME
   if [ "$1" -eq 0 ]; then
     local STATICRESOLVERS
-    if [ -z "$ODOH_ENABLE" ] || [ "$ODOH_ENABLE" = "false" ]; then
-      read_yesno "Will any static servers use the Oblivious DNS-over-HTTPS protocol?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
-    fi
-    if [ -z "$ADD_STATIC" ]; then
-      toml_avars_prep dnscrypt_servers true doh_servers true odoh_servers $ODOH_ENABLE require_dnssec false require_nolog false require_nofilter false
-    else
-      toml_avars_prep odoh_servers $ODOH_ENABLE
-    fi
+    [ -z "$ADD_STATIC" ] && toml_avars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
     PTXT -n "$INPUT Please choose Static Server Name${NORM}: "
     read -r STATICNAME
     PTXT -n "$INPUT Please enter Static Server SDNS stamp${NORM}: "
@@ -1312,7 +1305,6 @@ static_chosen () {
       return
     fi
   fi
-
   local STATIC
   STATIC="${STATICNAME}-Static"
   if [ -n "$(PTXT "$STATICRESOLVERS" | grep -oF "$STATIC")" ]; then
@@ -1324,6 +1316,24 @@ static_chosen () {
       STATICRESOLVERS="${STATICRESOLVERS%?}', '$STATIC'"
     else
       STATICRESOLVERS="'$STATIC'"
+    fi
+  fi
+  read_yesno "Is $STATIC a Dnscrypt Server?" && DNSCRYPT_STATIC="true" || DNSCRYPT_STATIC="false"
+  if [ "$DNSCRYPT_STATIC" = "true" ]; then
+    if [ -z "$STAT_CRYPT" ]; then
+      STAT_CRYPT="$STATIC"
+    else
+      STAT_CRYPT="$STAT_CRYPT $STATIC"
+    fi
+  else
+    read_yesno "Is $STATIC an Oblivious DNS-over-HTTPS Server?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
+  fi
+  if [ "$ODOH_ENABLE" = "true" ]; then
+    if [ -z "$STAT_ODOH" ]; then
+      toml_avars_prep odoh_servers $ODOH_ENABLE
+      STAT_ODOH="$STATIC"
+    else
+      STAT_ODOH="$STAT_ODOH $STATIC"
     fi
   fi
   static_chosen 1  
