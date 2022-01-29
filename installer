@@ -439,7 +439,7 @@ check_version () {
     local RES_STATE
     NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
     RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; echo $?)"
-    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/installer"
     LINSTALL="v$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     RMNSTALL="v$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum "${TARG_DIR}/installer" | cut -d' ' -f1)"
@@ -474,7 +474,7 @@ check_version () {
         local MD5SUM_M
         local L_GEN
         MD5SUM_LM="$(md5sum "${TARG_DIR}/manager" | cut -d' ' -f1)"
-        L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/gen"
+        L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/gen"
         MURL="${L_GEN}/manager"
         MD5SUM_M="$(curl -fsL "$MURL" | md5sum | awk '{print $1}')"
         if [ "$MD5SUM_M" = "$MD5SUM_LM" ]; then
@@ -957,7 +957,7 @@ inst_dnscrypt () {
   local CRYPT_RESOLVERS
   CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
   local RURL
-  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer"
+  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/installer"
   if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
     PTXT "$INFO Backup is detected."
     local USE_OLD
@@ -1258,6 +1258,9 @@ read_input_num () {
       ;;
     "Select your strategy"|"Select your mode")
       [ -z "$CHOSEN" ] && CHOSEN="1"
+      ;;
+    "Please enter the number that designates your selection:")
+      [ -z "$CHOSEN" ] && PTXT "$ERROR No character entered! Retrying..." && read_input_num "$@" && return
       ;;
   esac
   case "$CHOSEN" in
