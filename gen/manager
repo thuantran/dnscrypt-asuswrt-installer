@@ -53,7 +53,7 @@ start_dnscrypt () {
   killall -q dnscrypt-proxy
   logger -st "$NAME" "Start dnscrypt-proxy"
   cd /jffs/dnscrypt
-  env TZ="/jffs/dnscrypt/localtime" nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
+  nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
 }
 
 start_monitor () {
