@@ -958,40 +958,42 @@ inst_dnscrypt () {
   CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
   local RURL
   RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/installer"
-  if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
-    PTXT "$INFO Backup is detected."
-    local USE_OLD
-    read_yesno "Do you want Restore instead?" && USE_OLD="YES" || USE_OLD="NO"
-    if [ "$USE_OLD" = "YES" ]; then
-      PTXT "$INFO Installing from an old backup!"
-      backup_restore RESTORE
-    elif [ "$USE_OLD" = "NO" ]; then
-      PTXT "$INFO Continuing without restoring from backup!"
+  if [ -z "$1" ]; then
+    if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
+      PTXT "$INFO Backup is detected."
+      local USE_OLD
+      read_yesno "Do you want Restore instead?" && USE_OLD="YES" || USE_OLD="NO"
+      if [ "$USE_OLD" = "YES" ]; then
+        PTXT "$INFO Installing from an old backup!"
+        backup_restore RESTORE
+      elif [ "$USE_OLD" = "NO" ]; then
+        PTXT "$INFO Continuing without restoring from backup!"
+      fi
+    elif [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
+      read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP 0 || PTXT "$INFO continuing without making a backup."
     fi
-  elif [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
-    read_yesno "Do you want create a backup before updating?" && backup_restore BACKUP 0 || PTXT "$INFO continuing without making a backup."
+    local NW_STATE
+    local RES_STATE
+    NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
+    RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; echo $?)"
+    if [ "$NW_STATE" = "0" -a "$RES_STATE" != "0" ] || [ -z "DNSCRYPT_VER" ]; then
+      PTXT "$ERROR Unable to detect the Internet!"
+      end_op_message 1
+      return
+    fi
+    create_dir "$TARG_DIR"
+    if [ "$?" -ne 0 ]; then
+      end_op_message 1
+      return
+    fi  
+    download_file "$TARG_DIR" 755 "$RURL"
+    if [ "$?" -ne 0 ] || [ -z "$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')" ]; then
+      PTXT "$ERROR Failed to download installer."
+      end_op_message 1
+      return
+    fi
+    if [ "$AUTO_UPDATE" = "update" ]; then exec "${TARG_DIR}/installer" "$BRANCH" "$AUTO_UPDATE" && exit; fi
   fi
-  local NW_STATE
-  local RES_STATE
-  NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
-  RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; echo $?)"
-  if [ "$NW_STATE" = "0" -a "$RES_STATE" != "0" ] || [ -z "DNSCRYPT_VER" ]; then
-    PTXT "$ERROR Unable to detect the Internet!"
-    end_op_message 1
-    return
-  fi
-  create_dir "$TARG_DIR"
-  if [ "$?" -ne 0 ]; then
-    end_op_message 1
-    return
-  fi  
-  download_file "$TARG_DIR" 755 "$RURL"
-  if [ "$?" -ne 0 ] || [ -z "$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')" ]; then
-    PTXT "$ERROR Failed to download installer."
-    end_op_message 1
-    return
-  fi
-  if [ "$AUTO_UPDATE" = "update" ]; then exec "${TARG_DIR}/installer" "$BRANCH" "$AUTO_UPDATE" && exit; fi
   download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
   if [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
     local LVERSION
@@ -1733,7 +1735,7 @@ write_manager_script () {
 }
 
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
-[ "$2" = "update" ] && inst_dnscrypt
+[ "$2" = "update" ] && inst_dnscrypt $2
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 ROUTER_OS="$(uname)"
 ROUTER_ARCH="$(uname -m)"
