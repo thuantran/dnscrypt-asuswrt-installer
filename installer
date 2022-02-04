@@ -1735,7 +1735,6 @@ write_manager_script () {
 }
 
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
-[ "$2" = "update" ] && inst_dnscrypt $2
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 ROUTER_OS="$(uname)"
 ROUTER_ARCH="$(uname -m)"
@@ -1791,10 +1790,17 @@ case "$ROUTER_ARCH" in
     ;;
 esac
 
-check_jffs_enabled
-check_dns_environment
-cleanup
-check_version
+case "$2" in 
+  "update")
+    inst_dnscrypt $2
+    ;;
+  *)
+    cleanup
+    check_jffs_enabled
+    check_dns_environment
+    check_version
+    ;;
+esac
 
 menu () {
   PTXT "$INFO Choose what you want to do:" \
