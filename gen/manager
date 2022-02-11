@@ -5,6 +5,8 @@
 NAME="$(basename $0)[$$]"
 
 append_on_demand () {
+  local TARGET
+  local LINE
   TARGET="$1"
   shift
   for LINE in "$@"; do
@@ -15,6 +17,8 @@ append_on_demand () {
 }
 
 dnsmasq_params () {
+  local DNS
+  local VAR
   cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
   append_on_demand /etc/dnsmasq.conf "no-resolv"
   append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
@@ -32,15 +36,16 @@ dnsmasq_params () {
 }
 
 init_hwrng () {
-  local COUNT=0
+  local COUNT
+  COUNT="0"
   killall -q -9 haveged jitterentropy-rngd rngd
-  while [ ! -c $RNG_DEV ]; do
-    if [ $COUNT -gt 120 ]; then
+  while [ ! -c "$RNG_DEV" ]; do
+    if [ "$COUNT" -gt 120 ]; then
       logger -st "$NAME" "ERROR: Unable to find HWRNG device. Aborting..."
       if [ -f "/jffs/dnscrypt/haveged" ]; then /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; logger -st "$NAME" "Haveged: Using available haveged instead..."; fi
       exit 1
     fi
-    COUNT=$((COUNT+1))
+    COUNT="$((COUNT+1))"
     sleep 1
   done
   /jffs/dnscrypt/stty raw -echo -ixoff -F $RNG_DEV speed 115200
@@ -61,13 +66,15 @@ start_monitor () {
   while [ "$(nvram get ntp_ready)" -eq 0 ]; do sleep 1; done
   local NW_STATE
   local RES_STATE
-  local COUNT=0
-  local RANDOM=0
-  while true; do  
+  local COUNT
+  local RANDOM
+  COUNT="0"
+  RANDOM="0"
+  while true; do
     if [ "$COUNT" -eq 90 ]; then
-      COUNT=0
+      COUNT="0"
       timezone
-      $0 opendns-update
+      "$0" opendns-update
     fi
     COUNT="$((COUNT + 1))"
     NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
@@ -76,15 +83,15 @@ start_monitor () {
       if [ -z "$(pidof dnscrypt-proxy)" ]; then
         logger -st "$NAME" "Warning: dnscrypt-proxy is dead"
         start_dnscrypt
-      elif [ "$NW_STATE" = "0" -a "$RES_STATE" != "0" ]; then
+      elif { [ "$NW_STATE" = "0" ] && ["$RES_STATE" != "0" ]; }; then
         logger -st "$NAME" "Warning: dnscrypt-proxy is not responding"
         start_dnscrypt
       elif [ "$RANDOM" -eq 4320 ]; then
-        RANDOM=0
+        RANDOM="0"
         logger -st "$NAME" "Randomization: Health Check."
         start_dnscrypt
       fi
-      RANDOM=$((RANDOM + 1))
+      RANDOM="$((RANDOM + 1))"
     fi
     sleep 10
   done
@@ -96,25 +103,25 @@ timezone () {
   local TIMEZONE
   local TARGET
   local LINK
-  SANITY="$(date -u -r $0 '+%s')"
+  SANITY="$(date -u -r "$0" '+%s')"
   NOW="$(date -u '+%s')"
   TIMEZONE="/jffs/dnscrypt/localtime"
   TARGET="/etc/localtime"
-  LINK="$(readlink $TARGET)"
-  if [ -f "$TIMEZONE" ] && [ "$LINK" = "$TIMEZONE" ]; then
-      if [ "$NOW" -ge "$SANITY" ]; then
-        touch "$0"
-      fi
-  elif [ -f "$TIMEZONE" ]; then
-    ln -sf $TIMEZONE $TARGET
-    if [ "$NOW" -le "$SANITY" ]; then
+  LINK="$(readlink "$TARGET")"
+  if [ -f "$TARGET" ] || [ "$LINK" = "$TIMEZONE" ]; then
+    if [ "$NOW" -ge "$SANITY" ]; then
+      touch "$0"
+    elif [ "$NOW" -le "$SANITY" ]; then
       date -u -s "$(date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S')"
     fi
+  elif [ -f "$TIMEZONE" ] && [ ! -f "$TARGET" ]; then
+    ln -sf "$TIMEZONE" "$TARGET"
+    timezone
   fi
 }
 
 update_opendns () {
-  if [ -z "$OPENDNS_USER" ] || [ -z  "$OPENDNS_PASSWORD" ] || [ $1 -gt 2 ]; then
+  if [ -z "$OPENDNS_USER" ] || [ -z  "$OPENDNS_PASSWORD" ] || [ "$1" -gt 2 ]; then
     return
   fi
   sleep 5
@@ -134,34 +141,34 @@ update_opendns () {
 }
 
 unset TZ
-case $1 in
-  dnscrypt-start)
+case "$1" in
+  "dnscrypt-start")
     start_dnscrypt
     ;;
-  dnsmasq)
+  "dnsmasq")
     dnsmasq_params
     ;;
-  init-start)
+  "init-start")
     timezone
-    case $RAN_PRV in
-      haveged)
+    case "$RAN_PRV" in
+      "haveged")
         killall -q -9 haveged jitterentropy-rngd rngd
         /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
         ;;
-      rngd)
+      "rngd")
         init_hwrng &
         ;;
     esac
-    $0 monitor-start
+    "$0" monitor-start
     start_dnscrypt
     ;;
-  monitor-start)
+  "monitor-start")
     start_monitor &
     ;;
-  opendns-update)
+  "opendns-update")
     update_opendns 0 &
     ;;
-  services-stop)
+  "services-stop")
     timezone
     ;;
 esac
