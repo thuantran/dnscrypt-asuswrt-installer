@@ -54,6 +54,7 @@ init_hwrng () {
 }
 
 start_dnscrypt () {
+  local DNSCRYPT_START
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall -q dnscrypt-proxy
   logger -st "$NAME" "Start dnscrypt-proxy"
