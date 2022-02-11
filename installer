@@ -78,7 +78,7 @@ backup_restore () {
 	rm -rf "${BASE_DIR}/backup_dnscrypt.tar.gz"
       fi
     fi
-    tar -czvf "${BASE_DIR}/backup_dnscrypt.tar.gz" -C "$TARG_DIR" ../dnscrypt/ >/dev/null 2>&1    
+    tar -czvf "${BASE_DIR}/backup_dnscrypt.tar.gz" -C "$TARG_DIR" ../dnscrypt/ >/dev/null 2>&1
     PTXT "$INFO Backup complete"
     [ "$2" -ne 0 ] && end_op_message 0
   elif [ "$1" = "BACKUP" ] && [ ! -d "$TARG_DIR" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
@@ -444,19 +444,17 @@ check_version () {
     RMNSTALL="$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum "${TARG_DIR}/installer" | cut -d' ' -f1)"
     MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
-    if [ "$NW_STATE" = "0" -a "$RES_STATE" = "0" ] || [ -n "$RMNSTALL" -a -n "$DNSCRYPT_VER" ]; then
-      LINSTALL="v${LINSTALL}"
-      RMNSTALL="v${RINSTALL}"
+    if { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" = "0" ]; } || { [ -n "$LINSTALL" ] && [ -n "$RMNSTALL" ]; }; then
       [ -z "$LINSTALL" ] && exit 1
       [ -z "$RMNSTALL" ] && exit 1
       if [ "$RMNSTALL" != "$LINSTALL" ]; then
-        PTXT "$INFO New DI_VERSION=${RMNSTALL} Available!" \
+        PTXT "$INFO New DI_VERSION=v${RMNSTALL} Available!" \
              "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
         AUTO_UPDATE="update"
       elif [ "$MD5SUM_R" = "$MD5SUM_L" ]; then
-        PTXT "$INFO DI_VERSION=$LINSTALL"
+        PTXT "$INFO DI_VERSION=v${LINSTALL}"
       else
-        PTXT "$INFO DI_VERSION=${LINSTALL}, but a New Minor Update is Available!" \
+        PTXT "$INFO DI_VERSION=v${LINSTALL}, but a New Minor Update is Available!" \
           "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
 		AUTO_UPDATE="update"
       fi
@@ -486,7 +484,7 @@ check_version () {
             "$INFO Run Option 1 of the Installer to upgrade the Manager File."
         fi
       fi
-    elif [ "$NW_STATE" = "0" -a "$RES_STATE" != "0" ] || [ -z "$(pidof dnscrypt-proxy)" ] || [ -z "$DNSCRYPT_VER" ]; then
+    elif { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; } || [ -z "$(pidof dnscrypt-proxy)" ] || [ -z "$DNSCRYPT_VER" ]; then
       PTXT "$ERROR No Internet Detected or Dnscrypt-Proxy is Dead, Skipping Version Check." \
         "$INFO Run Option 3 to reconfigure, before trying option 1."
     fi
@@ -602,7 +600,7 @@ choose_dnscrypt_server_disabled_odoh () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then	  
-      RESOLVERS="${ORESOLVERS}, $RESOLVERS"		
+      RESOLVERS="${ORESOLVERS}, $RESOLVERS"
       return
     fi
   fi
@@ -978,7 +976,7 @@ inst_dnscrypt () {
     local RES_STATE
     NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
     RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; echo $?)"
-    if [ "$NW_STATE" = "0" -a "$RES_STATE" != "0" ] || [ -z "DNSCRYPT_VER" ]; then
+    if { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; } || [ -z "DNSCRYPT_VER" ]; then
       PTXT "$ERROR Unable to detect the Internet!"
       end_op_message 1
       return
@@ -1239,11 +1237,11 @@ read_input_dns () {
   fi
   case "$1" in
     "Default is")
-      BOOTSTRAP="'$DNS_SERVER:53'"
-      PROBE=$DNS_SERVER:53
+      BOOTSTRAP="'${DNS_SERVER}:53'"
+      PROBE="${DNS_SERVER}:53"
       ;;
     "2nd Default is")
-      BOOTSTRAP="$BOOTSTRAP, '$DNS_SERVER:53'"
+      BOOTSTRAP="${BOOTSTRAP}, '${DNS_SERVER}:53'"
       ;;
   esac
 }
@@ -1771,7 +1769,7 @@ case "$ROUTER_OS" in
     ;;
 esac
 
-case "$ROUTER_ARCH" in 
+case "$ROUTER_ARCH" in
   "aarch64"|"arm64")
     ROUTER_ARCH="arm64"
     URL_ARCH="${URL_ARCH}/armv8"
@@ -1792,9 +1790,9 @@ case "$ROUTER_ARCH" in
     ;;
 esac
 
-case "$2" in 
+case "$2" in
   "update")
-    inst_dnscrypt $2
+    inst_dnscrypt "$2"
     ;;
   *)
     cleanup
