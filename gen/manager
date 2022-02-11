@@ -84,7 +84,7 @@ start_monitor () {
       if [ -z "$(pidof dnscrypt-proxy)" ]; then
         logger -st "$NAME" "Warning: dnscrypt-proxy is dead"
         start_dnscrypt
-      elif { [ "$NW_STATE" = "0" ] && ["$RES_STATE" != "0" ]; }; then
+      elif { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; then
         logger -st "$NAME" "Warning: dnscrypt-proxy is not responding"
         start_dnscrypt
       elif [ "$RANDOM" -eq 4320 ]; then
