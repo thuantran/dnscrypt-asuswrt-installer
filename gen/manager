@@ -109,15 +109,15 @@ timezone () {
   TIMEZONE="/jffs/dnscrypt/localtime"
   TARGET="/etc/localtime"
   LINK="$(readlink "$TARGET")"
-  if [ -f "$TARGET" ] || [ "$LINK" = "$TIMEZONE" ]; then
+  if [ -f "$TIMEZONE" ] && [ "$LINK" = "$TIMEZONE" ]; then
     if [ "$NOW" -ge "$SANITY" ]; then
       touch "$0"
-    elif [ "$NOW" -le "$SANITY" ]; then
+    fi
+  elif [ -f "$TIMEZONE" ]; then
+    ln -sf "$TIMEZONE" "$TARGET"
+    if [ "$NOW" -le "$SANITY" ]; then
       date -u -s "$(date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S')"
     fi
-  elif [ -f "$TIMEZONE" ] && [ ! -f "$TARGET" ]; then
-    ln -sf "$TIMEZONE" "$TARGET"
-    timezone
   fi
 }
 
