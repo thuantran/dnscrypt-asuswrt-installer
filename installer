@@ -1744,7 +1744,7 @@ write_manager_script () {
 
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
-RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/"
+RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
 URL_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/gen"
 ROUTER_OS="$(uname)"
 ROUTER_ARCH="$(uname -m)"
