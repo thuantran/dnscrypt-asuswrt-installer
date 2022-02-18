@@ -19,11 +19,25 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.3                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.4                               #
 #                                                                                                      #
 ########################################################################################################
 
-DI_VERSION="v2.3.3"
+# shellcheck disable=SC1001
+# shellcheck disable=SC1083
+# shellcheck disable=SC2010
+# shellcheck disable=SC2015
+# shellcheck disable=SC2016
+# shellcheck disable=SC2034
+# shellcheck disable=SC2124
+# shellcheck disable=SC2155
+# shellcheck disable=SC2181
+# shellcheck disable=SC3043
+# shellcheck disable=SC3045
+# shellcheck disable=SC3057
+# shellcheck disable=SC3060
+
+DI_VERSION="v2.3.4"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -65,7 +79,7 @@ PTXT() {
 backup_restore () {
   if [ "$1" = "BACKUP" ] && [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
     PTXT "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition." \
-      "$INFO Please wait a moment."
+         "$INFO Please wait a moment."
     if [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
       PTXT "$INFO There is an old backup detected."
       local USE_OLD
@@ -91,25 +105,25 @@ backup_restore () {
     chown "$(nvram get http_username)":root "${TARG_DIR}/*"
     chmod 755 "${TARG_DIR}/dnscrypt-proxy"
     chmod 644 "${TARG_DIR}/public-resolvers.md" \
-      "${TARG_DIR}/public-resolvers.md.minisig" \
-      "${TARG_DIR}/relays.md" \
-      "${TARG_DIR}/relays.md.minisig" \
-      "${TARG_DIR}/odoh-servers.md" \
-      "${TARG_DIR}/odoh-servers.md.minisig" \
-      "${TARG_DIR}/odoh-relays.md" \
-      "${TARG_DIR}/odoh-relays.md.minisig" \
-      "${TARG_DIR}/dnscrypt-resolvers.csv" \
-      "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
+              "${TARG_DIR}/public-resolvers.md.minisig" \
+              "${TARG_DIR}/relays.md" \
+              "${TARG_DIR}/relays.md.minisig" \
+              "${TARG_DIR}/odoh-servers.md" \
+              "${TARG_DIR}/odoh-servers.md.minisig" \
+              "${TARG_DIR}/odoh-relays.md" \
+              "${TARG_DIR}/odoh-relays.md.minisig" \
+              "${TARG_DIR}/dnscrypt-resolvers.csv" \
+              "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     chown nobody:nobody "${TARG_DIR}/public-resolvers.md" \
-      "${TARG_DIR}/public-resolvers.md.minisig" \
-      "${TARG_DIR}/relays.md" \
-      "${TARG_DIR}/relays.md.minisig" \
-      "${TARG_DIR}/odoh-servers.md" \
-      "${TARG_DIR}/odoh-servers.md.minisig" \
-      "${TARG_DIR}/odoh-relays.md" \
-      "${TARG_DIR}/odoh-relays.md.minisig" \
-      "${TARG_DIR}/dnscrypt-resolvers.csv" \
-      "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
+              "${TARG_DIR}/public-resolvers.md.minisig" \
+              "${TARG_DIR}/relays.md" \
+              "${TARG_DIR}/relays.md.minisig" \
+              "${TARG_DIR}/odoh-servers.md" \
+              "${TARG_DIR}/odoh-servers.md.minisig" \
+              "${TARG_DIR}/odoh-relays.md" \
+              "${TARG_DIR}/odoh-relays.md.minisig" \
+              "${TARG_DIR}/dnscrypt-resolvers.csv" \
+              "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
     setup_dnscrypt
@@ -130,13 +144,13 @@ backup_restore () {
     service restart_dnsmasq >/dev/null 2>&1
     manager_monitor_restart
     PTXT "$INFO Backup restored!" \
-      "$INFO  - Add swap" \
-      "$INFO  - Add a RNG" \
-      "$INFO  - Set your timezone"
+         "$INFO  - Add swap" \
+         "$INFO  - Add a RNG" \
+         "$INFO  - Set your timezone"
     end_op_message 0
   elif [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && [ "$1" = "RESTORE" ]; then
     PTXT "$ERROR No Backup found!" \
-      "$ERROR Please make sure Backup Resides in $BASE_DIR"
+         "$ERROR Please make sure Backup Resides in $BASE_DIR"
     end_op_message 1
     return
   fi
@@ -148,7 +162,7 @@ check_dnscrypt_toml () {
   ${TARG_DIR}/dnscrypt-proxy -check -config "$TOML_FILE"
   if [ "$?" -ne 0 ]; then
     PTXT "$INFO Move invalid configuration file to $TOML_ERR" \
-      "$INFO Operation will continue with clean config file."
+         "$INFO Operation will continue with clean config file."
     mv "$TOML_FILE" "$TOML_ERR"
     return 1
   fi
@@ -157,23 +171,33 @@ check_dnscrypt_toml () {
 check_dns_environment () {
   if [ -f "/opt/etc/init.d/S61stubby" ] || [ -f "/opt/sbin/stubby" ] || [ -f "/opt/bin/install_stubby" ] || [ -f "/jffs/scripts/install_stubby.sh" ]; then
     PTXT "$ERROR Potential stubby installation detected." \
-      "$ERROR Please remove before attempting to continue." \
-      "$ERROR Exiting..."
+         "$ERROR Please remove before attempting to continue." \
+         "$ERROR Exiting..."
     exit 1
-  fi    
+  fi
   local DNSPRIV
   DNSPRIV="$(nvram get dnspriv_enable)"
+  local DHCPDNS
+  DHCPDNS="$(nvram get dhcpd_dns_router)"
+  local DHCPDNS1
+  DHCPDNS1="$(nvram get nvram set dhcp_dns1_x)"
+  local DHCPDNS2
+  DHCPDNS1="$(nvram get nvram set dhcp_dns2_x)" 
   if [ "$DNSPRIV" -ne 0 ]; then
     PTXT "$INFO Setting up Correct DNS Environment."
     nvram set dnspriv_enable=0
     nvram commit
     killall -q -9 stubby
+    check_dns_environment x
+  elif [ "$DHCPDNS" -ne 1 ] || [ -n "$DHCPDNS1" ] || [ -n "$DHCPDNS2" ] || [ -n "$1" ]; then
+    nvram set dhcp_dns1_x=""
+    nvram set dhcp_dns2_x=""
+    nvram set dhcpd_dns_router="1"
+    nvram commit
     service restart_dnsmasq >/dev/null 2>&1
-    PTXT "$INFO DNS Environment is Ready."
-  else
-    PTXT "$INFO DNS Environment is Ready."
+    while { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" != "0" ]; }; do sleep 1; done
   fi
-
+  PTXT "$INFO DNS Environment is Ready."
 }
 
 check_dns_filter () {
@@ -192,7 +216,7 @@ check_dns_filter () {
     USE_SOME=1
   elif [ "$1" -eq 1 ] && [ "$DNSFIL" -ne 0 ]; then
     PTXT "$INFO DNSFilter is Already on." \
-      "$INFO You can choose to keep any custom dnsfilter values and only redirect non-custom traffic or send all traffic through this proxy."
+         "$INFO You can choose to keep any custom dnsfilter values and only redirect non-custom traffic or send all traffic through this proxy."
     read_yesno "Do you want to redirect only SOME DNS resolutions on your network through this proxy?" && USE_SOME="0" || USE_SOME="1"
   fi
   if [ "$USE_SOME" -eq 0 ]; then
@@ -226,8 +250,8 @@ check_dns_filter () {
 check_jffs_enabled () {
   if [ "$(nvram get jffs2_format)" = "1" ]; then
     PTXT "$ERROR JFFS partition is scheduled to be reformatted." \
-      "$ERROR Please reboot to format or disable that setting and try again." \
-      "$ERROR Exiting..."
+         "$ERROR Please reboot to format or disable that setting and try again." \
+         "$ERROR Exiting..."
     exit 1
   fi
   local JFFS2_SCRIPTS
@@ -238,7 +262,7 @@ check_jffs_enabled () {
   [ -z "$(nvram get jffs2_enable)" ] && jffs2_on="jffs2_on" || jffs2_on="jffs2_enable"
   if [ "$JFFS2_ENABLED" -ne 1 ] || [ "$JFFS2_SCRIPTS" -ne 1 ]; then
     PTXT "$INFO JFFS custom scripts and configs are not enabled." \
-      "$INFO Enabling them now!"
+         "$INFO Enabling them now!"
     nvram set ${jffs2_on}=1
     nvram set jffs2_scripts=1
     nvram commit
@@ -248,16 +272,16 @@ check_jffs_enabled () {
 }
 
 check_anonymized_automatic () {
-  if [ "$1" -eq 0 ] && [ "$(grep '^server_names = .*Static.*' "$TOML_FILE")" ]; then
+  if [ "$1" -eq 0 ] && grep -q '^server_names = .*Static.*' "$TOML_FILE"; then
     PTXT "$INFO Custom servers that are potentially not compatible with relays are detected!" \
-      "$WARNING These servers might not work with relays." \
-      "$WARNING Use at your own risk."
+         "$WARNING These servers might not work with relays." \
+         "$WARNING Use at your own risk."
   fi
   local USE_BROKEN
   local USE_WILDCARD
   PTXT "$INFO This allows for the use of server_name='*' as wildcard option for all servers compatible with relays." \
-    "$INFO This will be the default route for all compatible servers." \
-    "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
+       "$INFO This will be the default route for all compatible servers." \
+       "$INFO Additionally routes can be distinctly selected by using via=['*'] as relay wildcard."
   read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
   [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
   [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic
@@ -272,7 +296,7 @@ check_anonymized_disabled () {
 }
 
 check_opendns () {
-  if [ "$(grep '^server_names = .*cisco.*' "$TOML_FILE")" ]; then
+  if grep -q '^server_names = .*cisco.*' "$TOML_FILE"; then
     if [ -f "$CONF_FILE" ]; then
       local OPENDNS_USER
       OPENDNS_USER="$(awk -F'=' '/OPENDNS_USER/ {print $2}' "$CONF_FILE")"
@@ -280,10 +304,10 @@ check_opendns () {
       OPENDNS_PASSWORD="$(awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' "$CONF_FILE")"
       if [ "$OPENDNS_USER" ] && [ "$OPENDNS_PASSWORD" ]; then
         PTXT "$INFO Found OpenDNS account ${BOLD}${OPENDNS_USER}" \
-          "$INFO What do you want to do:" \
-          "  1) Use this account" \
-          "  2) Setup new account" \
-          "  3) Disable OpenDNS account authen"
+             "$INFO What do you want to do:" \
+             "  1) Use this account" \
+             "  2) Setup new account" \
+             "  3) Disable OpenDNS account authen"
         read_input_num "Your choice" 1 3
         case "$CHOSEN" in
           1)
@@ -322,16 +346,16 @@ check_relays () {
   local CRYPT
   FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' "$TOML_ORI" | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
   NUMCRYPT="0"
-  while read CRYPT; do
+  while read -r CRYPT; do
     CRYPT="$(PTXT "$CRYPT" | cut -d',' -f1)"
     if [ "$NUMCRYPT" -eq 0 ]; then
       NUMCRYPT="1"
       continue
     fi
     if [ "$NUMCRYPT" -eq 1 ]; then
-      [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="$CRYPT"
+      if ! PTXT "$FRAGSBLOCKED_ARGS" | grep -qoF "$CRYPT"; then DNSCRYPT_ARGS="$CRYPT"; fi
     elif [ "$NUMCRYPT" -gt 1 ]; then
-      [ -z "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$CRYPT")" ] && DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"
+      if ! PTXT "$FRAGSBLOCKED_ARGS" | grep -qoF "$CRYPT"; then DNSCRYPT_ARGS="${DNSCRYPT_ARGS}|${CRYPT}"; fi
     fi
     NUMCRYPT="$((NUMCRYPT + 1))"
   done < $TARG_DIR/dnscrypt-resolvers.csv
@@ -348,12 +372,11 @@ check_relays () {
   [ "$NUMFRAG" -eq 0 ] && toml_avars_prep skip_incompatible false
   for SERVER in ${VARSARGS//|/ }; do
     if [ "$(grep '^server_names = .*'"${SERVER}"'.*' "$TOML_FILE" | grep -cF "'${SERVER}'")" -ne 0 ]; then
-      [ -n "$(PTXT "$DNSCRYPT_ARGS" | grep -oF "$SERVER")" ] && DNSCRYPT="$SERVER" # Martineau Ugly Hack
-      [ -n "$(PTXT "$ODOH_ARGS" | grep -oF "$SERVER")" ] && ODOH="$SERVER" # Martineau Ugly Hack
-      [ -n "$(PTXT "$FRAGSBLOCKED_ARGS" | grep -oF "$SERVER")" ] && FRAGSBLOCKED="$SERVER" # Martineau Ugly Hack
+      if PTXT "$DNSCRYPT_ARGS" | grep -qoF "$SERVER"; then DNSCRYPT="$SERVER"; fi
+      if PTXT "$ODOH_ARGS" | grep -qoF "$SERVER"; then ODOH="$SERVER"; fi
+      if PTXT "$FRAGSBLOCKED_ARGS" | grep -qoF "$SERVER"; then FRAGSBLOCKED="$SERVER"; fi
       case "$SERVER" in
         "$DNSCRYPT")
-	  CRYPT_COUNT="1"
           read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS="YES" || ADD_RELAYS="NO"
           [ "$ADD_RELAYS" = "YES" ] && PTXT "$INFO You may manually choose relays for $SERVER or you may specify wildcard relay (via=['*'])."
           if [ "$COUNT" -eq 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
@@ -361,7 +384,7 @@ check_relays () {
             read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
             [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
             [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual
-            COUNT=$((COUNT + 1))
+            COUNT="$((COUNT + 1))"
           elif [ "$COUNT" -gt 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
             read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
             [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
@@ -395,23 +418,23 @@ check_relays () {
       esac
     fi
   done
-  if [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
-    if [ "$CRYPT_COUNT" -gt 0 ]; then
+  if [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
+    if [ -n "$DNSCRYPT" ]; then
       PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers by selecting wildcard option for servers and/or relays."
       read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible DNSCrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
     else
       check_anonymized_disabled
     fi
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ]; then
+  elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*true.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
     PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
     read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
     [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then
+  elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*true.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then
     PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) required for Oblivious DNS-over-HTTPS servers."
     read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
     [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
     [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic_odoh
-  elif [ "$COUNT" -eq 0 ] && [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ]; then		  
+  elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then	  
     check_anonymized_disabled
   fi
 }
@@ -424,27 +447,24 @@ check_swap () {
     end_op_message 0
     return
   fi
-
   inst_swap
 }
 
 check_version () {
-  if [ -f "${TARG_DIR}/installer" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
-    local RURL
+  if [ -f "${TARG_DIR}/installer" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]&& [ -z "$2" ]; then
     local RMNSTALL
     local LINSTALL
     local MD5SUM_L
     local MD5SUM_R
     local NW_STATE
     local RES_STATE
-    NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
-    RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; echo $?)"
-    RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/installer"
+    [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
+    [ -z "$1" ] && RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
     LINSTALL="$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
-    RMNSTALL="$(curl -sL "$RURL" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
+    RMNSTALL="$(curl -sL "${RURL}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')"
     MD5SUM_L="$(md5sum "${TARG_DIR}/installer" | cut -d' ' -f1)"
-    MD5SUM_R="$(curl -fsL "$RURL" | md5sum | awk '{print $1}')"
-    if { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" = "0" ]; } || { [ -n "$LINSTALL" ] && [ -n "$RMNSTALL" ]; }; then
+    MD5SUM_R="$(curl -fsL "${RURL}/installer" | md5sum | awk '{print $1}')"
+    if { [ -n "$LINSTALL" ] && [ -n "$RMNSTALL" ]; } || { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" = "0" ]; }; then
       [ -z "$LINSTALL" ] && exit 1
       [ -z "$RMNSTALL" ] && exit 1
       if [ "$RMNSTALL" != "$LINSTALL" ]; then
@@ -455,7 +475,7 @@ check_version () {
         PTXT "$INFO DI_VERSION=v${LINSTALL}"
       else
         PTXT "$INFO DI_VERSION=v${LINSTALL}, but a New Minor Update is Available!" \
-          "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
+             "$INFO Run Option 1 of the Installer to upgrade DNScrypt Asuswrt Installer."
 		AUTO_UPDATE="update"
       fi
       local LVERSION
@@ -464,29 +484,27 @@ check_version () {
       [ -z "$DNSCRYPT_VER" ] && exit 1
       if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
         PTXT "$INFO New DNSCRYPT_VER=${DNSCRYPT_VER} Available!" \
-          "$INFO Run Option 1 of the Installer to upgrade DNScrypt Proxy."
+             "$INFO Run Option 1 of the Installer to upgrade DNScrypt Proxy."
       else
         PTXT "$INFO DNSCRYPT_VER=${LVERSION}"
       fi
       if [ -f "${TARG_DIR}/manager" ]; then
         local MD5SUM_LM
-        local MURL
         local MD5SUM_M
         local L_GEN
         MD5SUM_LM="$(md5sum "${TARG_DIR}/manager" | cut -d' ' -f1)"
-        L_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/gen"
-        MURL="${L_GEN}/manager"
+        MURL="${URL_GEN}/manager"
         MD5SUM_M="$(curl -fsL "$MURL" | md5sum | awk '{print $1}')"
         if [ "$MD5SUM_M" = "$MD5SUM_LM" ]; then
           PTXT "$INFO Manager file is Up-To-Date!"
         else
           PTXT "$INFO New Manager file is Available!" \
-            "$INFO Run Option 1 of the Installer to upgrade the Manager File."
+               "$INFO Run Option 1 of the Installer to upgrade the Manager File."
         fi
       fi
-    elif { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; } || [ -z "$(pidof dnscrypt-proxy)" ] || [ -z "$DNSCRYPT_VER" ]; then
-      PTXT "$ERROR No Internet Detected or Dnscrypt-Proxy is Dead, Skipping Version Check." \
-        "$INFO Run Option 3 to reconfigure, before trying option 1."
+    elif { [ -z "$LINSTALL" ] && [ -z "$RMNSTALL" ]; } || { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; then
+      [ -z "$1" ] && while { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; do sleep 1; NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"; RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"; done && check_version x
+      [ -n "$1" ] && check_version x x
     fi
   fi
 }
@@ -496,10 +514,10 @@ choose_dnscrypt_server () {
   if [ "$(nvram get ipv6_service)" != "disabled" ]; then read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6="true" || USE_IPV6="false"; else USE_IPV6="false"; fi 
   toml_avars_prep ipv6_servers $USE_IPV6
   PTXT "$INFO Choose DNS resolving load balancing strategy:" \
-    "  1) p2 (default)" \
-    "  2) ph" \
-    "  3) first" \
-    "  4) random"
+       "  1) p2 (default)" \
+       "  2) ph" \
+       "  3) first" \
+       "  4) random"
   read_input_num "Select your strategy" 1 4
   case "$CHOSEN" in
     1)
@@ -518,14 +536,14 @@ choose_dnscrypt_server () {
   read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?" && USE_LBE="true" || USE_LBE="false"
   toml_avars_prep lb_estimator $USE_LBE
   PTXT "$INFO Choose how your DNS servers are selected:" \
-    "  1) Automatically (default)" \
-    "  2) Manually" \
-    "  3) Static"
+       "  1) Automatically (default)" \
+       "  2) Manually" \
+       "  3) Static"
   read_input_num "Select your mode" 1 3
   case "$CHOSEN" in
     1)      
       choose_dnscrypt_server_auto
-      [ "$(grep '^dnscrypt_servers = .*true.*' "$TOML_FILE")" ] && CRYPT_COUNT="1"
+      if grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then CRYPT_COUNT="1"; fi
       read_yesno "Do you want to choose which servers to disable (this can be a long process)?" && CHOOSE_DISABLED="true" || CHOOSE_DISABLED="false"
       [ "$CHOOSE_DISABLED" = "true" ] && choose_dnscrypt_server_disabled
       [ "$CHOOSE_DISABLED" = "false" ] && toml_avar_disable disabled_server_names
@@ -566,7 +584,7 @@ choose_dnscrypt_server_disabled () {
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      if [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ]; then
+      if grep -q '^odoh_servers = .*true.*' "$TOML_FILE"; then
         read_yesno "Do you want to choose which Oblivious DNS-over-HTTPS DNS servers to disable?" && ODOH_DISABLED="true" || ODOH_DISABLED="false"
         [ "$ODOH_DISABLED" = "true" ] && choose_dnscrypt_server_disabled_odoh
       fi
@@ -576,7 +594,7 @@ choose_dnscrypt_server_disabled () {
   fi
   local ITEM
   ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/public-resolvers.md")"
-  if [ -n "$(PTXT "$RESOLVERS" | grep -oF "'$ITEM'")" ]; then
+  if PTXT "$RESOLVERS" | grep -qoF "'$ITEM'"; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RESOLVERS" ]; then
@@ -606,7 +624,7 @@ choose_dnscrypt_server_disabled_odoh () {
   fi
   local OITEM
   OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-servers.md")"
-  if [ -n "$(PTXT "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
+  if PTXT "$ORESOLVERS" | grep -qoF "'$OITEM'"; then
     PTXT "$INFO $OITEM is already set."
   else
     if [ "$ORESOLVERS" ]; then
@@ -643,7 +661,7 @@ choose_dnscrypt_server_manual () {
   fi
   local ITEM
   ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/public-resolvers.md")"
-  if [ -n "$(PTXT "$RESOLVERS" | grep -oF "'$ITEM'")" ]; then
+  if PTXT "$RESOLVERS" | grep -qoF "'$ITEM'"; then
     PTXT "$INFO $ITEM is already set"
   else
     if [ "$RESOLVERS" ]; then
@@ -675,7 +693,7 @@ choose_dnscrypt_server_odoh () {
   fi
   local OITEM
   OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odohrelay" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-servers.md")"
-  if [ -n "$(PTXT "$ORESOLVERS" | grep -oF "'$OITEM'")" ]; then
+  if PTXT "$ORESOLVERS" | grep -qoF "'$OITEM'"; then
     PTXT "$INFO $OITEM is already set"
   else
     if [ "$ORESOLVERS" ]; then
@@ -700,7 +718,7 @@ choose_relays_automatic () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      [ "$(grep '^odoh_servers = .*true.*' "$TOML_FILE")" ] && PTXT "$INFO Now to pick relays for Oblivious DNS-over-HTTPS DNS servers." && choose_relays_automatic_odoh
+      if grep -q '^odoh_servers = .*true.*' "$TOML_FILE"; then PTXT "$INFO Now to pick relays for Oblivious DNS-over-HTTPS DNS servers."; choose_relays_automatic_odoh; fi
       read_yesno "Do you want to add any static relays?" && ADD_STATIC="YES" || ADD_STATIC="NO"
       [ "$ADD_STATIC" = "YES" ] && static_chosen_relays 0
       toml_avars_prep routes "\"[ { server_name='*', via=[$RELAYS] } ]\""
@@ -709,7 +727,7 @@ choose_relays_automatic () {
   fi
   local ITEM
   ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/relays.md")"
-  if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
+  if PTXT "$RELAYS" | grep -qoF "'$ITEM'"; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
@@ -733,13 +751,13 @@ choose_relays_automatic_odoh () {
   else
     read_input_num "Please choose next RELAY server or press n to stop" 1 "$INDEX" n
     if [ "$?" -eq 1 ]; then
-      if [ "$(grep '^dnscrypt_servers = .*false.*' "$TOML_FILE")" ] || [ "$COUNT" -eq 0 ]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
+      if grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE" || [ "$COUNT" -eq 0 ]; then toml_avars_prep routes "\"[ { server_name='*', via=[$ORELAYS] } ]\""; else RELAYS="${ORELAYS}, $RELAYS"; fi
       return
     fi
   fi
   local OITEM
   OITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-relays.md")"
-  if [ -n "$(PTXT "$ORELAYS" | grep -oF "'$OITEM'")" ]; then
+  if PTXT "$ORELAYS" | grep -qoF "'$OITEM'"; then
     PTXT "$INFO $OITEM is already set."
   else
     if [ "$ORELAYS" ]; then
@@ -781,7 +799,7 @@ choose_relays_manual () {
   fi
   local ITEM
   ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/relays.md")" 
-  if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
+  if PTXT "$RELAYS" | grep -qoF "'$ITEM'"; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
@@ -817,7 +835,7 @@ choose_relays_manual_odoh () {
   fi
   local ITEM
   ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="odoh-" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/odoh-relays.md")"
-  if [ -n "$(PTXT "$RELAYS" | grep -oF "'$ITEM'")" ]; then
+  if PTXT "$RELAYS" | grep -qoF "'$ITEM'"; then
     PTXT "$INFO $ITEM is already set."
   else
     if [ "$RELAYS" ]; then
@@ -884,12 +902,12 @@ del_jffs_script () {
     local OP
     OP="${2:0:1}"
     if [ "$OP" = "!" ]; then
-      LINE_NUM="$(grep -n -F "[ -x $TARG_DIR/" "$TARG"|grep -v "$(_quote "$2")"|cut -d':' -f1)"
+      LINE_NUM="$(grep -n -F "[ -x $TARG_DIR/" "$TARG" | grep -v "$(_quote "$2")" | cut -d':' -f1)"
     else
-      LINE_NUM="$(grep -n -F "[ -x $TARG_DIR/" "$TARG"|grep "$(_quote "$2")"|cut -d':' -f1)"
+      LINE_NUM="$(grep -n -F "[ -x $TARG_DIR/" "$TARG" | grep "$(_quote "$2")" | cut -d':' -f1)"
     fi
   else
-    LINE_NUM="$(grep -n -F "[ -x $TARG_DIR/" "$TARG"|cut -d':' -f1)"
+    LINE_NUM="$(grep -n -F "[ -x $TARG_DIR/" "$TARG" | cut -d':' -f1)"
   fi
   [ -z "$LINE_NUM" ] && return
   sed -i "${LINE_NUM}d" "$TARG"
@@ -946,7 +964,7 @@ end_op_message () {
 }
 
 end_op_header () {
-   sed -n -e "1,$(($(grep -wn 'menu () {' "$0" | cut -d':' -f1)-1))p" "$0" > ${0}.tmp && sh ${0}.tmp && menu && rm -rf ${0}.tmp
+  sed -n -e "1,$(($(grep -wn 'menu () {' "$0" | cut -d':' -f1)-1))p" "$0" > "${0}".tmp && sh "${0}".tmp && menu && rm -rf "${0}".tmp
 }
 
 inst_dnscrypt () {
@@ -956,8 +974,6 @@ inst_dnscrypt () {
   RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
   local CRYPT_RESOLVERS
   CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
-  local RURL
-  RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/installer"
   if [ -z "$1" ]; then
     if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
       PTXT "$INFO Backup is detected."
@@ -974,9 +990,9 @@ inst_dnscrypt () {
     fi
     local NW_STATE
     local RES_STATE
-    NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; echo $?)"
-    RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; echo $?)"
-    if { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; } || [ -z "DNSCRYPT_VER" ]; then
+    NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
+    RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
+    if [ -z "$DNSCRYPT_VER" ] || { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; then
       PTXT "$ERROR Unable to detect the Internet!"
       end_op_message 1
       return
@@ -986,8 +1002,8 @@ inst_dnscrypt () {
       end_op_message 1
       return
     fi  
-    download_file "$TARG_DIR" 755 "$RURL"
-    if [ "$?" -ne 0 ] || [ -z "$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})')" ]; then
+    download_file "$TARG_DIR" 755 "${RURL}/installer"
+    if [ "$?" -ne 0 ] || ! awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -qoE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})'; then
       PTXT "$ERROR Failed to download installer."
       end_op_message 1
       return
@@ -1012,7 +1028,7 @@ inst_dnscrypt () {
       fi
       chown "$(nvram get http_username)":root ${TARG_DIR}/"${DNSCRYPT_ARCH_TAR}"/*
       mv ${TARG_DIR}/"${DNSCRYPT_ARCH_TAR}"/* "$TARG_DIR"
-      rm -r "${TARG_DIR}/${DNSCRYPT_ARCH_TAR}" "${TARG_DIR}/${DNSCRYPT_TAR}"
+      rm -r "${TARG_DIR:?}/${DNSCRYPT_ARCH_TAR}" "${TARG_DIR:?}/${DNSCRYPT_TAR}"
       chmod 755 "${TARG_DIR}/dnscrypt-proxy"
 	  if [ "$?" -ne 0 ] || [ -z "$("${TARG_DIR}/dnscrypt-proxy" -version)" ]; then
         PTXT "$ERROR Failed to download dnscrypt-proxy package for your router"
@@ -1032,7 +1048,7 @@ inst_dnscrypt () {
     fi
     chown "$(nvram get http_username)":root ${TARG_DIR}/"${DNSCRYPT_ARCH_TAR}"/*
     mv ${TARG_DIR}/"${DNSCRYPT_ARCH_TAR}"/* "$TARG_DIR"
-    rm -r "${TARG_DIR}/${DNSCRYPT_ARCH_TAR}" "${TARG_DIR}/${DNSCRYPT_TAR}"
+    rm -r "${TARG_DIR:?}/${DNSCRYPT_ARCH_TAR}" "${TARG_DIR:?}/${DNSCRYPT_TAR}"
     chmod 755 "${TARG_DIR}/dnscrypt-proxy"
 	if [ "$?" -ne 0 ] || [ -z "$("${TARG_DIR}/dnscrypt-proxy" -version)" ]; then
         PTXT "$ERROR Failed to download dnscrypt-proxy package for your router"
@@ -1041,25 +1057,25 @@ inst_dnscrypt () {
     fi
   fi
   download_file "$TARG_DIR" 644 "${RESOLVERS_URL_PREFIX}/public-resolvers.md" \
-    "${RESOLVERS_URL_PREFIX}/public-resolvers.md.minisig" \
-    "${RESOLVERS_URL_PREFIX}/relays.md" \
-    "${RESOLVERS_URL_PREFIX}/relays.md.minisig" \
-    "${RESOLVERS_URL_PREFIX}/odoh-servers.md" \
-    "${RESOLVERS_URL_PREFIX}/odoh-servers.md.minisig" \
-    "${RESOLVERS_URL_PREFIX}/odoh-relays.md" \
-    "${RESOLVERS_URL_PREFIX}/odoh-relays.md.minisig"
+                                "${RESOLVERS_URL_PREFIX}/public-resolvers.md.minisig" \
+                                "${RESOLVERS_URL_PREFIX}/relays.md" \
+                                "${RESOLVERS_URL_PREFIX}/relays.md.minisig" \
+                                "${RESOLVERS_URL_PREFIX}/odoh-servers.md" \
+                                "${RESOLVERS_URL_PREFIX}/odoh-servers.md.minisig" \
+                                "${RESOLVERS_URL_PREFIX}/odoh-relays.md" \
+                                "${RESOLVERS_URL_PREFIX}/odoh-relays.md.minisig"
   download_file "$TARG_DIR" 644 "${CRYPT_RESOLVERS}/dnscrypt-resolvers.csv" \
-    "${CRYPT_RESOLVERS}/dnscrypt-resolvers.csv.minisig"
+                                "${CRYPT_RESOLVERS}/dnscrypt-resolvers.csv.minisig"
   chown nobody:nobody "${TARG_DIR}/public-resolvers.md" \
-    "${TARG_DIR}/public-resolvers.md.minisig" \
-    "${TARG_DIR}/relays.md" \
-    "${TARG_DIR}/relays.md.minisig" \
-    "${TARG_DIR}/odoh-servers.md" \
-    "${TARG_DIR}/odoh-servers.md.minisig" \
-    "${TARG_DIR}/odoh-relays.md" \
-    "${TARG_DIR}/odoh-relays.md.minisig" \
-    "${TARG_DIR}/dnscrypt-resolvers.csv" \
-    "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
+                      "${TARG_DIR}/public-resolvers.md.minisig" \
+                      "${TARG_DIR}/relays.md" \
+                      "${TARG_DIR}/relays.md.minisig" \
+                      "${TARG_DIR}/odoh-servers.md" \
+                      "${TARG_DIR}/odoh-servers.md.minisig" \
+                      "${TARG_DIR}/odoh-relays.md" \
+                      "${TARG_DIR}/odoh-relays.md.minisig" \
+                      "${TARG_DIR}/dnscrypt-resolvers.csv" \
+                      "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
   setup_dnscrypt
@@ -1072,7 +1088,7 @@ inst_dnscrypt () {
   sleep 1
   if [ -z "$(pidof dnscrypt-proxy)" ]; then
     PTXT "$ERROR Couldn't start dnscrypt-proxy" \
-      "$ERROR Please send WebUI System Log to dev"
+         "$ERROR Please send WebUI System Log to dev"
     end_op_message 1
     return
   fi
@@ -1080,9 +1096,9 @@ inst_dnscrypt () {
   manager_monitor_restart
 
   PTXT "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:" \
-    "$INFO  - Add swap" \
-    "$INFO  - Add a RNG" \
-    "$INFO  - Set your timezone"
+       "$INFO  - Add swap" \
+       "$INFO  - Add a RNG" \
+       "$INFO  - Set your timezone"
   end_op_message 0
 }
 
@@ -1092,7 +1108,7 @@ manager_monitor_restart () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(awk '{ print }' "/proc/${PID}/cmdline" | grep dnscrypt)" ]; then
+      if awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; then
         kill -9 "$PID"
         break
       fi
@@ -1128,11 +1144,11 @@ opendns_authen () {
 inst_random () {
   create_dir "$TARG_DIR"
   PTXT "$INFO Install a (P)RNG for better cryptographic operations" \
-    "$INFO Available random number generator providers:" \
-    "  1) HAVEGED (Preferred if you do not have a HW RNG)" \
-    "  2) RNGD (Preferred if you have a HW RNG)" \
-    "$INFO If you choose a HW RNG, please have it plugged in now before" \
-    "$INFO proceeding with your selection."
+       "$INFO Available random number generator providers:" \
+       "  1) HAVEGED (Preferred if you do not have a HW RNG)" \
+       "  2) RNGD (Preferred if you have a HW RNG)" \
+       "$INFO If you choose a HW RNG, please have it plugged in now before" \
+       "$INFO proceeding with your selection."
   read_input_num "Please enter the number designates your selection" 1 2
   case "$CHOSEN" in
     1)
@@ -1193,20 +1209,20 @@ inst_swap () {
   local SWAP_SIZE
   SWAP_SIZE="524288"
   local USB_COUNT
-  USB_COUNT="$(df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){print $6}}' | wc -l)"
+  USB_COUNT="$(df | awk -v SWS=$((SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){print $6}}' | wc -l)"
   if [ "$USB_COUNT" -lt 1 ]; then
     PTXT "$ERROR Unable to find any external USB storage" \
-      "$ERROR Or no suitable external USB storage found" \
-      "$ERROR Please connect a USB storage with at least" \
-      "$ERROR $(($SWAP_SIZE * 2 / 1024))MB of free space."
+         "$ERROR Or no suitable external USB storage found" \
+         "$ERROR Please connect a USB storage with at least" \
+         "$ERROR $((SWAP_SIZE * 2 / 1024))MB of free space."
     end_op_message 1
     return
   fi
   PTXT "$INFO Available partition to install swap file:${NORM}"
-  df | awk -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6 " (" $4/1024 "MB free)"}}'
+  df | awk -v SWS=$((SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; print "  " i ") " $6 " (" $4/1024 "MB free)"}}'
   read_input_num "Please select the partition to install swap file" 1 "$USB_COUNT"
   local MOUNT
-  MOUNT="$(df | awk -v IDX="$CHOSEN" -v SWS=$(($SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}')"
+  MOUNT="$(df | awk -v IDX="$CHOSEN" -v SWS=$((SWAP_SIZE * 2)) '/\/tmp\/mnt\// {if ($4 > SWS){++i; if (i==IDX){print $6}}}')"
   PTXT "$INFO Please wait..."
   dd if=/dev/zero of="${MOUNT}/swap" bs=1024 count="$SWAP_SIZE"
   local MOUNT_FS
@@ -1229,7 +1245,7 @@ inst_swap () {
 read_input_dns () {
   PTXT -n "$INPUT $1 ${BOLD}${2}: ${NORM}"
   local DNS_SERVER
-  read DNS_SERVER
+  read -r DNS_SERVER
   [ -z "$DNS_SERVER" ] && DNS_SERVER="$2"
   if [ "$(PTXT "$DNS_SERVER" | awk -F'.' 'NF != 4 || $1 < 0 || $1 > 255 || $2 < 0 || $2 > 255 || $3 < 0 || $3 > 255 || $4 < 0 || $4 > 255 {print}')" ]; then
     PTXT "$ERROR Invalid DNS server address entered"
@@ -1253,7 +1269,7 @@ read_input_num () {
   [ -n "$4" ] && [ -n "$5" ] && [ -z "$6" ] && RANGE="[${2}-${3}/${4}/${5}]"
   [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ] && RANGE="[${2}-${3}/${4}/${5}/${6}]"  
   PTXT -n "$INPUT $1, ${BOLD}${RANGE}${NORM}: "
-  read CHOSEN
+  read -r CHOSEN
   case "$1" in
     "Set log level, default is 2, 0 is the most verbose")
       [ -z "$CHOSEN" ] && CHOSEN="2"
@@ -1270,7 +1286,7 @@ read_input_num () {
       return 1
       ;;
   esac
-  if [ -z "$(PTXT "$CHOSEN" | grep -E '^[0-9]+$')" ]; then
+  if ! PTXT "$CHOSEN" | grep -qE '^[0-9]+$'; then
     PTXT "$ERROR Invalid character entered! Retrying..."
     read_input_num "$@"
     return
@@ -1285,7 +1301,7 @@ read_input_num () {
 read_yesno () {
   PTXT -n "$INPUT $1 ${BOLD}[y/n]${NORM}: "
   local YESNO
-  read YESNO
+  read -r YESNO
   case "$YESNO" in
     y|Y)
       return 0
@@ -1326,7 +1342,7 @@ static_chosen () {
   fi
   local STATIC
   STATIC="${STATICNAME}-Static"
-  if [ -n "$(PTXT "$STATICRESOLVERS" | grep -oF "$STATIC")" ]; then
+  if PTXT "$STATICRESOLVERS" | grep -qoF "$STATIC"; then
     PTXT "$INFO $STATIC is already set"
   else
     toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" "$TOML_FILE"
@@ -1348,7 +1364,7 @@ static_chosen () {
     read_yesno "Is $STATIC an Oblivious DNS-over-HTTPS Server?" && ODOH_ENABLE="true" || ODOH_ENABLE="false"
     if [ "$ODOH_ENABLE" = "true" ]; then
       if [ -z "$STAT_ODOH" ]; then
-        [ "$(grep '^odoh_servers = .*false.*' "$TOML_FILE")" ] && toml_avars_prep odoh_servers true
+        if grep -q '^odoh_servers = .*false.*' "$TOML_FILE"; then toml_avars_prep odoh_servers true; fi
         STAT_ODOH="${STATIC}"
       else
         STAT_ODOH="${STAT_ODOH}|${STATIC}"
@@ -1383,7 +1399,7 @@ static_chosen_relays () {
 
   local STATIC
   STATIC="${STATICNAME}-Static"
-  if [ -n "$(PTXT "$STATICRELAYS" | grep -oF "$STATIC")" ]; then
+  if PTXT "$STATICRELAYS" | grep -qoF "$STATIC"; then
     PTXT "$INFO $STATIC is already set"
   else
     toml_nvars_insert "[static]" "[static.'${STATICNAME}-Static']" "$TOML_FILE"
@@ -1438,8 +1454,8 @@ setup_dnscrypt_impl () {
         PTXT "$INFO Found previous dnscrypt-proxy config file"
       fi
       PTXT "$INFO How do you want to reconfigure:" \
-        "$INFO   1) Start from previous settings file" \
-        "$INFO   2) Start from default config"
+           "$INFO   1) Start from previous settings file" \
+           "$INFO   2) Start from default config"
       read_input_num "Your selection" 1 2
       case "$CHOSEN" in
         1)
@@ -1469,7 +1485,7 @@ setup_dnscrypt_impl () {
     PTXT "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
     check_relays
     PTXT "$INFO Set the DNS server(s) for initializing dnscrypt-proxy" \
-      "$INFO and router services (e.g. ntp) at boot"
+         "$INFO and router services (e.g. ntp) at boot"
     read_input_dns "Default is" 9.9.9.9
     read_input_dns "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
@@ -1479,8 +1495,8 @@ setup_dnscrypt_impl () {
     check_dnscrypt_toml
     if [ "$?" -ne 0 ]; then
       PTXT "$INFO Writing dnscrypt-proxy configuration failed " \
-       "$INFO Please send $TOML_ERR file and screen log of " \
-       "$INFO all operations you have made to this script dev"
+           "$INFO Please send $TOML_ERR file and screen log of " \
+           "$INFO all operations you have made to this script dev"
       return 1
     fi
   fi
@@ -1500,28 +1516,19 @@ set_timezone () {
     "armv7l")
       TZ_ARCH="arm"
     ;;
-    *)
-      local USE_ANY
-      USE_ANY="TRUE"
-    ;;
   esac
-  [ "$USE_ANY" = "TRUE" ] && TZ_DATA="tzdata-2018c-1-any.pkg.tar.bz2"
-  [ -z "$USE_ANY" ] && TZ_DATA="tzdata-2021a-1-${TZ_ARCH}.pkg.tar.bz2"
+  TZ_DATA="tzdata-2021e-1-${TZ_ARCH}.pkg.tar.bz2"
   download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
   download_file "$TMP" 644 "${URL_GEN}/${TZ_DATA}"
   local INDEX
-  [ "$USE_ANY" = "TRUE" ] && INDEX="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | wc -l)"
-  [ -z "$USE_ANY" ] && INDEX="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && /\/posix\//' | wc -l)"
+  INDEX="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && /\/posix\//' | wc -l)"
   PTXT "$INFO Available timezones/locations:"
-  [ "$USE_ANY" = "TRUE" ] && tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
-  [ -z "$USE_ANY" ] && tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && /\/posix\//' | sort | cut -d'/' -f2- | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
+  tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && /\/posix\//' | sort | cut -d'/' -f2- | awk -v INDEX=0 -F'/' '!/\/$/ {++INDEX;printf "  " INDEX") ";for (i=5; i<NF; i++)  printf $i "/"; print $NF}'
   read_input_num "Select your timezone/location" 1 "$INDEX"
   local TZ_FILE 
-  [ "$USE_ANY" = "TRUE" ] && TZ_FILE="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ && !/PaxHeader/ && /\/posix\//' | sort | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
-  [ -z "$USE_ANY" ] && TZ_FILE="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ &&  /\/posix\//' | sort | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
+  TZ_FILE="$(tar tjf "${TMP}/${TZ_DATA}" | awk -F'/' '!/\/$/ &&  /\/posix\//' | sort | awk -v INDEX="$CHOSEN" '{++i}i==INDEX{print $0}')"
   PTXT "$INFO $(basename "$TZ_FILE") selected"
-  [ "$USE_ANY" = "TRUE" ] && tar xjf "${TMP}/${TZ_DATA}" -C "$TMP" usr/share/zoneinfo/posix
-  [ -z "$USE_ANY" ] && tar xjf "${TMP}/${TZ_DATA}" -C "$TMP" ./usr/share/zoneinfo/posix
+  tar xjf "${TMP}/${TZ_DATA}" -C "$TMP" ./usr/share/zoneinfo/posix
   mv "${TMP}/${TZ_FILE}" "${TARG_DIR}/localtime"
   if [ "$?" -ne 0 ]; then
     PTXT "$ERROR Unable to set your timezone file"
@@ -1532,7 +1539,7 @@ set_timezone () {
   write_manager_script /jffs/scripts/services-stop services-stop
   ln -sf $TARG_DIR/localtime /etc/localtime
   [ "$(pidof dnscrypt-proxy)" ] && ${TARG_DIR}/manager dnscrypt-start
-  rm -r "${TMP}/${TZ_DATA}" "${TMP}/usr"
+  rm -r "${TMP:?}/${TZ_DATA}" "${TMP:?}/usr"
   end_op_message 0
 }
 
@@ -1633,7 +1640,7 @@ uninst_all () {
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
-      if [ "$(awk '{ print }' "/proc/${PID}/cmdline" | grep dnscrypt)" ]; then
+      if awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; then
         kill -9 "$PID"
         break
       fi
@@ -1645,7 +1652,7 @@ uninst_all () {
 
 uninst_dnscrypt () {
   PTXT "$INFO Uninstalling dnscrypt-proxy..."
-  rm -f "${TARG_DIR}/dnscrypt-proxy" "${TARG_DIR}/nonroot"
+  rm -f "${TARG_DIR:?}/dnscrypt-proxy" "${TARG_DIR:?}/nonroot"
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   killall -q dnscrypt-proxy
   service restart_dnsmasq >/dev/null 2>&1
@@ -1655,16 +1662,16 @@ uninst_dnscrypt () {
 
 uninst_random () {
   PTXT "$INFO Uninstalling (P)RNG..."
-  rm -f "${TARG_DIR}/haveged" "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
+  rm -f "${TARG_DIR:?}/haveged" "${TARG_DIR:?}/rngd" "${TARG_DIR:?}/stty"
   killall -q -9 haveged rngd
   del_conf RAN_PRV RNG_DEV
-  [ ! -f "${TARG_DIR}/localtime" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
+  if [ ! -f "${TARG_DIR}/localtime" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
   end_op_message 0
 }
 
 unset_timezone () {
-  rm -f "${TARG_DIR}/localtime"
-  [ -z "$(grep \"^RAN_PRV=.*$\" "${TARG_DIR}/.config")" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop
+  rm -f "${TARG_DIR:?}/localtime"
+  if ! grep "^RAN_PRV=.*$" "${TARG_DIR}/.config" && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
   end_op_message 0
 }
 
@@ -1673,15 +1680,15 @@ write_conf () {
   VAR="$1"
   local VALUE 
   VALUE="$2"
-  [ -f "${TARG_DIR}/.opendns-auth" ] && mv "${TARG_DIR}/.opendns-auth" "$CONF_FILE" && chmod 644 "$CONF_FILE"
+  if [ -f "${TARG_DIR}/.opendns-auth" ]; then mv "${TARG_DIR}/.opendns-auth" "$CONF_FILE"; chmod 644 "$CONF_FILE"; fi
   if [ ! -f "$CONF_FILE" ]; then
     touch "$CONF_FILE" && chmod 644 "$CONF_FILE"
   fi
-  if [ "$(grep "$VAR" "$CONF_FILE")" ]; then
+  if grep -q "$VAR" "$CONF_FILE"; then
     VALUE=$(_quote "$VALUE")
     sed -i "/^$VAR=/s/=.*/=$VALUE/" "$CONF_FILE"
   else
-    echo "$VAR=$VALUE" >> "$CONF_FILE"
+    PTXT "$VAR=$VALUE" >> "$CONF_FILE"
   fi
 }
 
@@ -1694,14 +1701,14 @@ write_command_script () {
   FILENAME="$(basename "$TARG")"
   if [ ! -f "$TARG" ]; then
     PTXT "$INFO Creating $FILENAME file"
-    echo "#!/bin/sh" > "$TARG"
+    PTXT "#!/bin/sh" > "$TARG"
   fi
   chmod 755 "$TARG"
   if [ "$(grep -c -F "$COMMAND" "$TARG")" -gt 0 ]; then
     PTXT "$INFO $FILENAME file already configured"
   else
     PTXT "$INFO Configure $FILENAME file"
-    echo "$COMMAND" >> "$TARG"
+    PTXT "$COMMAND" >> "$TARG"
   fi
 }
 
@@ -1716,7 +1723,7 @@ write_manager_script () {
   COMMAND="${TARG_DIR}/manager"
   if [ ! -f "$TARG" ]; then
     PTXT "$INFO Creating $FILENAME file"
-    echo "#!/bin/sh" > "$TARG"
+    PTXT "#!/bin/sh" > "$TARG"
   fi
   chmod 755 "$TARG" "$COMMAND"
   del_between_magic "$TARG" dnscrypt-asuswrt-installer
@@ -1724,22 +1731,22 @@ write_manager_script () {
     PTXT "$INFO $FILENAME file already configured"
   else
     PTXT "$INFO Configure $FILENAME file"
-    if [ "$(grep \"^$COMMAND\" "$TARG")" ]; then
+    if grep -q "^$COMMAND" "$TARG"; then
       sed -i "s~^$COMMAND~[ -x $COMMAND ] \&\& $COMMAND $OP~" "$TARG"
     else
       del_jffs_script "$TARG" !manager
-      [ "$(tail -1 "$TARG"|grep -c '^$')" -eq 0 ] && echo "" >> "$TARG"
-      echo "[ -x $COMMAND ] && $COMMAND $OP" >> "$TARG"
+      [ "$(tail -1 "$TARG" | grep -c '^$')" -eq 0 ] && PTXT "" >> "$TARG"
+      PTXT "[ -x $COMMAND ] && $COMMAND $OP" >> "$TARG"
     fi
   fi
 }
 
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
+RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
+URL_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/gen"
 ROUTER_OS="$(uname)"
 ROUTER_ARCH="$(uname -m)"
-URL_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}/gen"
-URL_ARCH="https://github.com/thuantran/dnscrypt-asuswrt-installer/raw/${BRANCH}"
 
 clear
 
@@ -1804,15 +1811,15 @@ esac
 
 menu () {
   PTXT "$INFO Choose what you want to do:" \
-   "  1) Install/Update dnscrypt-proxy" \
-   "  2) Uninstall dnscrypt-proxy" \
-   "  3) Configure dnscrypt-proxy" \
-   "  4) Set timezone" \
-   "  5) Unset timezone" \
-   "  6) Install (P)RNG" \
-   "  7) Uninstall (P)RNG" \
-   "  8) Install swap file" \
-   "  9) Uninstall ALL"
+       "  1) Install/Update dnscrypt-proxy" \
+       "  2) Uninstall dnscrypt-proxy" \
+       "  3) Configure dnscrypt-proxy" \
+       "  4) Set timezone" \
+       "  5) Unset timezone" \
+       "  6) Install (P)RNG" \
+       "  7) Uninstall (P)RNG" \
+       "  8) Install swap file" \
+       "  9) Uninstall ALL"
   [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && PTXT "  b) Backup"
   [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && PTXT "  r) Restore"
   PTXT "  q) Quit"
@@ -1822,14 +1829,14 @@ menu () {
   case "$CHOSEN" in
     1)
       PTXT "$INFO This operation will install dnscrypt-proxy and related files (<6MB)" \
-        "$INFO to jffs, no other data will be changed." \
-        "$INFO Also some start scripts will be installed/modified as required."
+           "$INFO to jffs, no other data will be changed." \
+           "$INFO Also some start scripts will be installed/modified as required."
       read_yesno "Do you want to install dnscrypt-proxy to /jffs?" && inst_dnscrypt || end_op_message 1
       ;;
     2)
       PTXT "$INFO This operation will uninstall dnscrypt-proxy and related files" \
-        "$INFO from jffs, no other data will be changed." \
-        "$INFO Also some start scripts will be modified as required."
+           "$INFO from jffs, no other data will be changed." \
+           "$INFO Also some start scripts will be modified as required."
       read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?" && uninst_dnscrypt || end_op_message 1
       ;;
     3)
@@ -1846,18 +1853,18 @@ menu () {
       ;;
     6)
       PTXT "$INFO This operation will install a (P)RNG (<0.5MB) to jffs, no other data will be changed." \
-      "$INFO Also some start scripts will be installed/modified as required."
+           "$INFO Also some start scripts will be installed/modified as required."
       read_yesno "Do you want to install (P)RNG to /jffs?" && inst_random || end_op_message 1
       ;;
     7)
       PTXT "$INFO This operation will uninstall (P)RNG" \
-        "$INFO from jffs, no other data will be changed." \
-        "$INFO Also some start scripts will be installed/modified as required."
+           "$INFO from jffs, no other data will be changed." \
+           "$INFO Also some start scripts will be installed/modified as required."
       read_yesno "Do you want to uninstall (P)RNG from /jffs?" && uninst_random || end_op_message 1
       ;;
     8)
       PTXT "$INFO This operation will install a swap file for your device." \
-        "$INFO You need an external USB storage to host this file."
+           "$INFO You need an external USB storage to host this file."
       read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?" && check_swap || end_op_message 1
       ;;
     9)
@@ -1874,7 +1881,7 @@ menu () {
       ;;
     q|Q)
       PTXT "$INFO Operations have been applied if any has been made" \
-        "$INFO In case of anomaly, please reboot your router!"
+           "$INFO In case of anomaly, please reboot your router!"
       if [ -f "${HOME}/installer" ]; then rm -rf "${HOME}/installer"; fi
       sleep 3
       clear
