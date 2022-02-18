@@ -1518,7 +1518,7 @@ set_timezone () {
       TZ_ARCH="arm"
     ;;
   esac
-  TZ_DATA="tzdata-2021a-1-${TZ_ARCH}.pkg.tar.bz2"
+  TZ_DATA="tzdata-2021e-1-${TZ_ARCH}.pkg.tar.bz2"
   download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
   download_file "$TMP" 644 "${URL_GEN}/${TZ_DATA}"
   local INDEX
