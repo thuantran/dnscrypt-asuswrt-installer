@@ -2,128 +2,183 @@
 
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
+NAME="$(basename $0)[$$]"
+
 append_on_demand () {
+  local TARGET
+  local LINE
   TARGET="$1"
   shift
   for LINE in "$@"; do
-    if [ -z "`grep -F \"$LINE\" $TARGET`" ]; then
-      echo "$LINE" >> $TARGET
+    if ! grep -qF "$LINE" "$TARGET"; then
+      printf "%s\n" "$LINE" >> "$TARGET"
     fi
   done
 }
 
+dnsmasq_params () {
+  local DNS
+  local VAR
+  cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
+  append_on_demand /etc/dnsmasq.conf "no-resolv"
+  append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
+  if [ "$(nvram get dns_local_cache)" != "1" ]; then umount /tmp/resolv.conf 2>/dev/null; mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; fi
+  for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
+  sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+  done
+  for VAR in 1 2 3; do
+  DNS="$(nvram get "ipv6_dns$VAR")"
+  [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+  done
+  sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
+  append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+}
+
 init_hwrng () {
-  local COUNT=0
-  while [ ! -c $RNG_DEV ]; do
-    if [ $COUNT -gt 120 ]; then
-      logger "ERROR: Unable to find HWRNG device. Aborting..."
+  local COUNT
+  COUNT="0"
+  killall -q -9 haveged jitterentropy-rngd rngd
+  while [ ! -c "$RNG_DEV" ]; do
+    if [ "$COUNT" -gt 120 ]; then
+      logger -st "$NAME" "ERROR: Unable to find HWRNG device. Aborting..."
+      if [ -f "/jffs/dnscrypt/haveged" ]; then /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; logger -st "$NAME" "Haveged: Using available haveged instead..."; fi
       exit 1
     fi
-    COUNT=$((COUNT+1))
+    COUNT="$((COUNT+1))"
     sleep 1
   done
   /jffs/dnscrypt/stty raw -echo -ixoff -F $RNG_DEV speed 115200
   /jffs/dnscrypt/rngd -r $RNG_DEV
-  [ $? -eq 0 ] && logger "rngd: Started for $RNG_DEV"
+  [ $? -eq 0 ] && logger -st "$NAME" "rngd: Started for $RNG_DEV"
 }
 
 start_dnscrypt () {
+  local STATE
+  local NW_STATE
+  local RES_STATE
+  local DNSCRYPT_START
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   killall -q dnscrypt-proxy
-  logger "Start dnscrypt-proxy"
+  logger -st "$NAME" "Start dnscrypt-proxy"
   cd /jffs/dnscrypt
   nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null &
+  STATE="0"
+  [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
+  [ -z "$1" ] && RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
+  [ -z "$1" ] && while { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ] && [ "$STATE" -lt "10" ]; }; do sleep 1; NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"; RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"; STATE="$((STATE + 1))"; done
+  [ "$STATE" -eq "10" ] && start_dnscrypt x
 }
 
 start_monitor () {
-  trap "" 1
-  while [ `nvram get ntp_ready` -eq 0 ]; do sleep 1; done
+  trap "" 1 2 3 15
+  while [ "$(nvram get ntp_ready)" -eq 0 ]; do sleep 1; done
   local NW_STATE
   local RES_STATE
-  local COUNT=0
+  local COUNT
+  local RANDOM
+  COUNT="0"
+  RANDOM="0"
   while true; do
-    if [ -f /jffs/dnscrypt/localtime ]; then
-      if [ $COUNT -eq 90 ]; then
-        COUNT=0
-        touch "$0"
-      fi
-      COUNT=$((COUNT + 1))
-    fi
-    ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1
-    NW_STATE=$?
-    nslookup google.com >/dev/null 2>&1
-    RES_STATE=$?
-    if [ -f /jffs/dnscrypt/dnscrypt-proxy ]; then
-      if [ -z "`pidof dnscrypt-proxy`" ]; then
-        logger "Warning: dnscrypt-proxy is dead"
+    if [ "$COUNT" -gt 90 ]; then COUNT="0"; timezone; "$0" opendns-update; fi
+    COUNT="$((COUNT + 1))"
+    if [ -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
+      case "$COUNT" in
+        "30"|"60"|"90")
+          timezone
+          "$0" opendns-update
+          NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
+          RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
+          ;;
+      esac
+      if [ -z "$(pidof dnscrypt-proxy)" ]; then
+        logger -st "$NAME" "Warning: dnscrypt-proxy is dead"
         start_dnscrypt
-      elif [ $NW_STATE -eq 0 ] && [ $RES_STATE -ne 0 ]; then
-        logger "Warning: dnscrypt-proxy is not responding"
+      elif { [ "$COUNT" -eq "30" ] || [ "$COUNT" -eq "60" ] || [ "$COUNT" -eq "90" ]; } && { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; then
+        logger -st "$NAME" "Warning: dnscrypt-proxy is not responding"
+        start_dnscrypt
+      elif [ "$RANDOM" -eq 4320 ]; then
+        RANDOM="0"
+        logger -st "$NAME" "Randomization: Health Check."
         start_dnscrypt
       fi
+      RANDOM="$((RANDOM + 1))"
     fi
     sleep 10
   done
 }
 
+timezone () {
+  local SANITY
+  local NOW
+  local TIMEZONE
+  local TARGET
+  local LINK
+  SANITY="$(date -u -r "$0" '+%s')"
+  NOW="$(date -u '+%s')"
+  TIMEZONE="/jffs/dnscrypt/localtime"
+  TARGET="/etc/localtime"
+  LINK="$(readlink "$TARGET")"
+  if [ -f "$TIMEZONE" ] && [ "$LINK" = "$TIMEZONE" ]; then
+    if [ "$NOW" -ge "$SANITY" ]; then
+      touch "$0"
+    fi
+  elif [ -f "$TIMEZONE" ]; then
+    ln -sf "$TIMEZONE" "$TARGET"
+    if [ "$NOW" -le "$SANITY" ]; then
+      date -u -s "$(date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S')"
+    fi
+  fi
+}
+
 update_opendns () {
-  if [ -z "$OPENDNS_USER" ] || [ -z  "$OPENDNS_PASSWORD" ] || [ $1 -gt 2 ]; then
+  if [ -z "$OPENDNS_USER" ] || [ -z  "$OPENDNS_PASSWORD" ] || [ "$1" -gt 2 ]; then
     return
   fi
   sleep 5
-  RET=`curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname="`
+  RET="$(curl -k -s -u "$OPENDNS_USER:$OPENDNS_PASSWORD" "https://updates.opendns.com/nic/update?hostname=")"
   case "$RET" in
     good*)
-      logger "OpenDNS: Update IP succeeded"
+      logger -st "$NAME" "OpenDNS: Update IP succeeded"
       ;;
     badauth*)
-      logger "OpenDNS: Wrong username or password"
+      logger -st "$NAME" "OpenDNS: Wrong username or password"
       ;;
     *)
-      logger "OpenDNS: Received error $RET"
-      update_opendns $(($1+1))
+      logger -st "$NAME" "OpenDNS: Received error $RET"
+      update_opendns "$(($1+1))"
       ;;
   esac
 }
 
 unset TZ
-case $1 in
-  dnscrypt-start)
+case "$1" in
+  "dnscrypt-start")
     start_dnscrypt
     ;;
-  dnsmasq)
-    sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
-    append_on_demand /etc/dnsmasq.conf "no-resolv" "server=127.0.0.1#65053"
+  "dnsmasq")
+    dnsmasq_params
     ;;
-  fw-rules)
-    iptables -t nat -C  PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
-    [ $? -ne 0 ] && iptables -t nat -A PREROUTING -i br0 -p udp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
-    iptables -t nat -C PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr) > /dev/null 2>&1
-    [ $? -ne 0 ] && iptables -t nat -A PREROUTING -i br0 -p tcp --dport 53 -j DNAT --to $(nvram get lan_ipaddr)
-    ;;
-  init-start)
-    if [ -f /jffs/dnscrypt/localtime ]; then
-      ln -s /jffs/dnscrypt/localtime /etc/localtime
-      date -u -s "`date -u -r \"$0\" '+%Y-%m-%d %H:%M:%S'`"
-    fi
-    case $RAN_PRV in
-      haveged)
-        /jffs/dnscrypt/haveged -w1024 -v1
+  "init-start")
+    timezone
+    case "$RAN_PRV" in
+      "haveged")
+        killall -q -9 haveged jitterentropy-rngd rngd
+        /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1
         ;;
-      rngd)
+      "rngd")
         init_hwrng &
         ;;
     esac
-    $0 monitor-start
+    "$0" monitor-start
     start_dnscrypt
     ;;
-  monitor-start)
+  "monitor-start")
     start_monitor &
     ;;
-  services-stop)
-    [ -f /jffs/dnscrypt/localtime ] && touch "$0"
-    ;;
-  wan-start)
+  "opendns-update")
     update_opendns 0 &
+    ;;
+  "services-stop")
+    timezone
     ;;
 esac

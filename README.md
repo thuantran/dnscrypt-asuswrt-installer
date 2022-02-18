@@ -1,25 +1,30 @@
-So to solve all the problems with installing dnscrypt with entware (or similar) then setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, I made my own installer for dnscrypt-proxy.
+<a href="https://ibb.co/3CmV5dX"><img src="https://i.ibb.co/nLM4qm2/installer.jpg" alt="installer" border="0"></a>
+
+To resolve all problems associated with installing Dnscrypt-Proxy with Entware (or similar) along with setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, this installer of dnscrypt-proxy resolves all these concerns... The only requirement is an Asus Router flashed with custom Asuswrt-Merlin Firmware.
 
 # Requirements:
-- ARM or MIPSEL based ASUS routers
-- asuswrt-merlin firmwares or compatible
-- jffs support and script enabled
+- ARM based ASUS routers that use Asuswrt-Merlin Firmware
+- JFFS support and enabled
 
 # Incompatibilities:
 - No known issue
 
 # Current features:
-- [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with DoH and DNSCrypt version 2 protocols, multiple resolvers, and other features
+- [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with ODoH, DoH, and DNSCrypt version 2 protocols, multiple resolvers, and other features
 - Running as nobody through nonroot binary (using --user requires change to passwd)
-- Support ARM and MIPSEL based routers
+- Support ARM based routers
 - Support OpenDNS dynamic IP update by entering your OpenDNS account information
 - Handling ntp update at router boot up by starting dnscrypt-proxy with cert_ignore_timestamp option
-- Redirect all DNS queries on your network to dnscrypt if user chooses to
+- Redirect all DNS queries on your network to dnscrypt if user chooses to using DNS Filter Option
 - Install haveged/rngd for better speed with dnscrypt and other cryptographic applications
 - Support various HW RNG such as TrueRNG (tested with v3), TrueRNGpro, OneRNG, EntropyKey
 - Ability to setup a swap file
 - Ability to setup timezone file (/etc/localtime) used by dnscrypt-proxy and other apps
 - Ability to reconfigure dnscrypt-proxy without reinstalling unlike previous installer for dnscrypt-proxy version 1.x.x
+- Ability to configure anonymized relay support per Dnscrypt server through menu option or Wildcard Relay Support to cover all dnscrypt servers when automatic is selected.
+- Support for NextDNS.io Account SDNS stamp as Static server.
+- Support for addition of multiple static servers using SDNS Stamp and Custom Server Naming that can be mixed with servers on the resolvers list.
+- Improved Installer/Update/Backup Functions.
 
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
@@ -58,22 +63,20 @@ I need following directory and files:
 ```
 /jffs/dnscrypt
 /jffs/scripts/dnsmasq.postconf
-/jffs/scripts/firewall-start
-/jffs/scripts/wan-start
 ```
 One can use this command to create a tar archive of these files:
 ```
-echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/dnsmasq.postconf /jffs/scripts/firewall-start /jffs/scripts/wan-start ; rm exclude-files
+echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/dnsmasq.postconf; rm exclude-files
 ```
 in current directory and send me the archive for debug.
 
-I also need follwoing information:
-- Which dns server you selected during dnscrypt installtion
+I also need following information:
+- Which dns server you selected during dnscrypt installation
 - Which router you're using
 - Firmware and its version
 
 # How I made this:
 - Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
 - Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
-- Write the installer script with stuffs inspired from entware-setup.sh from asuswrt-merlin
-- You can look at all the stuffs here https://github.com/thuantran/dnscrypt-asuswrt-installer
+- I wrote the installer script with stuff inspired from entware-setup.sh from asuswrt-merlin
+- You can look at all the stuff here https://github.com/thuantran/dnscrypt-asuswrt-installer
