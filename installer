@@ -346,7 +346,7 @@ check_relays () {
   local CRYPT
   FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' "$TOML_ORI" | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
   NUMCRYPT="0"
-  while read -r CRYPT; do
+  while read CRYPT; do
     CRYPT="$(PTXT "$CRYPT" | cut -d',' -f1)"
     if [ "$NUMCRYPT" -eq 0 ]; then
       NUMCRYPT="1"
@@ -413,7 +413,7 @@ check_relays () {
             local USE_BROKEN
             read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?" && USE_BROKEN="true" || USE_BROKEN="false"
             toml_avars_prep skip_incompatible $USE_BROKEN
-	        NUMFRAG="$((NUMFRAG + 1))"
+	    NUMFRAG="$((NUMFRAG + 1))"
           fi
           ;;
       esac
