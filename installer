@@ -346,7 +346,7 @@ check_relays () {
   local CRYPT
   FRAGSBLOCKED_ARGS="$(grep '^fragments_blocked =' "$TOML_ORI" | cut -d'[' -f2- | sed "s/['\"\,]//g;s/]//g;s/^ [ t]*//;s/[ \t]*$//;s/ /|/g")"
   NUMCRYPT="0"
-  while read CRYPT; do
+  while read -r CRYPT; do
     CRYPT="$(PTXT "$CRYPT" | cut -d',' -f1)"
     if [ "$NUMCRYPT" -eq 0 ]; then
       NUMCRYPT="1"
@@ -377,7 +377,6 @@ check_relays () {
       if PTXT "$FRAGSBLOCKED_ARGS" | grep -qoF "$SERVER"; then FRAGSBLOCKED="$SERVER"; fi
       case "$SERVER" in
         "$DNSCRYPT")
-	  CRYPT_COUNT="1"
           read_yesno "Do you want to add relays for $SERVER?" && ADD_RELAYS="YES" || ADD_RELAYS="NO"
           [ "$ADD_RELAYS" = "YES" ] && PTXT "$INFO You may manually choose relays for $SERVER or you may specify wildcard relay (via=['*'])."
           if [ "$COUNT" -eq 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
@@ -385,7 +384,7 @@ check_relays () {
             read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
             [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
             [ "$USE_WILDCARD" = "NO" ] && choose_relays_manual
-            COUNT=$((COUNT + 1))
+            COUNT="$((COUNT + 1))"
           elif [ "$COUNT" -gt 0 ] && [ "$ADD_RELAYS" = "YES" ]; then
             read_yesno "Do you want to use wildcard relay (via=['*']) option for $SERVER?" && USE_WILDCARD="YES" || USE_WILDCARD="NO"
             [ "$USE_WILDCARD" = "YES" ] && choose_relays_manual_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
@@ -420,7 +419,7 @@ check_relays () {
     fi
   done
   if [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
-    if [ "$CRYPT_COUNT" -gt 0 ]; then
+    if [ -n "$DNSCRYPT" ]; then
       PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers by selecting wildcard option for servers and/or relays."
       read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible DNSCrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
     else
