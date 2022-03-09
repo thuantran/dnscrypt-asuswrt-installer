@@ -120,7 +120,7 @@ start_monitor () {
 }
 
 stop_monitor () {
-  for PID in $(pidof "$(basename $0)"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q monitor-start; } && [ "$PID" != "$$" ]; then { kill -s 10 "$PID" || kill -s 9 "$PID"; }; fi; done
+  for PID in $(pidof "$(basename $0)"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; } && [ "$PID" != "$$" ]; then { kill -s 10 "$PID" || kill -s 9 "$PID"; }; fi; done
 }
 
 timezone () {
@@ -187,7 +187,7 @@ case "$1" in
     ;;
   "init-start"|"services-stop")
     timezone
-    { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" || killall -q -9 haveged jitterentropy-rngd rngd stty; };
+    if [ -n "$RAN_PRV" ]; then { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" || killall -q -9 haveged jitterentropy-rngd rngd stty; }; fi
     if [ "$1" = "init-start" ]; then
       { printf "1" > /proc/sys/vm/overcommit_memory; };
       case "$RAN_PRV" in
