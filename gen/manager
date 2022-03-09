@@ -59,7 +59,7 @@ start_dnscrypt () {
   local RES_STATE
   local DNSCRYPT_START
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
-  { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" || killall -q -9 dnscrypt-proxy dnsmasq }
+  { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" || killall -q -9 dnscrypt-proxy dnsmasq; };
   logger -st "$NAME" "Start dnscrypt-proxy"
   cd /jffs/dnscrypt
   { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
@@ -72,7 +72,7 @@ start_dnscrypt () {
 }
 
 stop_dnscrypt () {
-  { killall -s 9 "$(pidof dnscrypt-proxy)" || killall -q -9 dnscrypt-proxy}
+  { killall -s 9 "$(pidof dnscrypt-proxy)" || killall -q -9 dnscrypt-proxy; };
   { service restart_dnsmasq >/dev/null 2>&1; };
 }
 
@@ -198,7 +198,7 @@ case "$1" in
           init_hwrng &
           ;;
       esac
-      "$0" monitor-start
+      { "$0" monitor-start; };
     elif [ "$1" = "services-stop" ]; then
       { stop_monitor; };
     fi
