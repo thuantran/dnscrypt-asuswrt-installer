@@ -147,10 +147,10 @@ timezone () {
   TARGET="/etc/localtime"
   LINK="$(readlink "$TARGET")"
   if [ -f "$TIMEZONE" ] && [ "$LINK" = "$TIMEZONE" ]; then
-    [ "$NOW" -ge "$SANITY" ] && { touch "$MID_SCRIPT"; };
+    [ "$NOW" -ge "$SANITY" ] && { touch "$0"; };
   elif [ -f "$TIMEZONE" ]; then
     ln -sf $TIMEZONE $TARGET
-    [ "$NOW" -le "$SANITY" ] && { date -u -s "$(date -u -r "$MID_SCRIPT" '+%Y-%m-%d %H:%M:%S')"; };
+    [ "$NOW" -le "$SANITY" ] && { date -u -s "$(date -u -r "$0" '+%Y-%m-%d %H:%M:%S')"; };
   fi
 }
 
