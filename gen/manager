@@ -58,10 +58,9 @@ start_dnscrypt () {
   local NW_STATE
   local RES_STATE
   local DNSCRYPT_START
+  { { cd /jffs/dnscrypt } && { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" || killall -q -9 dnscrypt-proxy dnsmasq; }; } || exit
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
-  { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" || killall -q -9 dnscrypt-proxy dnsmasq; };
-  logger -st "$NAME" "Start dnscrypt-proxy"
-  cd /jffs/dnscrypt
+  logger -st "$NAME" "Starting dnscrypt-proxy from $NAME."
   { nohup "$DNSCRYPT_START" >/dev/null 2>&1 </dev/null & };
   { service restart_dnsmasq >/dev/null 2>&1; };
   STATE="0"
@@ -72,7 +71,7 @@ start_dnscrypt () {
 }
 
 stop_dnscrypt () {
-  { killall -s 9 "$(pidof dnscrypt-proxy)" || killall -q -9 dnscrypt-proxy; };
+  { { cd /jffs/dnscrypt } && { killall -s 9 "$(pidof dnscrypt-proxy)" || killall -q -9 dnscrypt-proxy; }; } || exit
   { service restart_dnsmasq >/dev/null 2>&1; };
 }
 
