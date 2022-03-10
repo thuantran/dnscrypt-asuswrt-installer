@@ -135,7 +135,7 @@ backup_restore () {
     fi
 
     PTXT "$INFO Starting dnscrypt-proxy..."
-    ${TARG_DIR}/manager dnscrypt-start
+    service start_dnscrypt-proxy
     sleep 1
     if [ -z "$(pidof dnscrypt-proxy)" ]; then
       PTXT "$ERROR Couldn't start dnscrypt-proxy" \
@@ -143,8 +143,7 @@ backup_restore () {
       end_op_message 1
       return
     fi
-    ${TARG_DIR}/manager dnscrypt-stop
-    service start_dnscrypt-proxy
+    service restart_dnscrypt-proxy
     PTXT "$INFO Backup restored!" \
          "$INFO  - Add swap" \
          "$INFO  - Add a RNG" \
@@ -1089,7 +1088,7 @@ inst_dnscrypt () {
     return
   fi
   PTXT "$INFO Starting dnscrypt-proxy..."
-  ${TARG_DIR}/manager dnscrypt-start
+  service start_dnscrypt-proxy
   sleep 1
   if [ -z "$(pidof dnscrypt-proxy)" ]; then
     PTXT "$ERROR Couldn't start dnscrypt-proxy" \
@@ -1097,8 +1096,7 @@ inst_dnscrypt () {
     end_op_message 1
     return
   fi
-  ${TARG_DIR}/manager dnscrypt-stop
-  service start_dnscrypt-proxy
+  service restart_dnscrypt-proxy
   PTXT "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:" \
        "$INFO  - Add swap" \
        "$INFO  - Add a RNG" \
