@@ -73,7 +73,7 @@ start_dnscrypt () {
   { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" || killall -q -9 dnscrypt-proxy dnsmasq; };
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   logger -st "$NAME" "Starting dnscrypt-proxy from $NAME."
-  { nohup "$DNSCRYPT_START" >/dev/null 2>&1 </dev/null & };
+  { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
   { service restart_dnsmasq >/dev/null 2>&1; };
   STATE="0"
   [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
