@@ -2,7 +2,7 @@
 
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
-NAME="$(basename $0)[$$]"
+NAME="$(basename "$0")[$$]"
 
 append_on_demand () {
   local TARGET
@@ -20,7 +20,7 @@ dnsmasq_params () {
   local DNS
   local VAR
   if { [ "$(nvram get dns_local_cache)" != "1" ] && [ "$(readlink -f /tmp/resolv.conf)" = "/rom/etc/resolv.conf" ]; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
-  [ -z "(pidof dnscrypt-proxy)" ] && exit
+  [ -z "$(pidof dnscrypt-proxy)" ] && exit
   cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
   append_on_demand /etc/dnsmasq.conf "no-resolv"
   append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
@@ -42,14 +42,14 @@ init_hwrng () {
   while [ ! -c "$RNG_DEV" ]; do
     if [ "$COUNT" -gt 120 ]; then
       logger -st "$NAME" "ERROR: Unable to find HWRNG device. Aborting..."
-      if [ -f "/jffs/dnscrypt/haveged" ]; then { /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1 }; logger -st "$NAME" "Haveged: Using available haveged instead..."; fi
+      if [ -f "/jffs/dnscrypt/haveged" ]; then { /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; }; logger -st "$NAME" "Haveged: Using available haveged instead..."; fi
       exit 1
     fi
     COUNT="$((COUNT+1))"
     sleep 1
   done
-  { /jffs/dnscrypt/stty raw -echo -ixoff -F $RNG_DEV speed 115200; };
-  { /jffs/dnscrypt/rngd -r $RNG_DEV; };
+  { /jffs/dnscrypt/stty raw -echo -ixoff -F "$RNG_DEV" speed 115200; };
+  { /jffs/dnscrypt/rngd -r "$RNG_DEV"; };
   [ $? -eq 0 ] && logger -st "$NAME" "rngd: Started for $RNG_DEV"
 }
 
@@ -62,7 +62,7 @@ start_dnscrypt () {
   { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" || killall -q -9 dnscrypt-proxy dnsmasq; };
   logger -st "$NAME" "Start dnscrypt-proxy"
   cd /jffs/dnscrypt
-  { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
+  { nohup "$DNSCRYPT_START" >/dev/null 2>&1 </dev/null & };
   { service restart_dnsmasq >/dev/null 2>&1; };
   STATE="0"
   [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
@@ -120,7 +120,7 @@ start_monitor () {
 }
 
 stop_monitor () {
-  for PID in $(pidof "$(basename $0)"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; } && [ "$PID" != "$$" ]; then { kill -s 10 "$PID" || kill -s 9 "$PID"; }; fi; done
+  for PID in $(pidof "$(basename "$0")"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; } && [ "$PID" != "$$" ]; then { kill -s 10 "$PID" || kill -s 9 "$PID"; }; fi; done
 }
 
 timezone () {
