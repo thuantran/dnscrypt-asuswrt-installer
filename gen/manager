@@ -176,19 +176,13 @@ update_opendns () {
 
 unset TZ
 case "$1" in
-  "dnscrypt-start")
-    start_dnscrypt
-    ;;
-  "dnscrypt-stop")
-    stop_dnscrypt
-    ;;  
   "dnsmasq")
     dnsmasq_params
     ;;
-  "start"|"restart")
+  "start"|"restart"|"dnscrypt-start")
     "$0" init-start
     ;;
-  "stop"|"kill")
+  "stop"|"kill"|"dnscrypt-stop")
     "$0" services-stop
     ;;
   "monitor-start")
