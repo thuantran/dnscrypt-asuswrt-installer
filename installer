@@ -406,7 +406,7 @@ check_relays () {
     fi
   done
   if [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
-    if [ -n "$DNSCRYPT" ] || { grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE" && [ -z "$SERVER" ]; }; then
+    if [ -n "$DNSCRYPT" ] || { grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE" && ! grep -q '^server_names' "$TOML_FILE"; }; then
       PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers and relays by selecting wildcard option for servers and relays."
       read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and relays (via=['*']) for all compatible DNSCrypt servers and relays?" && check_anonymized_automatic 0 || check_anonymized_disabled
     else
