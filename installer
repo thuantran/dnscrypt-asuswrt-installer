@@ -420,19 +420,19 @@ check_relays () {
     fi
   done
   if [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
-    if [ -n "$DNSCRYPT" ]; then
-      PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers by selecting wildcard option for servers and/or relays."
-      read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible DNSCrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
+    if [ -n "$DNSCRYPT" ] || grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
+      PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers and relays by selecting wildcard option for servers and relays."
+      read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and relays (via=['*']) for all compatible DNSCrypt servers and relays?" && check_anonymized_automatic 0 || check_anonymized_disabled
     else
       check_anonymized_disabled
     fi
   elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*true.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
-    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
-    read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
+    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and relays (via=['*']) for all compatible servers and relays."
+    read_yesno "Do you only want to skip this option for Dnscrypt Servers (still required for ODOH)?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
     [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
   elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*true.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then
-    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) required for Oblivious DNS-over-HTTPS servers."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+    PTXT "$INFO This option allows you to setup wildcard options for both servers (server_name "*") and relays (via=['*']) required for Oblivious DNS-over-HTTPS servers."
+    read_yesno "Do you want to use wildcard relay (via=['*']) option for (server_name "*")?" && USE_WILDCARD=YES || USE_WILDCARD=NO
     [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
     [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic_odoh
   elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then	  
