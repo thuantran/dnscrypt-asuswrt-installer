@@ -19,7 +19,7 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.4                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.5                               #
 #                                                                                                      #
 ########################################################################################################
 
@@ -37,7 +37,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.3.4"
+DI_VERSION="v2.3.5"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -126,6 +126,8 @@ backup_restore () {
               "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     write_manager_script /jffs/scripts/init-start init-start
+    write_manager_script /jffs/scripts/services-stop services-stop
+    write_command_script /jffs/scripts/service-event-end 'if echo "$2" | /bin/grep -q "^dnscrypt-proxy"; then { sh /jffs/dnscrypt/manager "${1}" & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
     setup_dnscrypt
     if [ "$?" -ne 0 ]; then
       end_op_message 1
@@ -133,7 +135,7 @@ backup_restore () {
     fi
 
     PTXT "$INFO Starting dnscrypt-proxy..."
-    ${TARG_DIR}/manager dnscrypt-start
+    service start_dnscrypt-proxy >/dev/null 2>&1
     sleep 1
     if [ -z "$(pidof dnscrypt-proxy)" ]; then
       PTXT "$ERROR Couldn't start dnscrypt-proxy" \
@@ -141,8 +143,7 @@ backup_restore () {
       end_op_message 1
       return
     fi
-    service restart_dnsmasq >/dev/null 2>&1
-    manager_monitor_restart
+    service restart_dnscrypt-proxy >/dev/null 2>&1
     PTXT "$INFO Backup restored!" \
          "$INFO  - Add swap" \
          "$INFO  - Add a RNG" \
@@ -175,28 +176,14 @@ check_dns_environment () {
          "$ERROR Exiting..."
     exit 1
   fi
-  local DNSPRIV
-  DNSPRIV="$(nvram get dnspriv_enable)"
-  local DHCPDNS
-  DHCPDNS="$(nvram get dhcpd_dns_router)"
-  local DHCPDNS1
-  DHCPDNS1="$(nvram get nvram set dhcp_dns1_x)"
-  local DHCPDNS2
-  DHCPDNS1="$(nvram get nvram set dhcp_dns2_x)" 
-  if [ "$DNSPRIV" -ne 0 ]; then
-    PTXT "$INFO Setting up Correct DNS Environment."
-    nvram set dnspriv_enable=0
-    nvram commit
-    killall -q -9 stubby
-    check_dns_environment x
-  elif [ "$DHCPDNS" -ne 1 ] || [ -n "$DHCPDNS1" ] || [ -n "$DHCPDNS2" ] || [ -n "$1" ]; then
-    nvram set dhcp_dns1_x=""
-    nvram set dhcp_dns2_x=""
-    nvram set dhcpd_dns_router="1"
-    nvram commit
-    service restart_dnsmasq >/dev/null 2>&1
-    while { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" != "0" ]; }; do sleep 1; done
-  fi
+  local NVCHECK
+  NVCHECK="0"
+  if [ "$(nvram get dnspriv_enable)" != "0" ]; then { nvram set dnspriv_enable="0"; }; NVCHECK="$((NVCHECK+1))"; fi
+  if [ "$(pidof stubby)" ]; then { killall -q -9 stubby 2>/dev/null; }; NVCHECK="$((NVCHECK+1))"; fi
+  if [ "$(nvram get dhcp_dns1_x)" ]; then { nvram set dhcp_dns1_x=""; }; NVCHECK="$((NVCHECK+1))"; fi
+  if [ "$(nvram get dhcp_dns2_x)" ]; then { nvram set dhcp_dns2_x=""; }; NVCHECK="$((NVCHECK+1))"; fi
+  if [ "$(nvram get dhcpd_dns_router)" != "1" ]; then { nvram set dhcpd_dns_router="1"; }; NVCHECK="$((NVCHECK+1))"; fi
+  if [ "$NVCHECK" != "0" ]; then { nvram commit; }; { service restart_dnsmasq >/dev/null 2>&1; }; while { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" != "0" ]; }; do sleep 1; done; fi
   PTXT "$INFO DNS Environment is Ready."
 }
 
@@ -419,19 +406,19 @@ check_relays () {
     fi
   done
   if [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
-    if [ -n "$DNSCRYPT" ]; then
-      PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers by selecting wildcard option for servers and/or relays."
-      read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible DNSCrypt servers?" && check_anonymized_automatic 0 || check_anonymized_disabled
+    if [ -n "$DNSCRYPT" ] || grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
+      PTXT "$INFO To continue, you may still define a default route for all compatible DNSCrypt servers and relays by selecting wildcard option for servers and relays."
+      read_yesno "Do you still want to setup wildcard options for servers (server_name "*") and relays (via=['*']) for all compatible DNSCrypt servers and relays?" && check_anonymized_automatic 0 || check_anonymized_disabled
     else
       check_anonymized_disabled
     fi
   elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*true.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*true.*' "$TOML_FILE"; then
-    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) for all compatible servers."
-    read_yesno "Do you only want relays for Oblivious DNS-over-HTTPS Servers?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
+    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and relays (via=['*']) for all compatible servers and relays."
+    read_yesno "Do you only want to skip this option for Dnscrypt Servers (still required for ODOH)?" && choose_relays_automatic_odoh || COUNT="$((COUNT + 1))"
     [ "$COUNT" -gt 0 ] && check_anonymized_automatic 0
   elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*true.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then
-    PTXT "$INFO This option allows you to setup wildcard options for servers (server_name "*") and/or relays (via=['*']) required for Oblivious DNS-over-HTTPS servers."
-    read_yesno "Do you want to use wildcard relay (via=['*']) option?" && USE_WILDCARD=YES || USE_WILDCARD=NO
+    PTXT "$INFO This option allows you to setup wildcard options for both servers (server_name "*") and relays (via=['*']) required for Oblivious DNS-over-HTTPS servers."
+    read_yesno "Do you want to use wildcard relay (via=['*']) option for (server_name "*")?" && USE_WILDCARD=YES || USE_WILDCARD=NO
     [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
     [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic_odoh
   elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then	  
@@ -956,6 +943,7 @@ download_file () {
 end_op_message () {
   [ "$1" = "0" ] && PTXT "$INFO Operation completed. You can quit or continue"
   [ "$1" = "1" ] && PTXT "$INFO Operation aborted. You can quit or continue"
+  [ "$1" = "2" ] && PTXT "$INFO Abnormal operations, returning to Main Menu. You can quit or continue."
   PTXT "====================================================="
   PTXT " "
   PTXT " "
@@ -1078,13 +1066,15 @@ inst_dnscrypt () {
                       "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   write_manager_script /jffs/scripts/init-start init-start
+  write_manager_script /jffs/scripts/services-stop services-stop
+  write_command_script /jffs/scripts/service-event-end 'if echo "$2" | /bin/grep -q "^dnscrypt-proxy"; then { sh /jffs/dnscrypt/manager "${1}" & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
   setup_dnscrypt
   if [ "$?" -ne 0 ]; then
     end_op_message 1
     return
   fi
   PTXT "$INFO Starting dnscrypt-proxy..."
-  ${TARG_DIR}/manager dnscrypt-start
+  service start_dnscrypt-proxy >/dev/null 2>&1
   sleep 1
   if [ -z "$(pidof dnscrypt-proxy)" ]; then
     PTXT "$ERROR Couldn't start dnscrypt-proxy" \
@@ -1092,9 +1082,7 @@ inst_dnscrypt () {
     end_op_message 1
     return
   fi
-  service restart_dnsmasq >/dev/null 2>&1
-  manager_monitor_restart
-
+  service restart_dnscrypt-proxy >/dev/null 2>&1
   PTXT "$INFO For dnscrypt-proxy version 2 to work reliably, you might also want to:" \
        "$INFO  - Add swap" \
        "$INFO  - Add a RNG" \
@@ -1109,7 +1097,7 @@ manager_monitor_restart () {
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
       if awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; then
-        kill -9 "$PID"
+        { kill -s 10 "$PID" 2>/dev/null || kill -s 9 "$PID" 2>/dev/null; };
         break
       fi
     done
@@ -1153,14 +1141,14 @@ inst_random () {
   case "$CHOSEN" in
     1)
       rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-      killall -q -9 haveged jitterentropy-rngd rngd
+      { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; };
       download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_GEN}/manager"
       write_conf RAN_PRV haveged
       ${TARG_DIR}/haveged -w 1024 -d 32 -i 32 -v 1
       ;;
     2)
       local RNG_DEV
-      killall -q -9 haveged jitterentropy-rngd rngd
+      { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; };
       download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
       inst_ran_dev || return
       write_conf RAN_PRV rngd
@@ -1426,7 +1414,7 @@ setup_dnscrypt () {
   if [ "$1" = "reconfig" ]; then
     if [ "$RET" -eq 0 ]; then
       PTXT "$INFO Restarting dnscrypt-proxy with new config..."
-      ${TARG_DIR}/manager dnscrypt-start
+      service restart_dnscrypt-proxy
       end_op_message 0
     else
       end_op_message 0
@@ -1538,7 +1526,7 @@ set_timezone () {
   write_manager_script /jffs/scripts/init-start init-start
   write_manager_script /jffs/scripts/services-stop services-stop
   ln -sf $TARG_DIR/localtime /etc/localtime
-  [ "$(pidof dnscrypt-proxy)" ] && ${TARG_DIR}/manager dnscrypt-start
+  [ "$(pidof dnscrypt-proxy)" ] && { service restart_dnscrypt-proxy >/dev/null 2>&1; };
   rm -r "${TMP:?}/${TZ_DATA}" "${TMP:?}/usr"
   end_op_message 0
 }
@@ -1630,18 +1618,20 @@ uninst_all () {
     PTXT "$INFO Old Backup Detected!"
     read_yesno "Do you want to remove backup?(this will prevent resorting later)" && rm -rf "${BASE_DIR}/backup_dnscrypt.tar.gz" || PTXT "$INFO Keeping backup instead."
   fi
+  service stop_dnscrypt-proxy >/dev/null 2>&1
   rm -rf "$TARG_DIR"
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   del_jffs_script /jffs/scripts/init-start
-  del_jffs_script /jffs/scripts/services-stop  
-  killall -q -9 haveged rngd dnscrypt-proxy
+  del_jffs_script /jffs/scripts/services-stop
+  { kill -s 9 "$(pidof haveged rngd stty dnscrypt-proxy)" 2>/dev/null || killall -q -9 haveged rngd stty dnscrypt-proxy 2>/dev/null; };
+  del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
   local MAN_PID
   MAN_PID="$(pidof manager)"
   local PID
   if [ "$MAN_PID" ]; then
     for PID in $MAN_PID; do
       if awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; then
-        kill -9 "$PID"
+        { kill -s 10 "$PID" 2>/dev/null || kill -s 9 "$PID" 2>/dev/null; };
         break
       fi
     done
@@ -1654,7 +1644,7 @@ uninst_dnscrypt () {
   PTXT "$INFO Uninstalling dnscrypt-proxy..."
   rm -f "${TARG_DIR:?}/dnscrypt-proxy" "${TARG_DIR:?}/nonroot"
   del_jffs_script /jffs/scripts/dnsmasq.postconf
-  killall -q dnscrypt-proxy
+  { kill -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   service restart_dnsmasq >/dev/null 2>&1
   PTXT "$INFO Some configuration files are not removed in case you want to reinstall"
   end_op_message 0
@@ -1663,7 +1653,7 @@ uninst_dnscrypt () {
 uninst_random () {
   PTXT "$INFO Uninstalling (P)RNG..."
   rm -f "${TARG_DIR:?}/haveged" "${TARG_DIR:?}/rngd" "${TARG_DIR:?}/stty"
-  killall -q -9 haveged rngd
+  { kill -s 9 "$(pidof haveged rngd stty)" 2>/dev/null || killall -q -9 haveged rngd stty 2>/dev/null; };
   del_conf RAN_PRV RNG_DEV
   if [ ! -f "${TARG_DIR}/localtime" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
   end_op_message 0
@@ -1671,7 +1661,7 @@ uninst_random () {
 
 unset_timezone () {
   rm -f "${TARG_DIR:?}/localtime"
-  if ! grep "^RAN_PRV=.*$" "${TARG_DIR}/.config" && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
+  if ! grep -q "^RAN_PRV=.*$" "${TARG_DIR}/.config" && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
   end_op_message 0
 }
 
@@ -1741,6 +1731,8 @@ write_manager_script () {
   fi
 }
 
+trap - 1 2 3 6 15
+trap 'clear; end_op_message 2' 1 2 3 6 15
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
