@@ -74,6 +74,7 @@ start_dnscrypt () {
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   logger -st "$NAME" "Starting dnscrypt-proxy from $NAME."
   { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
+  { until [ -n "$(pidof dnscrypt-proxy)" ]; do sleep 1; done; };
   { service restart_dnsmasq >/dev/null 2>&1; };
   STATE="0"
   [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
@@ -85,6 +86,7 @@ start_dnscrypt () {
 stop_dnscrypt () {
   { cd /jffs/dnscrypt; } || exit
   { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
+  { until [ -z "$(pidof dnscrypt-proxy)" ]; do sleep 1; done; };
   { service restart_dnsmasq >/dev/null 2>&1; };
 }
 

@@ -1516,7 +1516,7 @@ set_timezone () {
   write_manager_script /jffs/scripts/services-stop services-stop
   ln -sf $TARG_DIR/localtime /etc/localtime
   [ "$(pidof dnscrypt-proxy)" ] && { service restart_dnscrypt-proxy >/dev/null 2>&1; };
-  rm -r "${TMP:?}/${TZ_DATA}" "${TMP:?}/usr"
+  rm -r "${TMP:?}/${TZ_DATA}" "${TMP}/usr"
   end_op_message 0
 }
 
@@ -1632,7 +1632,7 @@ uninst_all () {
 
 uninst_dnscrypt () {
   PTXT "$INFO Uninstalling dnscrypt-proxy..."
-  rm -f "${TARG_DIR:?}/dnscrypt-proxy" "${TARG_DIR:?}/nonroot"
+  rm -f "${TARG_DIR}/dnscrypt-proxy" "${TARG_DIR}/nonroot"
   del_jffs_script /jffs/scripts/dnsmasq.postconf
   { kill -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   service restart_dnsmasq >/dev/null 2>&1
@@ -1642,7 +1642,7 @@ uninst_dnscrypt () {
 
 uninst_random () {
   PTXT "$INFO Uninstalling (P)RNG..."
-  rm -f "${TARG_DIR:?}/haveged" "${TARG_DIR:?}/rngd" "${TARG_DIR:?}/stty"
+  rm -f "${TARG_DIR}/haveged" "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
   { kill -s 9 "$(pidof haveged rngd stty)" 2>/dev/null || killall -q -9 haveged rngd stty 2>/dev/null; };
   del_conf RAN_PRV RNG_DEV
   if [ ! -f "${TARG_DIR}/localtime" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
@@ -1650,7 +1650,7 @@ uninst_random () {
 }
 
 unset_timezone () {
-  rm -f "${TARG_DIR:?}/localtime"
+  rm -f "${TARG_DIR}/localtime"
   if ! grep -q "^RAN_PRV=.*$" "${TARG_DIR}/.config" && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then del_jffs_script /jffs/scripts/init-start; del_jffs_script /jffs/scripts/services-stop; fi
   end_op_message 0
 }
