@@ -85,6 +85,7 @@ start_dnscrypt () {
 stop_dnscrypt () {
   { cd /jffs/dnscrypt; } || exit
   { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
+  { until [ -z "$(pidof dnscrypt-proxy)" ]; do sleep 1; done; };
   { service restart_dnsmasq >/dev/null 2>&1; };
 }
 
