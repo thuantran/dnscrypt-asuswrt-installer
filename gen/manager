@@ -72,14 +72,14 @@ start_dnscrypt () {
   local RES_STATE
   local DNSCRYPT_START
   { cd /jffs/dnscrypt; } || exit
-  { killall -s 9 "$(pidof dnscrypt-proxy dnsmasq)" 2>/dev/null || killall -q -9 dnscrypt-proxy dnsmasq 2>/dev/null; };
+  { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   logger -st "$NAME" "Starting dnscrypt-proxy from $NAME."
   { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
   COUNTER="0";
   LIMIT="10";
   { while [ -z "$(pidof dnscrypt-proxy)" ] && [ "$COUNTER" -le "$LIMIT" ]; do sleep 1; COUNTER="$((COUNTER + 1))"; done; };
-  { service restart_dnsmasq >/dev/null 2>&1; };
+  if ! grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi
   STATE="0"
   [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
   [ -z "$1" ] && RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
@@ -95,7 +95,7 @@ stop_dnscrypt () {
   COUNTER="0";
   LIMIT="10";
   { while [ -n "$(pidof dnscrypt-proxy)" ] && [ "$COUNTER" -le "$LIMIT" ]; do sleep 1; COUNTER="$((COUNTER + 1))"; done; };
-  { service restart_dnsmasq >/dev/null 2>&1; };
+  if grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi
 }
 
 start_monitor () {
@@ -190,10 +190,10 @@ case "$1" in
     dnsmasq_params
     ;;
   "start"|"restart"|"dnscrypt-start")
-    "$0" init-start
+    { "$0" init-start & };
     ;;
   "stop"|"kill"|"dnscrypt-stop")
-    "$0" services-stop
+    { "$0" services-stop & };
     ;;
   "monitor-start")
     stop_monitor && { start_monitor & };
