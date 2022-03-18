@@ -142,7 +142,7 @@ start_monitor () {
 }
 
 stop_monitor () {
-  for PID in $(pidof "$(basename "$0")"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q dnscrypt; } && [ "$PID" != "$$" ]; then { kill -s 10 "$PID" 2>/dev/null || kill -s 9 "$PID" 2>/dev/null; }; fi; done
+  for PID in $(pidof "$(basename "$0")"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q monitor-start; } && [ "$PID" != "$$" ]; then { kill -s 10 "$PID" 2>/dev/null || kill -s 9 "$PID" 2>/dev/null; }; fi; done
 }
 
 timezone () {
