@@ -72,7 +72,6 @@ start_dnscrypt () {
   local RES_STATE
   local DNSCRYPT_START
   { cd /jffs/dnscrypt; } || exit
-  { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   logger -st "$NAME" "Starting dnscrypt-proxy from $NAME."
   { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
