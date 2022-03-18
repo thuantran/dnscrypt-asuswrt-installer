@@ -190,7 +190,7 @@ case "$1" in
     dnsmasq_params
     ;;
   "start"|"restart"|"dnscrypt-start")
-    { "$0" init-start & };
+    if [ -z "$(pidof dnscrypt-proxy)" ]; then { "$0" init-start & }; else { start_dnscrypt & }; fi
     ;;
   "stop"|"kill"|"dnscrypt-stop")
     { "$0" services-stop & };
