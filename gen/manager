@@ -72,6 +72,7 @@ start_dnscrypt () {
   local RES_STATE
   local DNSCRYPT_START
   { cd /jffs/dnscrypt; } || exit
+  { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -syslog -config /jffs/dnscrypt/dnscrypt-proxy.toml"
   logger -st "$NAME" "Starting dnscrypt-proxy from $NAME."
   { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
@@ -113,7 +114,7 @@ start_monitor () {
   logger -st "$NAME" "Starting_Monitor: $NAME"
   while true; do
     if [ "$EXIT" = "1" ]; then logger -st "$NAME" "Stopping_Monitor: $NAME"; trap - 1 2 3 6 10 12 15; stop_dnscrypt; break; fi
-    if [ "$EXIT" = "2" ]; then logger -st "$NAME" "Stopping_Monitor: $NAME"; trap - 1 2 3 6 10 12 15; { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }; { "$0" init-start & }; break; fi
+    if [ "$EXIT" = "2" ]; then start_dnscrypt; EXIT="0"; fi
     if [ "$COUNT" -gt 90 ]; then COUNT="0"; timezone; "$0" opendns-update; fi
     COUNT="$((COUNT + 1))"
     if [ -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
