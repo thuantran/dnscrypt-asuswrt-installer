@@ -199,7 +199,7 @@ case "$1" in
     { "$0" services-stop >/dev/null 2>&1; };
     ;;
   "monitor-start")
-    { stop_monitor 1; } && { start_monitor & };
+    { start_monitor & };
     ;;
   "opendns-update")
     update_opendns 0 &
