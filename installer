@@ -139,7 +139,7 @@ backup_restore () {
     sleep 1
     if [ -z "$(pidof dnscrypt-proxy)" ]; then
       PTXT "$ERROR Couldn't start dnscrypt-proxy" \
-        "$ERROR Please send WebUI System Log to dev"
+           "$ERROR Please send WebUI System Log to dev"
       end_op_message 1
       return
     fi
@@ -427,7 +427,7 @@ check_swap () {
 }
 
 check_version () {
-  if [ -f "${TARG_DIR}/installer" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]&& [ -z "$2" ]; then
+  if [ -f "${TARG_DIR}/installer" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -z "$2" ]; then
     local RMNSTALL
     local LINSTALL
     local MD5SUM_L
@@ -1516,7 +1516,7 @@ set_timezone () {
   write_manager_script /jffs/scripts/services-stop services-stop
   ln -sf $TARG_DIR/localtime /etc/localtime
   [ "$(pidof dnscrypt-proxy)" ] && { service restart_dnscrypt-proxy >/dev/null 2>&1; };
-  rm -r "${TMP:?}/${TZ_DATA}" "${TMP}/usr"
+  rm -r "${TMP:?}/${TZ_DATA}" "${TMP:?}/usr"
   end_op_message 0
 }
 
