@@ -150,7 +150,7 @@ stop_monitor () {
       SIGNAL="12"
       ;;
     "$$")
-      if [ -n "$MON_PID" ]; then SIGNAL="10"; else { stop_AdGuardHome; }; fi
+      if [ -n "$MON_PID" ]; then SIGNAL="10"; else { stop_dnscrypt; }; fi
       ;;
   esac
   [ -n "$SIGNAL" ] && { kill -s "$SIGNAL" "$MON_PID" 2>/dev/null; };
