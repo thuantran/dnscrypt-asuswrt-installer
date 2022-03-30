@@ -19,7 +19,7 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.3.9                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.4.0                               #
 #                                                                                                      #
 ########################################################################################################
 
@@ -37,7 +37,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.3.9"
+DI_VERSION="v2.4.0"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -1467,7 +1467,15 @@ setup_dnscrypt_impl () {
     read_input_dns "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP]" "$TOML_FILE"
-    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true user_name "\'nobody\'" max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+    case "$ROUTER_MODEL" in
+      RT-AX56U|RT-AX58U|RT-AX3000)
+        toml_avar_disable user_name
+      ;;
+      *)
+        toml_avars_prep user_name "\'nobody\'"
+      ;;
+    esac
     PTXT "$INFO Writing dnscrypt-proxy configuration..."
     check_dnscrypt_toml
     if [ "$?" -ne 0 ]; then
