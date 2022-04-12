@@ -207,7 +207,7 @@ case "$1" in
     if [ -n "$RAN_PRV" ]; then { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }; fi
     case "$1" in
       "init-start")
-        { printf "1" > /proc/sys/vm/overcommit_memory; };
+        { printf "0" > /proc/sys/vm/overcommit_memory; }; # Ensure correct kernel algorithm checks are working.
         case "$RAN_PRV" in
           "haveged")
             { /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; };
