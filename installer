@@ -1769,14 +1769,14 @@ esac
 case "$ROUTER_ARCH" in
   "aarch64"|"arm64")
     ROUTER_ARCH="arm64"
-    URL_ARCH="${URL_ARCH}/armv8"
+    URL_ARCH="${RURL}/armv8"
     DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
     DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
     PTXT "$INFO Detected ARMv8 architecture."
     ;;
   "armv7l")
     ROUTER_ARCH="arm"
-    URL_ARCH="${URL_ARCH}/armv7"
+    URL_ARCH="${RURL}/armv7"
     DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
     DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
     PTXT "$INFO Detected ARMv7 architecture."
