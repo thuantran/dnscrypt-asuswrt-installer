@@ -1095,15 +1095,17 @@ manager_monitor_restart () {
 }
   
 opendns_authen () {
-  local USERNAME
-  local PW1
-  local PW2
   if [ "$1" -eq 0 ]; then
     del_conf OPENDNS_USER OPENDNS_PASSWORD
     return
   fi
-  PTXT -n "$INPUT Please enter OpenDNS username${NORM}: "
-  read -r USERNAME
+  if [ -z "$PW1" ] || [ -z "$PW2" ]; then
+    local USERNAME
+    PTXT -n "$INPUT Please enter OpenDNS username${NORM}: "
+    read -r USERNAME
+  fi
+  local PW1
+  local PW2
   PTXT -n "$INPUT Please enter OpenDNS password${NORM}: "
   read -rs PW1
   PTXT " "
@@ -1811,9 +1813,10 @@ menu () {
        "  8) Install swap file" \
        "  9) Uninstall ALL"
   [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && PTXT "  b) Backup"
-  [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && PTXT "  r) Restore"
+  [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && PTXT "  r) Restore"
   PTXT "  q) Quit"
-  [ ! -d "$TARG_DIR" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && read_input_num "Please enter the number that designates your selection:" 1 9 q
+  [ ! -d "$TARG_DIR" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && read_input_num "Please enter the number that designates your selection:" 1 9 q
+  [ ! -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && read_input_num "Please enter the number that designates your selection:" 1 9 r q
   [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && read_input_num "Please enter the number that designates your selection:" 1 9 b q
   [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && read_input_num "Please enter the number that designates your selection:" 1 9 b r q
   case "$CHOSEN" in
