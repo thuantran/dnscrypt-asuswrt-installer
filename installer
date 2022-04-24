@@ -223,6 +223,20 @@ check_dns_filter () {
   if [ "$NVCHECK" != "0" ]; then { nvram commit; }; { service "restart_firewall;restart_dnsmasq" >/dev/null 2>&1; }; while { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" != "0" ]; }; do sleep 1; done; fi
 }
 
+check_dns_local () {
+  local LOCAL_CACHE
+  case "$1" in
+    0)
+      LOCAL_CACHE="NO"
+      write_conf DNSCRYPT_LOCAL "\"$LOCAL_CACHE\""
+    ;;
+    1)
+      LOCAL_CACHE="YES"
+      write_conf DNSCRYPT_LOCAL "\"$LOCAL_CACHE\""
+    ;;
+  esac
+}
+
 check_jffs_enabled () {
   if [ "$(nvram get jffs2_format)" = "1" ]; then
     PTXT "$ERROR JFFS partition is scheduled to be reformatted." \
@@ -1450,6 +1464,7 @@ setup_dnscrypt_impl () {
       cp -f "$TOML_ORI" "$TOML_FILE"
     fi    
     read_yesno "Do you want to redirect all DNS resolutions on your network through to Dnscrypt-Proxy?" && check_dns_filter 1 || check_dns_filter 0
+    if [ "$(nvram get dns_local_cache)" != "1" ]; then { read_yesno "Do you want to run Dnsmasq as a local caching DNS service which includes sending the routers traffic to Dnscrypt-Proxy?" && check_dns_local 1 || check_dns_local 0; }; else { check_dns_local 0; }; fi
     toml_avar_enable disabled_server_names
     local PHX
     for PHX in servers relays; do 
