@@ -32,20 +32,21 @@ dnsmasq_params () {
   local DNS
   local VAR
   if { [ "$(nvram get dns_local_cache)" != "1" ] && [ "$(readlink -f /tmp/resolv.conf)" = "/rom/etc/resolv.conf" ]; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
-  [ -z "$(pidof dnscrypt-proxy)" ] && exit
-  cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
-  append_on_demand /etc/dnsmasq.conf "no-resolv"
-  append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
-  if [ "$(nvram get dns_local_cache)" != "1" ]; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
-  for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
-  sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
-  done
-  for VAR in 1 2 3; do
-  DNS="$(nvram get "ipv6_dns$VAR")"
-  [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
-  done
-  sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
-  append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+  if [ -n "$(pidof dnscrypt-proxy)" ]; then
+    cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
+    append_on_demand /etc/dnsmasq.conf "no-resolv"
+    append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
+    for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
+      sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+    done
+    for VAR in 1 2 3; do
+      DNS="$(nvram get "ipv6_dns$VAR")"
+      [ -n "$DNS" ] && sed -i "/^server=$DNS.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+    done
+    sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
+    append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+    if { [ "$(nvram get dns_local_cache)" != "1" ] && [ "$DNSCRYPT_LOCAL" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
+  fi
 }
 
 init_hwrng () {
@@ -63,6 +64,22 @@ init_hwrng () {
   { /jffs/dnscrypt/stty raw -echo -ixoff -F "$RNG_DEV" speed 115200; };
   { /jffs/dnscrypt/rngd -r "$RNG_DEV"; };
   [ $? -eq 0 ] && logger -st "$NAME" "rngd: Started for $RNG_DEV"
+}
+
+proc_optimizations () {
+  { printf "0" > /proc/sys/vm/overcommit_memory; }; # Ensure kernal algorithm checks properly work.
+  { printf "2500000" > /proc/sys/net/core/rmem_max; }; # Ensure UDP receive buffer set to 2.5M.
+  { printf "0" > /proc/sys/net/ipv4/icmp_ratelimit; }; # Ensure Control over MTRS
+  { printf "256" > /proc/sys/net/ipv4/neigh/default/gc_thresh1; }; # Increase ARP cache sizes and GC thresholds
+  { printf "1024" > /proc/sys/net/ipv4/neigh/default/gc_thresh2; }; # Increase ARP cache sizes and GC thresholds
+  { printf "2048" > /proc/sys/net/ipv4/neigh/default/gc_thresh3; }; # Increase ARP cache sizes and GC thresholds
+  { printf "240" > /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_max_retrans; }; # Lower conntrack tcp_timeout_max_retrans from 300 to 240
+  if [ -n "$(nvram get ipv6_service)" ]; then #IPV6 proc variants
+    { printf "0" > /proc/sys/net/ipv6/icmp/ratelimit; };
+    { printf "256" > /proc/sys/net/ipv6/neigh/default/gc_thresh1; };
+    { printf "1024" > /proc/sys/net/ipv6/neigh/default/gc_thresh2; };
+    { printf "2048" > /proc/sys/net/ipv6/neigh/default/gc_thresh3; };
+  fi
 }
 
 start_dnscrypt () {
@@ -207,7 +224,7 @@ case "$1" in
     if [ -n "$RAN_PRV" ]; then { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }; fi
     case "$1" in
       "init-start")
-        { printf "0" > /proc/sys/vm/overcommit_memory; }; # Ensure correct kernel algorithm checks are working.
+        proc_optimizations
         case "$RAN_PRV" in
           "haveged")
             { /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; };
