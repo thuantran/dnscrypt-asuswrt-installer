@@ -19,7 +19,7 @@
 #  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
 #  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
 # _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.4.0                               #
+#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.4.1                               #
 #                                                                                                      #
 ########################################################################################################
 
@@ -37,7 +37,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.4.0"
+DI_VERSION="v2.4.1"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -1746,8 +1746,8 @@ write_manager_script () {
   fi
 }
 
-trap - 1 2 3 6 15
-trap 'clear; end_op_message 2' 1 2 3 6 15
+trap - HUP INT QUIT ABRT TERM
+trap 'clear; end_op_message 2' HUP INT QUIT ABRT TERM
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
