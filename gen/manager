@@ -28,6 +28,26 @@ check_dns_environment () {
   if [ "$NVCHECK" != "0" ]; then { nvram commit; }; { service restart_dnsmasq >/dev/null 2>&1; }; while { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" != "0" ]; }; do sleep 1; done; fi
 }
 
+dnscrypt_proxy_run () {
+  local lock_dir
+  local pid_file
+  lock_dir="/tmp/dnscrypt-proxy"
+  pid_file="${lock_dir}/pid"
+  if ( mkdir ${lock_dir} ) 2> /dev/null; then
+    printf "%s\n" "$$" > $pid_file
+    trap 'rm -rf "$lock_dir"; exit $?' EXIT
+    start="$(date +%s)"
+    $@
+    end="$(date +%s)"
+    runtime="$((end-start))"
+    logger -st "$NAME" "$@ took $runtime second(s) to complete."
+    rm -rf "$lock_dir"
+    trap - EXIT
+  else
+    logger -st "$NAME" "Lock owned by $(cat $pid_file) exists; preventing duplicate runs!"
+  fi
+}
+
 dnsmasq_params () {
   local DNS
   local VAR
@@ -82,7 +102,7 @@ proc_optimizations () {
   fi
 }
 
-start_dnscrypt () {
+start_dnscrypt_proxy () {
   local COUNTER
   local LIMIT
   local STATE
@@ -102,10 +122,10 @@ start_dnscrypt () {
   [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
   [ -z "$1" ] && RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
   [ -z "$1" ] && while { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ] && [ "$STATE" -lt "10" ]; }; do sleep 1; NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"; RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"; STATE="$((STATE + 1))"; done
-  [ "$STATE" -eq "10" ] && start_dnscrypt x
+  [ "$STATE" -eq "10" ] && start_dnscrypt_proxy x
 }
 
-stop_dnscrypt () {
+stop_dnscrypt_proxy () {
   local COUNTER
   local LIMIT
   { cd /jffs/dnscrypt; } || exit
@@ -117,9 +137,9 @@ stop_dnscrypt () {
 }
 
 start_monitor () {
-  trap "" 1 2 3 6 15
-  trap 'EXIT="1"' 10
-  trap 'EXIT="2"' 12
+  trap '' HUP INT QUIT ABRT TERM
+  trap 'EXIT="1"' USR1
+  trap 'EXIT="2"' USR2
   while [ "$(nvram get ntp_ready)" -eq 0 ]; do sleep 1; done
   local NW_STATE
   local RES_STATE
@@ -128,10 +148,10 @@ start_monitor () {
   local RANDOM
   EXIT="0"
   RANDOM="0"
-  logger -st "$NAME" "Starting_Monitor: $NAME"
+  logger -st "$NAME" "Starting Monitor!"
   while true; do
-    if [ "$EXIT" = "1" ]; then logger -st "$NAME" "Stopping_Monitor: $NAME"; trap - 1 2 3 6 10 12 15; stop_dnscrypt; break; fi
-    if [ "$EXIT" = "2" ]; then start_dnscrypt; EXIT="0"; fi
+    if [ "$EXIT" = "1" ]; then logger -st "$NAME" "Stopping Monitor!"; trap - HUP INT QUIT ABRT USR1 USR2 TERM; { dnscrypt_proxy_run stop_dnscrypt_proxy; }; break; fi
+    if [ "$EXIT" = "2" ]; then { dnscrypt_proxy_run start_dnscrypt_proxy; }; EXIT="0"; fi
     if [ -z "$COUNT" ]; then COUNT="0"; timezone; "$0" opendns-update; fi
     if [ "$COUNT" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi
     if [ -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
@@ -145,14 +165,14 @@ start_monitor () {
       esac
       if [ -z "$(pidof dnscrypt-proxy)" ]; then
         logger -st "$NAME" "Warning: dnscrypt-proxy is dead; $NAME will start it!"
-        start_dnscrypt
+        dnscrypt_proxy_run start_dnscrypt_proxy
       elif { [ "$COUNT" -eq "30" ] || [ "$COUNT" -eq "60" ] || [ "$COUNT" -eq "90" ]; } && { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; then
         logger -st "$NAME" "Warning: dnscrypt-proxy is not responding; $NAME will re-start it!"
-        start_dnscrypt
+        dnscrypt_proxy_run start_dnscrypt_proxy
       elif [ "$RANDOM" -eq 4320 ]; then
         RANDOM="0"
         logger -st "$NAME" "Randomization: Health Check; $NAME will randomize it!"
-        start_dnscrypt
+        dnscrypt_proxy_run start_dnscrypt_proxy
       fi
       RANDOM="$((RANDOM + 1))"
     fi
@@ -167,7 +187,7 @@ stop_monitor () {
       SIGNAL="12"
       ;;
     "$$")
-      if [ -n "$MON_PID" ]; then SIGNAL="10"; else { stop_dnscrypt; }; fi
+      if [ -n "$MON_PID" ]; then SIGNAL="10"; else { dnscrypt_proxy_run stop_dnscrypt_proxy; }; fi
       ;;
   esac
   [ -n "$SIGNAL" ] && { kill -s "$SIGNAL" "$MON_PID" 2>/dev/null; };
