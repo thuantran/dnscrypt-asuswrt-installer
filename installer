@@ -1827,13 +1827,13 @@ menu () {
        "  7) Uninstall (P)RNG" \
        "  8) Install swap file" \
        "  9) Uninstall ALL"
-  [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && PTXT "  b) Backup"
-  [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && PTXT "  r) Restore"
+  if { [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; }; then { PTXT "  b) Backup"; }; fi
+  if { [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { PTXT "  r) Restore"; }; fi
   PTXT "  q) Quit"
-  [ ! -d "$TARG_DIR" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && read_input_num "Please enter the number that designates your selection:" 1 9 q
-  [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && read_input_num "Please enter the number that designates your selection:" 1 9 r q
-  [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && read_input_num "Please enter the number that designates your selection:" 1 9 b q
-  [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && read_input_num "Please enter the number that designates your selection:" 1 9 b r q
+  if { [ ! -d "$TARG_DIR" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 q; }; fi
+  if { [ ! -d "$TARG_DIR" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 r q; }; fi
+  if { [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 b q; }; fi
+  if { [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 b r q; }; fi
   case "$CHOSEN" in
     1)
       PTXT "$INFO This operation will install dnscrypt-proxy and related files (<6MB)" \
