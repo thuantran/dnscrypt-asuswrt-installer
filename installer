@@ -355,7 +355,7 @@ check_relays () {
   fi
   if [ -n "$STAT_ODOH" ]; then
     ODOH_ARGS="${ODOH_ARGS}|${STAT_ODOH}"
-  fi   
+  fi
   VARSARGS="${DNSCRYPT_ARGS}|${ODOH_ARGS}|${FRAGSBLOCKED_ARGS}"
   COUNT="0"
   NUMFRAG="0"
@@ -424,7 +424,7 @@ check_relays () {
     read_yesno "Do you want to use wildcard relay (via=['*']) option for (server_name "*")?" && USE_WILDCARD=YES || USE_WILDCARD=NO
     [ "$USE_WILDCARD" = "YES" ] && choose_relays_automatic_wildcard || PTXT "$INFO You chose not to use wildcard for relay selection." "$INFO Instead you will manually choose relays from a list."
     [ "$USE_WILDCARD" = "NO" ] && choose_relays_automatic_odoh
-  elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then	  
+  elif [ "$COUNT" -eq 0 ] && grep -q '^odoh_servers = .*false.*' "$TOML_FILE" && grep -q '^dnscrypt_servers = .*false.*' "$TOML_FILE"; then
     check_anonymized_disabled
   fi
 }
@@ -499,7 +499,7 @@ check_version () {
   fi
 }
 
-choose_dnscrypt_server () {  
+choose_dnscrypt_server () {
   local USE_IPV6
   if [ "$(nvram get ipv6_service)" != "disabled" ]; then read_yesno "Do you want to use DNS server over IPv6 (yes only if your connection has IPv6)?" && USE_IPV6="true" || USE_IPV6="false"; else USE_IPV6="false"; fi 
   toml_avars_prep ipv6_servers $USE_IPV6
@@ -607,7 +607,7 @@ choose_dnscrypt_server_disabled_odoh () {
     read_input_num "Please choose DNS server to disable" 1 "$INDEX"
   else
     read_input_num "Please choose next DNS server to disable or press n to stop" 1 "$INDEX" n
-    if [ "$?" -eq 1 ]; then	  
+    if [ "$?" -eq 1 ]; then
       RESOLVERS="${ORESOLVERS}, $RESOLVERS"
       return
     fi
@@ -788,7 +788,7 @@ choose_relays_manual () {
     fi
   fi
   local ITEM
-  ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/relays.md")" 
+  ITEM="$(awk -v INDEX="$CHOSEN" -v PATT="$USE_IPV6" '/^## / && ($0 !~ PATT) {i++} i==INDEX {print $2;exit}' "${TARG_DIR}/relays.md")"
   if PTXT "$RELAYS" | grep -qoF "'$ITEM'"; then
     PTXT "$INFO $ITEM is already set."
   else
@@ -1107,7 +1107,7 @@ manager_monitor_restart () {
   fi
   ${TARG_DIR}/manager monitor-start
 }
-  
+
 opendns_authen () {
   if [ "$1" -eq 0 ]; then
     del_conf OPENDNS_USER OPENDNS_PASSWORD
@@ -1260,7 +1260,7 @@ read_input_num () {
   [ -z "$4" ] && [ -z "$5" ] && [ -z "$6" ] && RANGE="[${2}-${3}]"
   [ -n "$4" ] && [ -z "$5" ] && [ -z "$6" ] && RANGE="[${2}-${3}/${4}]"
   [ -n "$4" ] && [ -n "$5" ] && [ -z "$6" ] && RANGE="[${2}-${3}/${4}/${5}]"
-  [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ] && RANGE="[${2}-${3}/${4}/${5}/${6}]"  
+  [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ] && RANGE="[${2}-${3}/${4}/${5}/${6}]"
   PTXT -n "$INPUT $1, ${BOLD}${RANGE}${NORM}: "
   read -r CHOSEN
   case "$1" in
@@ -1364,7 +1364,7 @@ static_chosen () {
       fi
     fi
   fi
-  static_chosen 1  
+  static_chosen 1
 }
 
 static_chosen_relays () {
@@ -1565,7 +1565,7 @@ toml_avars_prep () {
   local AVARS_ARGS
   AVARS_ARGS=""
   AVARS_ARGS="$AVARS_ARGS $@"
-  eval toml_avars_write "$AVARS_ARGS"  
+  eval toml_avars_write "$AVARS_ARGS"
 }
 
 toml_avars_write () {
@@ -1683,7 +1683,7 @@ unset_timezone () {
 write_conf () {
   local VAR
   VAR="$1"
-  local VALUE 
+  local VALUE
   VALUE="$2"
   if [ -f "${TARG_DIR}/.opendns-auth" ]; then mv "${TARG_DIR}/.opendns-auth" "$CONF_FILE"; chmod 644 "$CONF_FILE"; fi
   if [ ! -f "$CONF_FILE" ]; then
@@ -1700,7 +1700,7 @@ write_conf () {
 write_command_script () {
   local TARG
   TARG="$1"
-  local COMMAND 
+  local COMMAND
   COMMAND="$2"
   local FILENAME
   FILENAME="$(basename "$TARG")"
