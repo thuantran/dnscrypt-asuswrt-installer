@@ -1,27 +1,24 @@
 #!/bin/sh
-########################################################################################################
-#           _____ _    _  _______          _______ _______     __  __ ______ _____  _      _____ _   _ #
-#    /\    / ____| |  | |/ ____\ \        / |  __ |__   __|   |  \/  |  ____|  __ \| |    |_   _| \ | |#
-#   /  \  | (___ | |  | | (___  \ \  /\  / /| |__) | | |______| \  / | |__  | |__) | |      | | |  \| |#
-#  / /\ \  \___ \| |  | |\___ \  \ \/  \/ / |  _  /  | |______| |\/| |  __| |  _  /| |      | | | . ` |#
-# / ____ \ ____) | |__| |____) |  \  /\  /  | | \ \  | |      | |  | | |____| | \ \| |____ _| |_| |\  |#
-#/_/    \_|_____/ \____/|_____/    \/  \/   |_|  \_\ |_|      |_|  |_|______|_|  \_|______|_____|_| \_|#
-#                                                                                                      #
-# _____  _   _  _____  _____ _______     _______ _______     _____  _____   ______   ___     __        #
-#|  __ \| \ | |/ ____|/ ____|  __ \ \   / |  __ |__   __|   |  __ \|  __ \ / __ \ \ / \ \   / /        #
-#| |  | |  \| | (___ | |    | |__) \ \_/ /| |__) | | |______| |__) | |__) | |  | \ V / \ \_/ /         #
-#| |  | | . ` |\___ \| |    |  _  / \   / |  ___/  | |______|  ___/|  _  /| |  | |> <   \   /          #
-#| |__| | |\  |____) | |____| | \ \  | |  | |      | |      | |    | | \ \| |__| / . \   | |           #
-#|_____/|_| \_|_____/ \_____|_|  \_\ |_|  |_|      |_|      |_|    |_|  \_\\____/_/ \_\  |_|           #
-#                                                                                                      #
-# _____ _   _  _____ _______       _      _      ______ _____     Original Author:                     #
-#|_   _| \ | |/ ____|__   __|/\   | |    | |    |  ____|  __ \             bigeyes0x0                  #
-#  | | |  \| | (___    | |  /  \  | |    | |    | |__  | |__) |   Current Maintainer:                  #
-#  | | | . ` |\___ \   | | / /\ \ | |    | |    |  __| |  _  /             SomeWhereOverTheRainBow     #
-# _| |_| |\  |____) |  | |/ ____ \| |____| |____| |____| | \ \                                         #
-#|_____|_| \_|_____/   |_/_/    \_|______|______|______|_|  \_\   v2.4.1                               #
-#                                                                                                      #
-########################################################################################################
+###################################################################################################################
+# █████╗ ███████╗██╗   ██╗███████╗██╗    ██╗██████╗ ████████╗     ███╗   ███╗███████╗██████╗ ██╗     ██╗███╗   ██╗#
+#██╔══██╗██╔════╝██║   ██║██╔════╝██║    ██║██╔══██╗╚══██╔══╝     ████╗ ████║██╔════╝██╔══██╗██║     ██║████╗  ██║#
+#███████║███████╗██║   ██║███████╗██║ █╗ ██║██████╔╝   ██║ █████╗ ██╔████╔██║█████╗  ██████╔╝██║     ██║██╔██╗ ██║#
+#██╔══██║╚════██║██║   ██║╚════██║██║███╗██║██╔══██╗   ██║ ╚════╝ ██║╚██╔╝██║██╔══╝  ██╔══██╗██║     ██║██║╚██╗██║#
+#██║  ██║███████║╚██████╔╝███████║╚███╔███╔╝██║  ██║   ██║        ██║ ╚═╝ ██║███████╗██║  ██║███████╗██║██║ ╚████║#
+#╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝        ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝╚═╝  ╚═══╝#
+#██████╗ ███╗   ██╗███████╗ ██████╗██████╗ ██╗   ██╗██████╗ ████████╗   ██████╗ ██████╗  ██████╗ ██╗  ██╗██╗   ██╗#
+#██╔══██╗████╗  ██║██╔════╝██╔════╝██╔══██╗╚██╗ ██╔╝██╔══██╗╚══██╔══╝   ██╔══██╗██╔══██╗██╔═══██╗╚██╗██╔╝╚██╗ ██╔╝#
+#██║  ██║██╔██╗ ██║███████╗██║     ██████╔╝ ╚████╔╝ ██████╔╝   ██║█████╗██████╔╝██████╔╝██║   ██║ ╚███╔╝  ╚████╔╝ #
+#██║  ██║██║╚██╗██║╚════██║██║     ██╔══██╗  ╚██╔╝  ██╔═══╝    ██║╚════╝██╔═══╝ ██╔══██╗██║   ██║ ██╔██╗   ╚██╔╝  #
+#██████╔╝██║ ╚████║███████║╚██████╗██║  ██║   ██║   ██║        ██║      ██║     ██║  ██║╚██████╔╝██╔╝ ██╗   ██║   #
+#╚═════╝ ╚═╝  ╚═══╝╚══════╝ ╚═════╝╚═╝  ╚═╝   ╚═╝   ╚═╝        ╚═╝      ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   #
+#██╗███╗   ██╗███████╗████████╗ █████╗ ██╗     ██╗     ███████╗██████╗   Original Author:                         #
+#██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗                 bigeyes0x0                #
+#██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
+#██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗                 SomeWhereOverTheRainBow   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.2                                   #
+#╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
+###################################################################################################################
 
 # shellcheck disable=SC1001
 # shellcheck disable=SC1083
@@ -37,7 +34,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.4.1"
+DI_VERSION="v2.4.2"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 readonly DNSCRYPT_VER="$(curl -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4)"
 
@@ -78,8 +75,6 @@ PTXT() {
 
 backup_restore () {
   if [ "$1" = "BACKUP" ] && [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
-    PTXT "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition." \
-         "$INFO Please wait a moment."
     if [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
       PTXT "$INFO There is an old backup detected."
       local USE_OLD
@@ -92,9 +87,11 @@ backup_restore () {
 	rm -rf "${BASE_DIR}/backup_dnscrypt.tar.gz"
       fi
     fi
+    PTXT "$INFO This operation will backup dnscrypt-proxy(<4MB)to jffs partition." \
+         "$INFO Please wait a moment."
     tar -czvf "${BASE_DIR}/backup_dnscrypt.tar.gz" -C "$TARG_DIR" ../dnscrypt/ >/dev/null 2>&1
     PTXT "$INFO Backup complete"
-    [ "$2" -ne 0 ] && end_op_message 0
+    [ -z "$2" ] && end_op_message 0
   elif [ "$1" = "BACKUP" ] && [ ! -d "$TARG_DIR" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
     PTXT "$ERROR No ${TARG_DIR}/dnscrypt-proxy to Backup!"
     end_op_message 1
@@ -102,7 +99,7 @@ backup_restore () {
   if [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && [ "$1" = "RESTORE" ]; then
     PTXT "$INFO Please wait a moment."
     tar -xzvf "${BASE_DIR}/backup_dnscrypt.tar.gz" -C "$BASE_DIR" >/dev/null 2>&1
-    chown "$(nvram get http_username)":root "${TARG_DIR}/*"
+    chown "$(nvram get http_username)":root ${TARG_DIR}/*
     chmod 755 "${TARG_DIR}/dnscrypt-proxy"
     chmod 644 "${TARG_DIR}/public-resolvers.md" \
               "${TARG_DIR}/public-resolvers.md.minisig" \
@@ -1746,8 +1743,6 @@ write_manager_script () {
   fi
 }
 
-trap - HUP INT QUIT ABRT TERM
-trap 'clear; end_op_message 2' HUP INT QUIT ABRT TERM
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
@@ -1755,12 +1750,16 @@ URL_GEN="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/
 ROUTER_OS="$(uname)"
 ROUTER_ARCH="$(uname -m)"
 
-clear
+[ -z "$ROUTER_MODEL" ] && PTXT "$ERROR This is an unsupported router, sorry." && sleep 3 && exit 1
+[ "$(nvram get sw_mode)" != "1" ] && PTXT "$ERROR You are not running in router mode, sorry." && sleep 3 && exit 1
 
-[ -z "$ROUTER_MODEL" ] && PTXT "$ERROR This is an unsupported router, sorry." && exit 1
-[ "$(nvram get sw_mode)" != "1" ] && PTXT "$ERROR You are not running in router mode, sorry." && exit 1
-
-sed -n '2,24p' "$0"
+if [ -z "$2" ]; then
+  printf '\e[8;50;125t'
+  printf '\033[?7l'
+  clear
+  sed -n '2,21p' "$0"
+  printf '\033[?7h'
+fi
 
 case "$ROUTER_MODEL" in
   #RT-AX56U|RT-AX58U|RT-AX3000)
@@ -1768,13 +1767,13 @@ case "$ROUTER_MODEL" in
   #  exit 1
   #  ;;
   *)
-    PTXT "$INFO Detected $ROUTER_MODEL router."
+    [ -z "$2" ] && PTXT "$INFO Detected $ROUTER_MODEL router."
     ;;
 esac
 
 case "$ROUTER_OS" in
   "Linux")
-    PTXT "$INFO Detected $ROUTER_OS platform."
+    [ -z "$2" ] && PTXT "$INFO Detected $ROUTER_OS platform."
     ROUTER_OS="linux"
     ;;
   *)
@@ -1789,14 +1788,14 @@ case "$ROUTER_ARCH" in
     URL_ARCH="${RURL}/armv8"
     DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
     DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
-    PTXT "$INFO Detected ARMv8 architecture."
+    [ -z "$2" ] && PTXT "$INFO Detected ARMv8 architecture."
     ;;
   "armv7l")
     ROUTER_ARCH="arm"
     URL_ARCH="${RURL}/armv7"
     DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
     DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
-    PTXT "$INFO Detected ARMv7 architecture."
+    [ -z "$2" ] && PTXT "$INFO Detected ARMv7 architecture."
     ;;
   *)
     PTXT "$ERROR This is an unsupported architecture, sorry."
@@ -1817,6 +1816,7 @@ case "$2" in
 esac
 
 menu () {
+  trap - HUP INT QUIT ABRT TERM
   PTXT "$INFO Choose what you want to do:" \
        "  1) Install/Update dnscrypt-proxy" \
        "  2) Uninstall dnscrypt-proxy" \
@@ -1834,6 +1834,7 @@ menu () {
   if { [ ! -d "$TARG_DIR" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 r q; }; fi
   if { [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 b q; }; fi
   if { [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 b r q; }; fi
+  [ -n "$CHOSEN" ] && trap 'clear; end_op_message 2' HUP INT QUIT ABRT TERM
   case "$CHOSEN" in
     1)
       PTXT "$INFO This operation will install dnscrypt-proxy and related files (<6MB)" \
@@ -1884,6 +1885,7 @@ menu () {
       read_yesno "Do you want to continue?" && backup_restore BACKUP || end_op_message 1
       ;;
     r|R)
+      
       PTXT "$INFO This operation will restore everything!"
       read_yesno "Do you want to continue?" && backup_restore RESTORE || end_op_message 1
       ;;
