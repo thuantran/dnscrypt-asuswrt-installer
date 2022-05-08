@@ -1885,7 +1885,6 @@ menu () {
       read_yesno "Do you want to continue?" && backup_restore BACKUP || end_op_message 1
       ;;
     r|R)
-      
       PTXT "$INFO This operation will restore everything!"
       read_yesno "Do you want to continue?" && backup_restore RESTORE || end_op_message 1
       ;;
