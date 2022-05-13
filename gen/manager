@@ -160,7 +160,7 @@ start_monitor () {
           timezone
           "$0" opendns-update
           NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
-          RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
+          RES_STATE="$(nslookup google.com 127.0.1.1 >/dev/null 2>&1; printf "%s" "$?")"
           ;;
       esac
       if [ -z "$(pidof dnscrypt-proxy)" ]; then
