@@ -1231,13 +1231,15 @@ read_input_num () {
   [ -n "$4" ] && [ -n "$5" ] && [ -z "$6" ] && RANGE="[${2}-${3}/${4}/${5}]"
   [ -n "$4" ] && [ -n "$5" ] && [ -n "$6" ] && RANGE="[${2}-${3}/${4}/${5}/${6}]"
   PTXT -n "$INPUT $1, ${BOLD}${RANGE}${NORM}: "
-  read -r CHOSEN
   case "$1" in
     "Set log level, default is 2, 0 is the most verbose")
       [ -z "$CHOSEN" ] && CHOSEN="2"
       ;;
     "Select your strategy"|"Select your mode")
       [ -z "$CHOSEN" ] && CHOSEN="1"
+      ;;
+    *)
+      read -r CHOSEN
       ;;
   esac
   case "$CHOSEN" in
