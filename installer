@@ -1240,7 +1240,6 @@ read_input_num () {
       if [ -z "$CHOSEN" ]; then CHOSEN="1"; fi
       ;;
     *)
-      if [ -z "$CHOSEN" ]; then PTXT "$ERROR Invalid or no character(s) entered! Retrying..."; read_input_num "$@"; return; fi
       ;;
   esac
   case "$CHOSEN" in
