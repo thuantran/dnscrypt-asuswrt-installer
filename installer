@@ -1240,6 +1240,7 @@ read_input_num () {
       if [ -z "$CHOSEN" ]; then CHOSEN="1"; fi
       ;;
     *)
+      if [ -z "$CHOSEN" ]; then PTXT "$ERROR Invalid character(s) entered! Retrying..."; read_input_num "$@"; return; fi
       ;;
   esac
   case "$CHOSEN" in
@@ -1247,8 +1248,8 @@ read_input_num () {
       return 1
       ;;
     "$2"|"$3"|*)
-      if [ -z "$CHOSEN" ] || ! PTXT "$CHOSEN" | grep -qE '^[0-9]+$'; then
-        PTXT "$ERROR Invalid or no character(s) entered! Retrying..."
+      if ! PTXT "$CHOSEN" | grep -qE '^[0-9]+$'; then
+        PTXT "$ERROR Invalid character(s) entered! Retrying..."
         read_input_num "$@"
         return
       fi
