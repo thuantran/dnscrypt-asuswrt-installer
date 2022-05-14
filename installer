@@ -908,7 +908,7 @@ download_file () {
         PTXT "$INFO Downloading $FILENAME"
         if curl -L -k -s "$URL" -o "${TARG}/${FILENAME}"; then
           chmod "$PERM" "${TARG}/${FILENAME}"
-          return 0
+          break
         fi
         COUNT="$((COUNT+1))"
       done
@@ -918,6 +918,7 @@ download_file () {
       fi
     fi
   done
+  return 0
 }
 
 end_op_message () {
