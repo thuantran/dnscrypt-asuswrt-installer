@@ -164,8 +164,6 @@ check_dnscrypt_toml () {
          "$INFO Operation will continue with clean config file."
     mv "$TOML_FILE" "$TOML_ERR"
     return 1
-  else
-    return 0
   fi
 }
 
@@ -1389,20 +1387,15 @@ setup_dnscrypt () {
   setup_dnscrypt_impl "$@"
   local RET="$?"
   check_opendns
-  case "$RET" in
-    0)
-      if [ "$1" = "reconfig" ]; then
-        PTXT "$INFO Restarting dnscrypt-proxy with new config..."
-        service restart_dnscrypt-proxy
-        end_op_message 0
-      else
-        return "$RET"
-      fi
-      ;;
-    1)
-      return "$RET"
-      ;;
-  esac
+  if [ "$1" = "reconfig" ]; then
+    if [ "$RET" -eq 0 ]; then
+      PTXT "$INFO Restarting dnscrypt-proxy with new config..."
+      service restart_dnscrypt-proxy
+      end_op_message 0
+    else
+      end_op_message 0
+    fi
+  fi
 }
 
 setup_dnscrypt_impl () {
