@@ -1223,7 +1223,7 @@ read_input_dns () {
     "2nd Default is")
       local BOOTSTRAP2
       BOOTSTRAP2="${BOOTSTRAP}, '${DNS_SERVER}:53'"
-      if PTXT "$BOOTSTRAP" | grep -qoF "^$DNS_SERVER"; then PTXT "$ERROR $DNS_SERVER DNS server address already entered, please try again!"; read_input_dns "$@"; fi
+      if PTXT "$BOOTSTRAP" | grep -qoF "$DNS_SERVER"; then PTXT "$ERROR $DNS_SERVER DNS server address already entered, please try again!"; read_input_dns "$@"; fi
       ;;
   esac
 }
