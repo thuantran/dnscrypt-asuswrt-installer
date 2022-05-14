@@ -1393,7 +1393,7 @@ setup_dnscrypt () {
   if [ "$1" = "reconfig" ]; then
     if [ "$RET" -eq 0 ]; then
       PTXT "$INFO Restarting dnscrypt-proxy with new config..."
-      service restart_dnscrypt-proxy
+      service restart_dnscrypt-proxy >/dev/null 2>&1
       end_op_message 0
     else
       end_op_message 0
@@ -1626,6 +1626,7 @@ uninst_all () {
 }
 
 uninst_dnscrypt () {
+  service stop_dnscrypt-proxy >/dev/null 2>&1
   PTXT "$INFO Uninstalling dnscrypt-proxy..."
   rm -f "${TARG_DIR}/dnscrypt-proxy" "${TARG_DIR}/nonroot"
   del_jffs_script /jffs/scripts/dnsmasq.postconf
