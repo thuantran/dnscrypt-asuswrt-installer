@@ -164,6 +164,8 @@ check_dnscrypt_toml () {
          "$INFO Operation will continue with clean config file."
     mv "$TOML_FILE" "$TOML_ERR"
     return 1
+  else
+    return 0
   fi
 }
 
@@ -1409,7 +1411,6 @@ setup_dnscrypt_impl () {
   else
     if [ -f "$TOML_FILE" ]; then
       if [ "$1" = "reconfig" ]; then
-        check_dnscrypt_toml
         if ! check_dnscrypt_toml; then
           setup_dnscrypt_impl x
           return
@@ -1464,7 +1465,6 @@ setup_dnscrypt_impl () {
       ;;
     esac
     PTXT "$INFO Writing dnscrypt-proxy configuration..."
-    check_dnscrypt_toml
     if ! check_dnscrypt_toml; then
       PTXT "$INFO Writing dnscrypt-proxy configuration failed " \
            "$INFO Please send $TOML_ERR file and screen log of " \
