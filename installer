@@ -1389,15 +1389,20 @@ setup_dnscrypt () {
   setup_dnscrypt_impl "$@"
   local RET="$?"
   check_opendns
-  if [ "$1" = "reconfig" ]; then
-    if [ "$RET" -eq 0 ]; then
-      PTXT "$INFO Restarting dnscrypt-proxy with new config..."
-      service restart_dnscrypt-proxy
-      end_op_message 0
-    else
-      end_op_message 0
-    fi
-  fi
+  case "$RET" in
+    0)
+      if [ "$1" = "reconfig" ]; then
+        PTXT "$INFO Restarting dnscrypt-proxy with new config..."
+        service restart_dnscrypt-proxy
+        end_op_message 0
+      else
+        return "$RET"
+      fi
+      ;;
+    1)
+      return "$RET"
+      ;;
+  esac
 }
 
 setup_dnscrypt_impl () {
