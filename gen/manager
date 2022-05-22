@@ -159,8 +159,8 @@ start_monitor () {
             "30"|"60"|"90")
               timezone;
               "$0" opendns-update;
-              if { ! netcheck && [ -n "$(pidof dnscrypt-proxy)" ]; }; then logger -st "$NAME" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"; unset COUNT; fi;
               if [ "$COUNT" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi;
+              if { ! netcheck && [ -n "$(pidof dnscrypt-proxy)" ]; }; then logger -st "$NAME" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"; unset COUNT; fi;
               ;;
              *)
               COUNT="$((COUNT + 1))";
