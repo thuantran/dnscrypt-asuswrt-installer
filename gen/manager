@@ -112,8 +112,6 @@ start_dnscrypt_proxy () {
   local COUNTER
   local LIMIT
   local STATE
-  local NW_STATE
-  local RES_STATE
   local DNSCRYPT_START
   { cd /jffs/dnscrypt; } || exit
   { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
@@ -125,7 +123,7 @@ start_dnscrypt_proxy () {
   { while [ -z "$(pidof dnscrypt-proxy)" ] && [ "$COUNTER" -le "$LIMIT" ]; do sleep 1; COUNTER="$((COUNTER + 1))"; done; };
   if ! grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi
   STATE="0"
-  [ -z "$1" ] && while { ! netcheck; }; do sleep 1; done
+  [ -z "$1" ] && while { ! netcheck && [ "$STATE" -lt "10" ]; }; do sleep 1; STATE="$((STATE + 1))"; done
   [ "$STATE" -eq "10" ] && start_dnscrypt_proxy x
 }
 
@@ -168,7 +166,7 @@ start_monitor () {
               COUNT="$((COUNT + 1))";
               ;;
           esac
-          if [ -z "$(pidof "$PROCS")" ]; then logger -st "$NAME" "Warning: dnscrypt-proxy is dead; Monitor will start it!"; unset COUNT; fi;
+          if [ -z "$(pidof dnscrypt-proxy)" ]; then logger -st "$NAME" "Warning: dnscrypt-proxy is dead; Monitor will start it!"; unset COUNT; fi;
           case $RANDOM in
             "4320")
               RANDOM="0";
