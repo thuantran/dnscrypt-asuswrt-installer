@@ -174,7 +174,7 @@ start_monitor () {
               unset COUNT;
               ;;
              *)
-              RANDOM="$((RANDOM + 1))";
+              if [ -z "$COUNT" ]; then RANDOM="0"; else RANDOM="$((RANDOM + 1))"; fi;
               ;;
           esac
           ;;
