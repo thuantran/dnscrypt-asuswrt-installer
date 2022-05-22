@@ -2,7 +2,6 @@
 
 [ -f /jffs/dnscrypt/.config ] && . /jffs/dnscrypt/.config
 
-{ for PID in $(pidof "$(basename "$0")"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q monitor-start; } && [ "$PID" != "$$" ]; then { MON_PID="$PID"; }; fi; done; };
 NAME="$(basename "$0")[$$]"
 
 append_on_demand () {
@@ -25,7 +24,7 @@ check_dns_environment () {
   if [ "$(nvram get dhcp_dns1_x)" ] && [ "$NVCHECK" != "0" ]; then { nvram set dhcp_dns1_x=""; }; NVCHECK="$((NVCHECK+1))"; fi
   if [ "$(nvram get dhcp_dns2_x)" ] && [ "$NVCHECK" != "0" ]; then { nvram set dhcp_dns2_x=""; }; NVCHECK="$((NVCHECK+1))"; fi
   if [ "$(nvram get dhcpd_dns_router)" != "1" ] && [ "$NVCHECK" != "0" ]; then { nvram set dhcpd_dns_router="1"; }; NVCHECK="$((NVCHECK+1))"; fi
-  if [ "$NVCHECK" != "0" ]; then { nvram commit; }; { service restart_dnsmasq >/dev/null 2>&1; }; while { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" != "0" ]; }; do sleep 1; done; fi
+  if [ "$NVCHECK" != "0" ]; then { nvram commit; }; { service restart_dnsmasq >/dev/null 2>&1; }; while { ! netcheck; }; do sleep 1; done; fi
 }
 
 dnscrypt_proxy_run () {
@@ -35,12 +34,12 @@ dnscrypt_proxy_run () {
   pid_file="${lock_dir}/pid"
   if ( mkdir ${lock_dir} ) 2> /dev/null; then
     printf "%s\n" "$$" > $pid_file
-    trap 'rm -rf /tmp/dnscrypt-proxy; exit $?' EXIT
+    trap 'rm -rf "$lock_dir"; exit $?' EXIT
     start="$(date +%s)"
     $1
     end="$(date +%s)"
     runtime="$((end-start))"
-    logger -st "$NAME" "$@ took $runtime second(s) to complete."
+    logger -st "$NAME" "$1 took $runtime second(s) to complete."
     rm -rf "$lock_dir"
   else
     logger -st "$NAME" "Lock owned by $(cat $pid_file) exists; preventing duplicate runs!"
@@ -101,12 +100,18 @@ proc_optimizations () {
   fi
 }
 
+netcheck() {
+  local ALIVE
+  if { [ "$(/bin/date +"%Y")" -gt "1970" ] || [ "$(nvram get ntp_ready)" -ne "0" ]; }; then ALIVE="0"; else ALIVE="1"; fi
+  if { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" = "0" ]; }; then ALIVE="0"; else ALIVE="$((ALIVE+1))"; fi
+  if { [ "$(curl -Is  http://www.google.com | head -n 1 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] || [ "$(wget -q --spider http://google.com >/dev/null 2>&1; printf "%s" "$?")" = "0" ]; }; then ALIVE="0"; else ALIVE="$((ALIVE+1))"; fi
+  if [ "$ALIVE" -ne "0" ]; then return 1; else return 0; fi
+}
+
 start_dnscrypt_proxy () {
   local COUNTER
   local LIMIT
   local STATE
-  local NW_STATE
-  local RES_STATE
   local DNSCRYPT_START
   { cd /jffs/dnscrypt; } || exit
   { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
@@ -118,9 +123,7 @@ start_dnscrypt_proxy () {
   { while [ -z "$(pidof dnscrypt-proxy)" ] && [ "$COUNTER" -le "$LIMIT" ]; do sleep 1; COUNTER="$((COUNTER + 1))"; done; };
   if ! grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi
   STATE="0"
-  [ -z "$1" ] && NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
-  [ -z "$1" ] && RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
-  [ -z "$1" ] && while { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ] && [ "$STATE" -lt "10" ]; }; do sleep 1; NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"; RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"; STATE="$((STATE + 1))"; done
+  [ -z "$1" ] && while { ! netcheck && [ "$STATE" -lt "10" ]; }; do sleep 1; STATE="$((STATE + 1))"; done
   [ "$STATE" -eq "10" ] && start_dnscrypt_proxy x
 }
 
@@ -128,6 +131,7 @@ stop_dnscrypt_proxy () {
   local COUNTER
   local LIMIT
   { cd /jffs/dnscrypt; } || exit
+  logger -st "$NAME" "Stopping dnscrypt-proxy from $NAME."
   { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   COUNTER="0";
   LIMIT="10";
@@ -139,9 +143,7 @@ start_monitor () {
   trap '' HUP INT QUIT ABRT TERM
   trap 'EXIT="1"' USR1
   trap 'EXIT="2"' USR2
-  while [ "$(nvram get ntp_ready)" -eq 0 ]; do sleep 1; done
-  local NW_STATE
-  local RES_STATE
+  while { ! netcheck; }; do sleep 1; done
   local COUNT
   local EXIT
   local RANDOM
@@ -149,33 +151,47 @@ start_monitor () {
   RANDOM="0"
   logger -st "$NAME" "Starting Monitor!"
   while true; do
-    if [ "$EXIT" = "1" ]; then logger -st "$NAME" "Stopping Monitor!"; trap - HUP INT QUIT ABRT USR1 USR2 TERM; { dnscrypt_proxy_run stop_dnscrypt_proxy; }; break; fi
-    if [ "$EXIT" = "2" ]; then { dnscrypt_proxy_run start_dnscrypt_proxy; }; EXIT="0"; fi
-    if [ -z "$COUNT" ]; then COUNT="0"; timezone; "$0" opendns-update; fi
-    if [ "$COUNT" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi
     if [ -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
-      case "$COUNT" in
-        "30"|"60"|"90")
-          timezone
-          "$0" opendns-update
-          NW_STATE="$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")"
-          RES_STATE="$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")"
+      if [ -z "$COUNT" ]; then COUNT="0"; timezone; "$0" opendns-update; { dnscrypt_proxy_run start_dnscrypt_proxy; }; fi
+      case $EXIT in
+        "0")
+          case $COUNT in
+            "30"|"60"|"90")
+              timezone;
+              "$0" opendns-update;
+              if { ! netcheck && [ -n "$(pidof dnscrypt-proxy)" ]; }; then logger -st "$NAME" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"; unset COUNT; fi;
+              if [ "$COUNT" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi;
+              ;;
+             *)
+              COUNT="$((COUNT + 1))";
+              ;;
+          esac
+          if [ -z "$(pidof dnscrypt-proxy)" ]; then logger -st "$NAME" "Warning: dnscrypt-proxy is dead; Monitor will start it!"; unset COUNT; fi;
+          case $RANDOM in
+            "4320")
+              RANDOM="0";
+              logger -st "$NAME" "Randomization: Health Check; Monitor will randomize it!";
+              unset COUNT;
+              ;;
+             *)
+              RANDOM="$((RANDOM + 1))";
+              ;;
+          esac
           ;;
-      esac
-      if [ -z "$(pidof dnscrypt-proxy)" ]; then
-        logger -st "$NAME" "Warning: dnscrypt-proxy is dead; $NAME will start it!"
-        dnscrypt_proxy_run start_dnscrypt_proxy
-      elif { [ "$COUNT" -eq "30" ] || [ "$COUNT" -eq "60" ] || [ "$COUNT" -eq "90" ]; } && { [ "$NW_STATE" = "0" ] && [ "$RES_STATE" != "0" ]; }; then
-        logger -st "$NAME" "Warning: dnscrypt-proxy is not responding; $NAME will re-start it!"
-        dnscrypt_proxy_run start_dnscrypt_proxy
-      elif [ "$RANDOM" -eq 4320 ]; then
-        RANDOM="0"
-        logger -st "$NAME" "Randomization: Health Check; $NAME will randomize it!"
-        dnscrypt_proxy_run start_dnscrypt_proxy
-      fi
-      RANDOM="$((RANDOM + 1))"
+        "1")
+          logger -st "$NAME" "Stopping Monitor!";
+          trap - HUP INT QUIT ABRT USR1 USR2 TERM;
+          { dnscrypt_proxy_run stop_dnscrypt_proxy; };
+          break;
+          ;;
+        "2")
+          logger -st "$NAME" "Monitor is restarting dnscrypt-proxy!";
+          unset COUNT;
+          EXIT="0";
+          ;;
+      esac    
     fi
-    sleep 10
+    if [ -z "$COUNT" ]; then sleep 1; else sleep 10; fi
   done
 }
 
@@ -220,6 +236,8 @@ update_opendns () {
       ;;
   esac
 }
+
+{ for PID in $(pidof "$(basename "$0")"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q monitor-start; } && [ "$PID" != "$$" ]; then { MON_PID="$PID"; }; fi; done; };
 
 unset TZ
 case "$1" in
