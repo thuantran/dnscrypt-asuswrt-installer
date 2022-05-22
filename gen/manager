@@ -170,8 +170,7 @@ start_monitor () {
           case $RANDOM in
             "4320")
               RANDOM="0";
-              logger -st "$NAME" "Randomization: Health Check; Monitor will randomize it!";
-              unset COUNT;
+              if [ -n "$COUNT" ]; then logger -st "$NAME" "Randomization: Health Check; Monitor will randomize it!"; unset COUNT; fi;
               ;;
              *)
               if [ -z "$COUNT" ]; then RANDOM="0"; else RANDOM="$((RANDOM + 1))"; fi;
