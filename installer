@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.3                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.4                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -27,7 +27,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.4.3"
+DI_VERSION="v2.4.4"
 export DI_VERSION
 
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -892,6 +892,7 @@ download_file () {
   local PERM
   PERM="$1"; shift
   local URL
+  local RET
   local FILENAME
   local MD5SUM_OLD
   local MD5SUM_CURR
@@ -914,10 +915,12 @@ download_file () {
       done
       if [ "$COUNT" -eq 3 ]; then
         PTXT "$ERROR Unable to download ${BOLD}${URL}${NORM}"
-        return 1
+        if [ -z "$RET" ]; then RET="1"; else RET="$((RET+1))"; fi
       fi
     fi
   done
+  if [ -z "$RET" ]; then RET="0"; else PTXT "$ERROR One or more download failures has occured." "$ERROR It is recommended to rerun the installer, or restore from a backup!"; fi
+  return $RET
 }
 
 end_op_message () {
