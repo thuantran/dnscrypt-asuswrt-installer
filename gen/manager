@@ -236,6 +236,7 @@ update_opendns () {
   esac
 }
 
+if { [ "$2" != "x" ] && echo "$1" | grep -qE "^(((dnscrypt-)?(start|stop)|restart|kill)$)"; }; then { service "$1"_dnscrypt-proxy >/dev/null 2>&1; exit; }; fi
 { for PID in $(pidof "$(basename "$0")"); do if { awk '{ print }' "/proc/${PID}/cmdline" | grep -q monitor-start; } && [ "$PID" != "$$" ]; then { MON_PID="$PID"; }; fi; done; };
 
 unset TZ
