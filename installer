@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.4                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.5                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -27,7 +27,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.4.4"
+DI_VERSION="v2.4.5"
 export DI_VERSION
 
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -124,10 +124,12 @@ backup_restore () {
               "${TARG_DIR}/odoh-relays.md.minisig" \
               "${TARG_DIR}/dnscrypt-resolvers.csv" \
               "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
+    for i in init-start services-stop; do if { ! grep -q "${TARG_DIR}/manager $i &" "/jffs/scripts/${i}" && grep -q "${TARG_DIR}/manager $i" "/jffs/scripts/${i}"; }; then del_jffs_script "/jffs/scripts/${i}"; fi; done
+    write_manager_script /jffs/scripts/init-start "init-start &"
+    write_manager_script /jffs/scripts/services-stop "services-stop &"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
-    write_manager_script /jffs/scripts/init-start init-start
-    write_manager_script /jffs/scripts/services-stop services-stop
-    write_command_script /jffs/scripts/service-event-end 'if echo "$2" | /bin/grep -q "^dnscrypt-proxy"; then { sh /jffs/dnscrypt/manager "${1}" & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
+    del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
+    write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
     if ! setup_dnscrypt; then
       end_op_message 1
       return
@@ -1041,10 +1043,12 @@ inst_dnscrypt () {
                       "${TARG_DIR}/odoh-relays.md.minisig" \
                       "${TARG_DIR}/dnscrypt-resolvers.csv" \
                       "${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
+  for i in init-start services-stop; do if { ! grep -q "${TARG_DIR}/manager $i &" "/jffs/scripts/${i}" && grep -q "${TARG_DIR}/manager $i" "/jffs/scripts/${i}"; }; then del_jffs_script "/jffs/scripts/${i}"; fi; done
+  write_manager_script /jffs/scripts/init-start "init-start &"
+  write_manager_script /jffs/scripts/services-stop "services-stop &"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
-  write_manager_script /jffs/scripts/init-start init-start
-  write_manager_script /jffs/scripts/services-stop services-stop
-  write_command_script /jffs/scripts/service-event-end 'if echo "$2" | /bin/grep -q "^dnscrypt-proxy"; then { sh /jffs/dnscrypt/manager "${1}" & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
+  del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
+  write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
   if ! setup_dnscrypt; then
     end_op_message 1
     return
