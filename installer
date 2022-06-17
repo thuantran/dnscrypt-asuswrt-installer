@@ -129,7 +129,7 @@ backup_restore () {
     write_manager_script /jffs/scripts/services-stop "services-stop &"
     write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
     del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
-    write_command_script /jffs/scripts/service-event-end 'if echo "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s\n" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
+    write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
     if ! setup_dnscrypt; then
       end_op_message 1
       return
@@ -1048,7 +1048,7 @@ inst_dnscrypt () {
   write_manager_script /jffs/scripts/services-stop "services-stop &"
   write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
   del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
-  write_command_script /jffs/scripts/service-event-end 'if echo "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s\n" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
+  write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
   if ! setup_dnscrypt; then
     end_op_message 1
     return
