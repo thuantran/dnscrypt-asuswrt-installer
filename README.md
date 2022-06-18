@@ -40,7 +40,14 @@ If you want to use dnscrypt-proxy version 1, run this command:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
-
+# Terminal commands to for AdGuardHome are
+```
+/opt/etc/init.d/S99AdGuardHome {start|stop|restart|check|kill|reload}
+```
+or (recommended commands)
+```
+service {start|stop|restart|kill|reload}_AdGuardHome
+```
 # How to check if it works
 If you use OpenDNS, run this command on Windows cmd
 ```
@@ -62,11 +69,14 @@ will return a number.
 I need following directory and files:
 ```
 /jffs/dnscrypt
+/jffs/scripts/init-start
 /jffs/scripts/dnsmasq.postconf
+/jffs/scripts/services-stop
+/jffs/scripts/service-event-end
 ```
 One can use this command to create a tar archive of these files:
 ```
-echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/dnsmasq.postconf; rm exclude-files
+echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/init-start /jffs/scripts/dnsmasq.postconf /jffs/scripts/services-stop /jffs/scripts/service-event-end ; rm exclude-files
 ```
 in current directory and send me the archive for debug.
 
