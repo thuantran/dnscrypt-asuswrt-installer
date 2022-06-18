@@ -84,4 +84,4 @@ I also need following information:
 - I wrote the installer script with stuff inspired from entware-setup.sh from asuswrt-merlin
 - You can look at all the stuff here https://github.com/thuantran/dnscrypt-asuswrt-installer
 # Donate:
-This script will always be open source and free to use under [GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE), but if you want to support future development you can do so by [Donating With PayPal.](https://paypal.me/swotrb).
+This script will always be open source and free to use under [GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE), but if you want to support future development you can do so by [Donating With PayPal.](https://paypal.me/swotrb)
