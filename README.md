@@ -1,14 +1,11 @@
 <a href="https://ibb.co/82v4nFh"><img src="https://i.ibb.co/ft6GVmc/image.png" alt="image" border="0"></a>
 
 To resolve all problems associated with installing Dnscrypt-Proxy with Entware (or similar) along with setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, this installer of dnscrypt-proxy resolves all these concerns... The only requirement is an Asus Router flashed with custom Asuswrt-Merlin Firmware.
-
 # Requirements:
 - ARM based ASUS routers that use Asuswrt-Merlin Firmware
 - JFFS support and enabled
-
 # Incompatibilities:
 - No known issue
-
 # Current features:
 - [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with ODoH, DoH, and DNSCrypt version 2 protocols, multiple resolvers, and other features
 - Running as nobody through nonroot binary (using --user requires change to passwd)
@@ -25,10 +22,8 @@ To resolve all problems associated with installing Dnscrypt-Proxy with Entware (
 - Support for NextDNS.io Account SDNS stamp as Static server.
 - Support for addition of multiple static servers using SDNS Stamp and Custom Server Naming that can be mixed with servers on the resolvers list.
 - Improved Installer/Update/Backup Functions.
-
 # Changelog:
 https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
-
 # Install/Update/Reconfig/Uninstall:
 Run this command from ssh shell and following the prompt for dnscrypt-proxy version 2:
 ```
@@ -40,7 +35,7 @@ If you want to use dnscrypt-proxy version 1, run this command:
 ```
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
-# Terminal commands to for AdGuardHome are
+# Terminal commands to for Dnscrypt-Proxy are:
 ```
 /jffs/dnscrypt/manager {(dnscrypt-)?(start|stop)|restart|check|kill|reload}
 ```
@@ -48,7 +43,7 @@ or (recommended commands)
 ```
 service {(dnscrypt-)?(start|stop)|restart|check|kill|reload}_dnscrypt-proxy
 ```
-# How to check if it works
+# How to check if it works:
 If you use OpenDNS, run this command on Windows cmd
 ```
 nslookup -type=txt debug.opendns.com
@@ -64,7 +59,6 @@ Otherwise running this command:
 pidof dnscrypt-proxy
 ```
 will return a number.
-
 # How to report issue:
 I need following directory and files:
 ```
@@ -84,9 +78,10 @@ I also need following information:
 - Which dns server you selected during dnscrypt installation
 - Which router you're using
 - Firmware and its version
-
 # How I made this:
 - Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
 - Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
 - I wrote the installer script with stuff inspired from entware-setup.sh from asuswrt-merlin
 - You can look at all the stuff here https://github.com/thuantran/dnscrypt-asuswrt-installer
+# Donate:
+This script will always be open source and free to use under [GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE), but if you want to support future development you can do so by [Donating With PayPal.](https://paypal.me/swotrb).
