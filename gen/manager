@@ -82,6 +82,14 @@ init_hwrng () {
   if [ "$?" -eq "0" ]; then logger -st "$NAME" "rngd: Started for $RNG_DEV"; return 0; fi;
 }
 
+netcheck() {
+  local ALIVE
+  if { [ "$(/bin/date -u +"%Y")" -gt "1970" ] || [ "$(/bin/date -u '+%s')" -ge "$(/bin/date -u -r "$0" '+%s')" ]; }; then ALIVE="0"; else ALIVE="1"; fi;
+  if { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" = "0" ]; }; then ALIVE="0"; else ALIVE="$((ALIVE+1))"; fi;
+  if { [ "$(curl -Is  http://www.google.com | head -n 1 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] || [ "$(wget -q --spider http://google.com >/dev/null 2>&1; printf "%s" "$?")" = "0" ]; }; then ALIVE="0"; else ALIVE="$((ALIVE+1))"; fi;
+  if [ "$ALIVE" -ne "0" ]; then return 1; else return 0; fi;
+}
+
 proc_optimizations () {
   { printf "4194304" > /proc/sys/kernel/pid_max; }; # Ensure max PID coverage
   { printf "2" > /proc/sys/vm/overcommit_memory; }; # Ensure ratio algorithm checks properly work including swap.
@@ -97,14 +105,6 @@ proc_optimizations () {
     { printf "1024" > /proc/sys/net/ipv6/neigh/default/gc_thresh2; };
     { printf "2048" > /proc/sys/net/ipv6/neigh/default/gc_thresh3; };
   fi
-}
-
-netcheck() {
-  local ALIVE
-  if { [ "$(/bin/date -u +"%Y")" -gt "1970" ] || [ "$(/bin/date -u '+%s')" -ge "$(/bin/date -u -r "$0" '+%s')" ]; }; then ALIVE="0"; else ALIVE="1"; fi;
-  if { [ "$(ping 1.1.1.1 -c1 -W2 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] && [ "$(nslookup google.com 127.0.0.1 >/dev/null 2>&1; printf "%s" "$?")" = "0" ]; }; then ALIVE="0"; else ALIVE="$((ALIVE+1))"; fi;
-  if { [ "$(curl -Is  http://www.google.com | head -n 1 >/dev/null 2>&1; printf "%s" "$?")" = "0" ] || [ "$(wget -q --spider http://google.com >/dev/null 2>&1; printf "%s" "$?")" = "0" ]; }; then ALIVE="0"; else ALIVE="$((ALIVE+1))"; fi;
-  if [ "$ALIVE" -ne "0" ]; then return 1; else return 0; fi;
 }
 
 service_wait () {
@@ -129,14 +129,6 @@ start_dnscrypt_proxy () {
   { nohup $DNSCRYPT_START >/dev/null 2>&1 </dev/null & };
   if ! grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi;
   if [ -n "$(pidof dnscrypt-proxy)" ] && { service_wait netcheck 300; }; then return "0"; else return "1"; fi;
-}
-
-stop_dnscrypt_proxy () {
-  { cd /jffs/dnscrypt; } || exit;
-  logger -st "$NAME" "Stopping dnscrypt-proxy from $NAME.";
-  { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
-  if grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi;
-  if [ -z "$(pidof "$PROCS")" ] && { service_wait netcheck 300; }; then return 0; else return 1; fi;
 }
 
 start_monitor () {
@@ -202,6 +194,14 @@ start_monitor () {
       esac;    
     fi;
   done;
+}
+
+stop_dnscrypt_proxy () {
+  { cd /jffs/dnscrypt; } || exit;
+  logger -st "$NAME" "Stopping dnscrypt-proxy from $NAME.";
+  { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
+  if grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi;
+  if [ -z "$(pidof "$PROCS")" ] && { service_wait netcheck 300; }; then return 0; else return 1; fi;
 }
 
 stop_monitor () {
