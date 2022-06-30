@@ -27,7 +27,7 @@ https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
 # Install/Update/Reconfig/Uninstall:
 Run this command from ssh shell and following the prompt for dnscrypt-proxy version 2:
 ```
-curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer && sh installer ; rm installer
+curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer && sh installer; rm installer
 ```
 User can safely update from dnscrypt-proxy version 1 to version 2 with above command.
 
@@ -37,11 +37,11 @@ curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-in
 ```
 # Terminal commands to for Dnscrypt-Proxy are:
 ```
-/jffs/dnscrypt/manager {(dnscrypt-)?(start|stop)|restart|check|kill|reload}
+/jffs/dnscrypt/manager {(dnscrypt-)?(start|stop)|restart|kill}
 ```
 or (recommended commands)
 ```
-service {(dnscrypt-)?(start|stop)|restart|check|kill|reload}_dnscrypt-proxy
+service {(dnscrypt-)?(start|stop)|restart|kill}_dnscrypt-proxy
 ```
 # How to check if it works:
 If you use OpenDNS, run this command on Windows cmd
