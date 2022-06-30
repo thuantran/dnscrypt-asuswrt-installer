@@ -263,7 +263,7 @@ case "$1" in
     if [ -n "$MON_PID" ]; then { stop_monitor "$MON_PID"; }; else { start_monitor & }; fi;
     ;;
   "opendns-update")
-    update_opendns 0 &;
+    { update_opendns 0 & };
     ;;
   "init-start"|"services-stop")
     timezone;
@@ -276,7 +276,7 @@ case "$1" in
             { /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; };
             ;;
           "rngd")
-            init_hwrng &;
+            { init_hwrng & };
             ;;
         esac;
         { "$0" monitor-start; };
