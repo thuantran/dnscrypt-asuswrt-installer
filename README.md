@@ -37,11 +37,11 @@ curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-in
 ```
 # Terminal commands to for Dnscrypt-Proxy are:
 ```
-/jffs/dnscrypt/manager {(dnscrypt-)?(start|stop)|restart|check|kill|reload}
+/jffs/dnscrypt/manager {(dnscrypt-)?(start|stop)|restart|kill}
 ```
 or (recommended commands)
 ```
-service {(dnscrypt-)?(start|stop)|restart|check|kill|reload}_dnscrypt-proxy
+service {(dnscrypt-)?(start|stop)|restart|kill}_dnscrypt-proxy
 ```
 # How to check if it works:
 If you use OpenDNS, run this command on Windows cmd
