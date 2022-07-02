@@ -201,7 +201,7 @@ stop_dnscrypt_proxy () {
   logger -st "$NAME" "Stopping dnscrypt-proxy from $NAME.";
   { killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; };
   if grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi;
-  if [ -z "$(pidof "$PROCS")" ] && { service_wait netcheck 300; }; then return 0; else return 1; fi;
+  if [ -z "$(pidof dnscrypt-proxy)" ] && { service_wait netcheck 300; }; then return 0; else return 1; fi;
 }
 
 stop_monitor () {
