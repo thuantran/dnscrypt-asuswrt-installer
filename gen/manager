@@ -47,7 +47,7 @@ dnscrypt_proxy_run () {
 
 dnsmasq_params () {
   local DNS VAR
-  if { [ "$(nvram get dns_local_cache)" != "1" ] && [ "$(readlink -f /tmp/resolv.conf)" = "/rom/etc/resolv.conf" ]; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi;
+  if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && df -h | grep -qoE '/tmp/resolv.conf'; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi;
   if [ -n "$(pidof dnscrypt-proxy)" ]; then
     cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq;
     append_on_demand /etc/dnsmasq.conf "no-resolv";
@@ -61,7 +61,7 @@ dnsmasq_params () {
     done;
     sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf;
     append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq";
-    if { [ "$(nvram get dns_local_cache)" != "1" ] && [ "$DNSCRYPT_LOCAL" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi;
+    if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && [ "$DNSCRYPT_LOCAL" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi;
   fi;
 }
 
