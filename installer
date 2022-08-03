@@ -1404,7 +1404,7 @@ setup_dnscrypt_impl () {
     if [ "$(nvram get dns_local_cache)" != "1" ]; then { if read_yesno "Do you want to run Dnsmasq as a local caching DNS service which includes sending the routers traffic to Dnscrypt-Proxy?"; then check_dns_local 1; else check_dns_local 0; fi; }; else { check_dns_local 0; }; fi
     toml_avar_enable disabled_server_names
     local PHX NXT
-    PHX="$(grep -n "[sources.odoh-servers]" "$TOML_FILE" | cut -f1 -d:)"
+    PHX="$(grep -wn "sources.odoh-servers" "$TOML_FILE" | cut -f1 -d:)"
     NXT="$((PHX+11))"
     sed -i "$PHX,$NXT s/#//g" "$TOML_FILE"
     choose_dnscrypt_server
