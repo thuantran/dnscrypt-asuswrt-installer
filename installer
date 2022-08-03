@@ -1403,15 +1403,10 @@ setup_dnscrypt_impl () {
     if read_yesno "Do you want to redirect all DNS resolutions on your network through to Dnscrypt-Proxy?"; then check_dns_filter 1; else check_dns_filter 0; fi
     if [ "$(nvram get dns_local_cache)" != "1" ]; then { if read_yesno "Do you want to run Dnsmasq as a local caching DNS service which includes sending the routers traffic to Dnscrypt-Proxy?"; then check_dns_local 1; else check_dns_local 0; fi; }; else { check_dns_local 0; }; fi
     toml_avar_enable disabled_server_names
-    local PHX
-    for PHX in servers relays; do 
-      toml_nvars_replace "# [sources.'odoh-${PHX}']" " [sources.'odoh-${PHX}']" "$TOML_FILE"
-      toml_nvars_replace "#   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md']" "   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md']" "$TOML_FILE"
-      toml_nvars_replace "#   cache_file = 'odoh-${PHX}.md'" "   cache_file = 'odoh-${PHX}.md'" "$TOML_FILE"
-      toml_nvars_replace "#   minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "   minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "$TOML_FILE"
-      toml_nvars_replace "#   refresh_delay = 24" "   refresh_delay = 24" "$TOML_FILE"
-      toml_nvars_replace "#   prefix = ''" "   prefix = ''" "$TOML_FILE"
-    done
+    local PHX PHX_NXT
+    PHX="$(grep -n "[sources.odoh-servers]" "$TOML_FILE" | cut -f1 -d:)"
+    PHX_NXT="$((11+PHX))"
+    sed -i "$PHX,$PHX_NXT s/#//g" "$TOML_FILE"
     choose_dnscrypt_server
     PTXT "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
     check_relays
