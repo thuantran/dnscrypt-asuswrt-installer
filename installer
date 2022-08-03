@@ -1403,10 +1403,10 @@ setup_dnscrypt_impl () {
     if read_yesno "Do you want to redirect all DNS resolutions on your network through to Dnscrypt-Proxy?"; then check_dns_filter 1; else check_dns_filter 0; fi
     if [ "$(nvram get dns_local_cache)" != "1" ]; then { if read_yesno "Do you want to run Dnsmasq as a local caching DNS service which includes sending the routers traffic to Dnscrypt-Proxy?"; then check_dns_local 1; else check_dns_local 0; fi; }; else { check_dns_local 0; }; fi
     toml_avar_enable disabled_server_names
-    local PHX PHX_NXT
+    local PHX NXT
     PHX="$(grep -n "[sources.odoh-servers]" "$TOML_FILE" | cut -f1 -d:)"
-    PHX_NXT="$((11+PHX))"
-    sed -i "$PHX,$PHX_NXT s/#//g" "$TOML_FILE"
+    NXT="$((PHX+11))"
+    sed -i "$PHX,$NXT s/#//g" "$TOML_FILE"
     choose_dnscrypt_server
     PTXT "$INFO Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
     check_relays
