@@ -1406,7 +1406,7 @@ setup_dnscrypt_impl () {
     local PHX
     for PHX in servers relays; do 
       toml_nvars_replace "# [sources.'odoh-${PHX}']" " [sources.'odoh-${PHX}']" "$TOML_FILE"
-      toml_nvars_replace "#   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://download.dnscrypt.net/resolvers-list/v3/odoh-${PHX}.md']" "$TOML_FILE"
+      toml_nvars_replace "#   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md']" "   urls = ['https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-${PHX}.md', 'https://download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md', 'https://ipv6.download.dnscrypt.info/resolvers-list/v3/odoh-${PHX}.md']" "$TOML_FILE"
       toml_nvars_replace "#   cache_file = 'odoh-${PHX}.md'" "   cache_file = 'odoh-${PHX}.md'" "$TOML_FILE"
       toml_nvars_replace "#   minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "   minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'" "$TOML_FILE"
       toml_nvars_replace "#   refresh_delay = 24" "   refresh_delay = 24" "$TOML_FILE"
@@ -1421,7 +1421,7 @@ setup_dnscrypt_impl () {
     read_input_dns "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP2]" "$TOML_FILE"
-    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP2]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP2]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true http3 false tls_cipher_suite "[52393, 52392, 49199, 49195, 4867, 4865]"
     case "$ROUTER_MODEL" in
       RT-AX56U|RT-AX58U|RT-AX3000)
         toml_avar_disable user_name
