@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.6                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.7                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -27,7 +27,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.4.6"
+DI_VERSION="v2.4.7"
 export DI_VERSION
 
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -170,8 +170,8 @@ check_dnscrypt_toml () {
 }
 
 check_dns_environment () {
-  if [ -f "/opt/etc/init.d/S61stubby" ] || [ -f "/opt/sbin/stubby" ] || [ -f "/opt/bin/install_stubby" ] || [ -f "/jffs/scripts/install_stubby.sh" ]; then
-    PTXT "$ERROR Potential stubby installation detected." \
+  if [ -f "/opt/etc/init.d/S61stubby" ] || [ -f "/opt/sbin/stubby" ] || [ -f "/opt/bin/install_stubby" ] || [ -f "/jffs/scripts/install_stubby.sh" ] || [ -d "/jffs/addons/AdGuardHome.d" ]; then
+    PTXT "$ERROR Potential stubby or adguardhome installation detected." \
          "$ERROR Please remove before attempting to continue." \
          "$ERROR Exiting..."
     exit 1
