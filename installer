@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.8                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.4.9                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -27,7 +27,7 @@
 # shellcheck disable=SC3057
 # shellcheck disable=SC3060
 
-DI_VERSION="v2.4.8"
+DI_VERSION="v2.4.9"
 export DI_VERSION
 
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1416,7 +1416,8 @@ setup_dnscrypt_impl () {
     read_input_dns "2nd Default is" 8.8.8.8
     read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
     toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP2]" "$TOML_FILE"
-    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP2]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true http3 false tls_cipher_suite "\"[52393, 52392, 49199, 49195, 4867, 4865]\""
+    if read_yesno "Do you want to use TLSv1.3 (http3)?"; then toml_avar_disable tls_cipher_suite; toml_avars_prep http3 true; else toml_avar_enable tls_cipher_suite; toml_avars_prep http3 false tls_cipher_suite "\"[52393, 52392, 49199, 49195, 4867, 4865]\""; fi
+    toml_avars_prep bootstrap_resolvers "\"[$BOOTSTRAP2]\"" log_level "$CHOSEN" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'$PROBE\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
     case "$ROUTER_MODEL" in
       RT-AX56U|RT-AX58U|RT-AX3000)
         toml_avar_disable user_name
