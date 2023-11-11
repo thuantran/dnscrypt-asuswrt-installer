@@ -1055,7 +1055,7 @@ inst_dnscrypt() {
 			return
 		fi
 		download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
-		if [  "${1:-RESTORE}" != "RESTORE" ]; then
+		if [ "${1:-RESTORE}" != "RESTORE" ]; then
 			if [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
 				local LVERSION
 				LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
@@ -1872,7 +1872,7 @@ case "$2" in
 	;;
 "BACKUP" | "RESTORE")
 	if { [ ! -d "$TARG_DIR" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && [ "$2" = "BACKUP" ]; }; then exit 1; fi
-	if { [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && [ "$2" = "RESTORE" ]; }; then exit 1; fi 
+	if { [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && [ "$2" = "RESTORE" ]; }; then exit 1; fi
 	backup_restore "$2"
 	;;
 *)
