@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.1                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.2                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,7 +30,7 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:$PATH"
 
-DI_VERSION="v2.5.1"
+DI_VERSION="v2.5.2"
 export DI_VERSION
 
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -110,52 +110,7 @@ backup_restore() {
 		tar -xzvf "${BASE_DIR}/backup_dnscrypt.tar.gz" -C "$BASE_DIR" >/dev/null 2>&1
 		chown "$(nvram get http_username)":root ${TARG_DIR}/*
 		chmod 755 "${TARG_DIR}/dnscrypt-proxy"
-		chmod 644 "${TARG_DIR}/public-resolvers.md" \
-			"${TARG_DIR}/public-resolvers.md.minisig" \
-			"${TARG_DIR}/relays.md" \
-			"${TARG_DIR}/relays.md.minisig" \
-			"${TARG_DIR}/odoh-servers.md" \
-			"${TARG_DIR}/odoh-servers.md.minisig" \
-			"${TARG_DIR}/odoh-relays.md" \
-			"${TARG_DIR}/odoh-relays.md.minisig" \
-			"${TARG_DIR}/dnscrypt-resolvers.csv" \
-			"${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
-		chown nobody:nobody "${TARG_DIR}/public-resolvers.md" \
-			"${TARG_DIR}/public-resolvers.md.minisig" \
-			"${TARG_DIR}/relays.md" \
-			"${TARG_DIR}/relays.md.minisig" \
-			"${TARG_DIR}/odoh-servers.md" \
-			"${TARG_DIR}/odoh-servers.md.minisig" \
-			"${TARG_DIR}/odoh-relays.md" \
-			"${TARG_DIR}/odoh-relays.md.minisig" \
-			"${TARG_DIR}/dnscrypt-resolvers.csv" \
-			"${TARG_DIR}/dnscrypt-resolvers.csv.minisig"
-		for i in init-start services-stop; do if { ! grep -q "${TARG_DIR}/manager $i &" "/jffs/scripts/${i}" && grep -q "${TARG_DIR}/manager $i" "/jffs/scripts/${i}"; }; then del_jffs_script "/jffs/scripts/${i}"; fi; done
-		write_manager_script /jffs/scripts/init-start "init-start &"
-		write_manager_script /jffs/scripts/services-stop "services-stop &"
-		write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
-		del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
-		write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
-		if ! setup_dnscrypt "" "$1"; then
-			end_op_message 1
-			return
-		fi
-
-		PTXT "$INFO Starting dnscrypt-proxy..."
-		service start_dnscrypt-proxy >/dev/null 2>&1
-		sleep 1
-		if [ -z "$(pidof dnscrypt-proxy)" ]; then
-			PTXT "$ERROR Couldn't start dnscrypt-proxy" \
-				"$ERROR Please send WebUI System Log to dev"
-			end_op_message 1
-			return
-		fi
-		service restart_dnscrypt-proxy >/dev/null 2>&1
-		PTXT "$INFO Backup restored!" \
-			"$INFO  - Add swap" \
-			"$INFO  - Add a RNG" \
-			"$INFO  - Set your timezone"
-		end_op_message 0
+		inst_dnscrypt "${1:-RESTORE}"
 	elif [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && [ "$1" = "RESTORE" ]; then
 		PTXT "$ERROR No Backup found!" \
 			"$ERROR Please make sure Backup Resides in $BASE_DIR"
@@ -1060,19 +1015,21 @@ inst_dnscrypt() {
 	DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
 	RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3/"
 	CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1/"
-	if [ "${1:-install}" = "install" ]; then
-		if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
-			PTXT "$INFO Backup is detected."
-			local USE_OLD
-			if read_yesno "Do you want Restore instead?"; then USE_OLD="YES"; else USE_OLD="NO"; fi
-			if [ "$USE_OLD" = "YES" ]; then
-				PTXT "$INFO Installing from an old backup!"
-				backup_restore RESTORE
-			elif [ "$USE_OLD" = "NO" ]; then
-				PTXT "$INFO Continuing without restoring from backup!"
+	if [ -z "$2" ]; then
+		if [ "${1:-RESTORE}" != "RESTORE" ]; then
+			if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
+				PTXT "$INFO Backup is detected."
+				local USE_OLD
+				if read_yesno "Do you want Restore instead?"; then USE_OLD="YES"; else USE_OLD="NO"; fi
+				if [ "$USE_OLD" = "YES" ]; then
+					PTXT "$INFO Installing from an old backup!"
+					backup_restore RESTORE
+				elif [ "$USE_OLD" = "NO" ]; then
+					PTXT "$INFO Continuing without restoring from backup!"
+				fi
+			elif [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
+				if read_yesno "Do you want create a backup before updating?"; then backup_restore BACKUP 0; else PTXT "$INFO continuing without making a backup."; fi
 			fi
-		elif [ -d "$TARG_DIR" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
-			if read_yesno "Do you want create a backup before updating?"; then backup_restore BACKUP 0; else PTXT "$INFO continuing without making a backup."; fi
 		fi
 		local NW_STATE RES_STATE
 		NW_STATE="$(
@@ -1097,36 +1054,26 @@ inst_dnscrypt() {
 			end_op_message 1
 			return
 		fi
-		if [ "$AUTO_UPDATE" = "update" ]; then exec "${TARG_DIR}/installer" "$BRANCH" "$AUTO_UPDATE" && exit; fi
-	fi
-	download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
-	if [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
-		local LVERSION
-		LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
-		[ -z "$LVERSION" ] && exit 1
-		[ -z "$DNSCRYPT_VER" ] && exit 1
-		if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
-			PTXT "$INFO New DNSCRYPT_VER=${DNSCRYPT_VER} Available!" \
-				"$INFO Updating DNSCRYPT_VER=${LVERSION} to $DNSCRYPT_VER ."
-			if ! download_file "$TARG_DIR" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}"; then
-				PTXT "$ERROR Unable to download dnscrypt-proxy package for your router"
-				end_op_message 1
-				return
+		download_file "$TARG_DIR" 755 "${URL_GEN}/manager"
+		if [  "${1:-RESTORE}" != "RESTORE" ]; then
+			if [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
+				local LVERSION
+				LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
+				[ -z "$LVERSION" ] && exit 1
+				[ -z "$DNSCRYPT_VER" ] && exit 1
+				if [ "$DNSCRYPT_VER" != "$LVERSION" ]; then
+					PTXT "$INFO New DNSCRYPT_VER=${DNSCRYPT_VER} Available!" \
+						"$INFO Updating DNSCRYPT_VER=${LVERSION} to $DNSCRYPT_VER."
+					inst_dnscrypt "${1:-update}" "$DNSCRYPT_VER"
+				else
+					PTXT "$INFO DNSCRYPT_VER=${LVERSION}"
+				fi
+			else
+				inst_dnscrypt "${1:-install}" "$DNSCRYPT_VER"
 			fi
-			tar xzv -C "$TARG_DIR" -f "${TARG_DIR}/${DNSCRYPT_TAR}"
-			chown "$(nvram get http_username)":root ${TARG_DIR}/"${DNSCRYPT_ARCH_TAR}"/*
-			mv ${TARG_DIR}/"${DNSCRYPT_ARCH_TAR}"/* "$TARG_DIR"
-			rm -r "${TARG_DIR:?}/${DNSCRYPT_ARCH_TAR}" "${TARG_DIR:?}/${DNSCRYPT_TAR}"
-			if ! chmod 755 "${TARG_DIR}/dnscrypt-proxy" && [ -z "$("${TARG_DIR}/dnscrypt-proxy" -version)" ]; then
-				PTXT "$ERROR Failed to download dnscrypt-proxy package for your router"
-				end_op_message 1
-				return
-			fi
-		else
-			PTXT "$INFO DNSCRYPT_VER=${LVERSION}"
 		fi
 	else
-		if ! download_file "$TARG_DIR" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_TAR}"; then
+		if ! download_file "$TARG_DIR" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${2}/${DNSCRYPT_TAR}"; then
 			PTXT "$ERROR Unable to download dnscrypt-proxy package for your router"
 			end_op_message 1
 			return
@@ -1921,7 +1868,7 @@ case "$2" in
 	;;
 "set" | "unset")
 	if [ ! -d "$TARG_DIR" ]; then exit 1; fi
-	${2}_timezone
+	"${2}"_timezone
 	;;
 "BACKUP" | "RESTORE")
 	if { [ ! -d "$TARG_DIR" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && [ "$2" = "BACKUP" ]; }; then exit 1; fi
@@ -1961,7 +1908,7 @@ menu() {
 		PTXT "$INFO This operation will install dnscrypt-proxy and related files (<6MB)" \
 			"$INFO to jffs, no other data will be changed." \
 			"$INFO Also some start scripts will be installed/modified as required."
-		if read_yesno "Do you want to install dnscrypt-proxy to /jffs?"; then inst_dnscrypt; else end_op_message 1; fi
+		if read_yesno "Do you want to install dnscrypt-proxy to /jffs?"; then inst_dnscrypt "${AUTO_UPDATE:-install}"; else end_op_message 1; fi
 		;;
 	2)
 		PTXT "$INFO This operation will uninstall dnscrypt-proxy and related files" \
