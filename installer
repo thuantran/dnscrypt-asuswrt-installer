@@ -1868,7 +1868,7 @@ case "$2" in
 	;;
 "set" | "unset")
 	if [ ! -d "$TARG_DIR" ]; then exit 1; fi
-	${2}_timezone
+	"${2}"_timezone
 	;;
 "BACKUP" | "RESTORE")
 	if { [ ! -d "$TARG_DIR" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ] && [ "$2" = "BACKUP" ]; }; then exit 1; fi
