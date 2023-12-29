@@ -445,7 +445,7 @@ check_relays() {
 				;;
 			"${ODOH}")
 				PTXT "${INFO} Found ${SERVER}, Oblivious DNS-over-HTTPS relays are required for Oblivious DNS-over-HTTPS servers." \
-					"${INFO} You may manually choose relays for $SERVER server or you may specify wildcard relay (via=['*'])."
+					"${INFO} You may manually choose relays for ${SERVER} server or you may specify wildcard relay (via=['*'])."
 				if [ "${COUNT}" -eq 0 ]; then
 					if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
 					if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
