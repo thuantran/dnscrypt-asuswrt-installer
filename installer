@@ -35,7 +35,7 @@ export DI_VERSION
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 varcnt=0
 until [ -n "${DNSCRYPT_VER}" ]; do
-	[ -z "${DNSCRYPT_VER}" ] && DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "$LATEST_URL" | grep "tag_name" | head -1 | cut -d \" -f 4 &)" || true
+	[ -z "${DNSCRYPT_VER}" ] && DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" | grep "tag_name" | head -1 | cut -d \" -f 4 &)" || true
 	varcnt="$((varcnt + 1))"
 	if [ "${varcnt}" -le 84 ]; then
 		wait
@@ -124,7 +124,7 @@ backup_restore() {
 		inst_dnscrypt "${1:-RESTORE}"
 	elif [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ] && [ "$1" = "RESTORE" ]; then
 		PTXT "${ERROR} No Backup found!" \
-			"{$ERROR} Please make sure Backup Resides in $BASE_DIR"
+			"${ERROR} Please make sure Backup Resides in $BASE_DIR"
 		end_op_message 1
 		return
 	fi
