@@ -715,7 +715,7 @@ choose_dnscrypt_server_manual() {
 		[ "${USE_IPV6}" = "true" ] && USE_IPV6="NOMATCH" || USE_IPV6="6"
 		local RESOLVERS
 		toml_avars_prep dnscrypt_servers true doh_servers true require_dnssec false require_nolog false require_nofilter false
-		PTXT "$INFO Available DNS servers: "
+		PTXT "${INFO} Available DNS servers: "
 		INDEX="$(awk -v PATT="${USE_IPV6}" '/^## / && ($0 !~ PATT)' "${TARG_DIR}/public-resolvers.md" | wc -l)"
 		awk -v PATT="${USE_IPV6}" '/^## / && ($0 !~ PATT) {printf "  "; printf ++i") "$2": "; getline; getline; print}' "${TARG_DIR}/public-resolvers.md"
 		read_input_num "Please choose DNS server." 1 "${INDEX}"
