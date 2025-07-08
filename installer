@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.3                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.4                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,17 +30,16 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.5.3"
+DI_VERSION="v2.5.4"
 export DI_VERSION
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 varcnt=0
+readonly MAX_RETRIES="2"
 until [ -n "${DNSCRYPT_VER}" ]; do
-	[ -z "${DNSCRYPT_VER}" ] && DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" | grep "tag_name" | head -1 | cut -d \" -f 4 &)" || true
+	if [ -z "${DNSCRYPT_VER}" ]; then DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" | awk -F'"' '/tag_name/ { print $4; exit }')"; fi
 	varcnt="$((varcnt + 1))"
-	if [ "${varcnt}" -le 84 ]; then
-		wait
-	else
-		printf "%s/n" "One or more critical variables could not be set in a timely mannor." "Please check your internet connection, or try again later." "The installer script will now exit."
+	if [ "${varcnt}" -ge "${MAX_RETRIES}" ]; then
+		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit, or your internet maybe down." "Please check your internet connection, or try again in an hour." "The installer script will now exit."
 		sleep 3s
 		exit 1
 	fi
@@ -512,15 +511,13 @@ check_version() {
 		if [ -n "$1" ] || { check_connection; }; then
 			local varcnt=0
 			until [ -n "${LINSTALL}" ] && [ -n "${RMNSTALL}" ] && [ -n "${MD5SUM_L}" ] && [ -n "${MD5SUM_R}" ]; do
-				[ -z "${LINSTALL}" ] && LINSTALL="$(awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})' &)" || true
-				[ -z "${RMNSTALL}" ] && RMNSTALL="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${RURL}/installer" | grep -m1 "^DI_VERSION=" | grep -oE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})' &)" || true
-				[ -z "${MD5SUM_L}" ] && MD5SUM_L="$(md5sum "${TARG_DIR}/installer" | cut -d' ' -f1 &)" || true
-				[ -z "${MD5SUM_R}" ] && MD5SUM_R="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -fsL "${RURL}/installer" | md5sum | awk '{print $1}' &)" || true
+				if [ -z "${LINSTALL}" ]; then LINSTALL="$(awk -F= '/^DI_VERSION=/ { gsub(/"/, "", $2); sub(/^v/, "", $2); if ($2 ~ /^[0-9]{1,2}(\.[0-9]{1,2}){2}$/) print $2; exit }' "${TARG_DIR}/installer")"; fi
+				if [ -z "${RMNSTALL}" ]; then RMNSTALL="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${RURL}/installer" | awk -F= '/^DI_VERSION=/ { gsub(/"/, "", $2); sub(/^v/, "", $2); if ($2 ~ /^[0-9]{1,2}(\.[0-9]{1,2}){2}$/) print $2; exit }')"; fi
+				if [ -z "${MD5SUM_L}" ]; then MD5SUM_L="$(md5sum "${TARG_DIR}/installer" | awk '{print $1; exit}')"; fi
+				if [ -z "${MD5SUM_R}" ]; then MD5SUM_R="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -fsL "${RURL}/installer" | md5sum | awk '{print $1; exit}')"; fi 
 				varcnt="$((varcnt + 1))"
-				if [ "${varcnt}" -le 84 ]; then
-					wait
-				else
-					printf "%s/n" "One or more critical variables could not be set in a timely mannor." "Please check your internet connection, or try again later." "The installer script will now exit."
+				if [ "${varcnt}" -ge 2 ]; then
+					printf "%s\n" "One or more critical variables could not be set in a timely mannor." "Please check your internet connection, or try again later." "The installer script will now exit."
 					sleep 3s
 					exit 1
 				fi
@@ -556,13 +553,11 @@ check_version() {
 					varcnt=0
 					MURL="${URL_GEN}/manager"
 					until [ -n "${MD5SUM_LM}" ] && [ -n "${MD5SUM_M}" ]; do
-						[ -z "${MD5SUM_LM}" ] && MD5SUM_LM="$(md5sum "${TARG_DIR}/manager" | cut -d' ' -f1 &)" || true
-						[ -z "${MD5SUM_M}" ] && MD5SUM_M="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -fsL "${MURL}" | md5sum | awk '{print $1}' &)" || true
+						if [ -z "${MD5SUM_LM}" ]; then MD5SUM_LM="$(md5sum "${TARG_DIR}/manager" | awk '{print $1; exit}')"; fi
+						if [ -z "${MD5SUM_M}" ]; then MD5SUM_M="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -fsL "${MURL}" | md5sum | awk '{print $1; exit}')"; fi
 						varcnt="$((varcnt + 1))"
-						if [ "${varcnt}" -le 84 ]; then
-							wait
-						else
-							printf "%s/n" "One or more critical variables could not be set in a timely mannor." "Please check your internet connection, or try again later." "The installer script will now exit."
+						if [ "${varcnt}" -ge 2 ]; then
+							printf "%s\n" "One or more critical variables could not be set in a timely mannor." "Please check your internet connection, or try again later." "The installer script will now exit."
 							sleep 3s
 							exit 1
 						fi
@@ -990,9 +985,9 @@ download_file() {
 		local varcnt="0"
 		until [ -n "${MD5SUM_CURR}" ]; do
 			if [ -f "${TARG}/${FILENAME}" ]; then
-				[ -z "${MD5SUM_OLD}" ] && MD5SUM_OLD="$(md5sum "${TARG}/${FILENAME}" | cut -d' ' -f1 &)" || true
+				if [ -z "${MD5SUM_OLD}" ]; then MD5SUM_OLD="$(md5sum "${TARG}/${FILENAME}" | awk '{print $1; exit}')"; fi
 			fi
-			[ -z "${MD5SUM_CURR}" ] && MD5SUM_CURR="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -fsL "${URL}" | md5sum | awk '{print $1}' &)" || true
+			if [ -z "${MD5SUM_CURR}" ]; then MD5SUM_CURR="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -fsL "${URL}" | md5sum | awk '{print $1; exit}')"; fi
 			varcnt="$((varcnt + 1))"
 			if [ "${varcnt}" -eq 1 ]; then
 				wait
