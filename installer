@@ -36,7 +36,7 @@ readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releas
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
-	if [ -z "${DNSCRYPT_VER}" ]; then DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL --compressed "${LATEST_URL}?per_page=1" | awk -F'"' '/tag_name/ { print $4; exit }')"; fi
+	if [ -z "${DNSCRYPT_VER}" ]; then DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}?per_page=1" | awk -F'"' '/tag_name/ { print $4; exit }')"; fi
 	varcnt="$((varcnt + 1))"
 	if [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
 		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit, or your internet maybe down." "Please check your internet connection, or try again in an hour." "The installer script will now exit."
