@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.5                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.6                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,13 +30,15 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.5.5"
+DI_VERSION="v2.5.6"
 export DI_VERSION
+readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
-	if [ -z "${DNSCRYPT_VER}" ]; then DNSCRYPT_VER="$(curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}?per_page=1" | awk -F'"' '/tag_name/ { print $4; exit }')"; fi
+	curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}?per_page=1" -o "${API_FILE}"
+	if [ -z "${DNSCRYPT_VER}" ]; then DNSCRYPT_VER="$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"; fi
 	varcnt="$((varcnt + 1))"
 	if [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
 		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit, or your internet maybe down." "Please check your internet connection, or try again in an hour." "The installer script will now exit."
@@ -44,6 +46,7 @@ until [ -n "${DNSCRYPT_VER}" ]; do
 		exit 1
 	fi
 done
+rm -rf "$API_FILE" 
 wait
 unset varcnt
 readonly DNSCRYPT_VER
@@ -1056,10 +1059,17 @@ end_op_header() {
 }
 
 inst_dnscrypt() {
-	local DNSCRYPT_TAR RESOLVERS_URL_PREFIX CRYPT_RESOLVERS
+	local DNSCRYPT_TAR RESOLVERS_URL_PREFIX CRYPT_RESOLVERS FULL_RESOLVERS
 	DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
-	RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/v3"
-	CRYPT_RESOLVERS="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v1"
+	if ping -q -w3 -c1 "download.dnscrypt.info" >/dev/null 2>&1; then
+		RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/"
+	else
+		RESOLVERS_URL_PREFIX="https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/"
+	fi
+	FULL_RESOLVERS="v3"
+	CRYPT_RESOLVERS="v1"
+	CRYPT_RESOLVERS="${RESOLVERS_URL_PREFIX}${CRYPT_RESOLVERS}"
+	RESOLVERS_URL_PREFIX="${RESOLVERS_URL_PREFIX}${FULL_RESOLVERS}"
 	if [ -z "$2" ]; then
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
 			if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
