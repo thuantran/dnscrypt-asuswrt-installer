@@ -95,7 +95,7 @@ dnsmasq_params() {
 			sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
 			append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
 			if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
-		elif [ -n "$1" ] && nvram get webs_state_info | grep -q "3006" && [ "$(ls /etc/dnsmasq-*.conf 2>/dev/null | wc -l)" != "0" ]; then
+		elif [ -n "$1" ] && nvram get rc_support | grep -q 'mtlancfg' && [ "$(ls /etc/dnsmasq-*.conf 2>/dev/null | wc -l)" != "0" ]; then
 			SDN="$1"
 			append_on_demand "/etc/dnsmasq-${SDN}.conf" "no-resolv"
 			sed -i "/^servers-file=.*$/d" "/etc/dnsmasq-${SDN}.conf"
