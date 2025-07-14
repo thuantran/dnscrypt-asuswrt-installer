@@ -1166,7 +1166,7 @@ inst_dnscrypt() {
 	write_manager_script /jffs/scripts/init-start "init-start &"
 	write_manager_script /jffs/scripts/services-stop "services-stop &"
 	write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
-	if nvram get webs_state_info | grep -q "3006"; then write_manager_script /jffs/scripts/dnsmasq-sdn.postconf 'dnsmasq-sdn $2'; fi
+	if nvram get rc_support | grep -q 'mtlancfg'; then write_manager_script /jffs/scripts/dnsmasq-sdn.postconf 'dnsmasq-sdn $2'; fi
 	del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	if ! setup_dnscrypt "" "${1:-install}"; then
@@ -1729,7 +1729,7 @@ uninst_all() {
 	mv "${TARG_DIR}/installer" "${HOME}/installer"
 	rm -rf "${TARG_DIR}"
 	del_jffs_script /jffs/scripts/dnsmasq.postconf
-	if nvram get webs_state_info | grep -q "3006"; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
+	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
 	del_jffs_script /jffs/scripts/init-start
 	del_jffs_script /jffs/scripts/services-stop
 	{ kill -s 9 "$(pidof haveged rngd stty dnscrypt-proxy)" 2>/dev/null || killall -q -9 haveged rngd stty dnscrypt-proxy 2>/dev/null; }
@@ -1753,7 +1753,7 @@ uninst_dnscrypt() {
 	PTXT "${INFO} Uninstalling dnscrypt-proxy..."
 	rm -f "${TARG_DIR}/dnscrypt-proxy" "${TARG_DIR}/nonroot"
 	del_jffs_script /jffs/scripts/dnsmasq.postconf
-	if nvram get webs_state_info | grep -q "3006"; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
+	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
 	{ kill -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }
 	service restart_dnsmasq >/dev/null 2>&1
 	PTXT "${INFO} Some configuration files are not removed in case you want to reinstall"
