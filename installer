@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.6                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.7                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,23 +30,31 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.5.6"
+DI_VERSION="v2.5.7"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+if openssl version | grep -q "1.1.1"; then
+	API_AUTH="$(printf "%s\n" "U2FsdGVkX180OojciT3jpna9rvuWTN53DO+tY12B58x6rQojAyi/iaNNI0VoU+wp" | openssl enc -aes-256-cbc -d -base64 -pass pass:dnscrypt -pbkdf2)"
+	API_SECRET="$(printf "%s\n" "U2FsdGVkX1+qpRJubYofTMJlfRGUlysrDHZ/64wvj1idmhGz+WklLfjkpArv+O0xNsVGffL6TV/BCWIztdhYMEzjycBFD146Ftz2ju9miXHUWy0HX++gJMO3bio1ueTmf5LE51KWxpkZkWVbZvPpOg==" | openssl enc -aes-256-cbc -d -base64 -pass pass:dnscrypt -pbkdf2)"
+	API_HEADER="-H "\""${API_AUTH} ${API_SECRET}"\"""
+fi
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
-	curl --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}?per_page=1" -o "${API_FILE}"
-	if [ -z "${DNSCRYPT_VER}" ]; then DNSCRYPT_VER="$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"; fi
-	varcnt="$((varcnt + 1))"
-	if [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
-		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit, or your internet maybe down." "Please check your internet connection, or try again in an hour." "The installer script will now exit."
+	if [ "${varcnt}" -lt "${MAX_RETRIES}" ] || { [ "${varcnt}" -eq "${MAX_RETRIES}" ] && [ -z "${API_HEADER}" ]; }; then
+		curl -D /tmp/$$_headers.out --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" -o "${API_FILE}"
+	elif { [ "${varcnt}" -eq "${MAX_RETRIES}" ] && [ -n "${API_HEADER}" ]; }; then
+		curl -D /tmp/$$_headers.out --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" -o "${API_FILE}" "${API_HEADER}"
+	elif [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
+		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit (60req./hr), and our token work around did not work (5000req./hr)." "For more information, please read /tmp/$$_headers.out." "Please be sure to check your internet connection, and please try again later." "The installer script will now exit."
 		sleep 3s
 		exit 1
 	fi
+	if [ -z "${DNSCRYPT_VER}" ] && [ -f "${API_FILE}" ]; then DNSCRYPT_VER="$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"; fi
+	varcnt="$((varcnt + 1))"
 done
-rm -rf "$API_FILE" 
+rm -rf "$API_FILE" "/tmp/$$_headers.out"
 wait
 unset varcnt
 readonly DNSCRYPT_VER
@@ -1158,6 +1166,7 @@ inst_dnscrypt() {
 	write_manager_script /jffs/scripts/init-start "init-start &"
 	write_manager_script /jffs/scripts/services-stop "services-stop &"
 	write_manager_script /jffs/scripts/dnsmasq.postconf dnsmasq
+	if nvram get rc_support | grep -q 'mtlancfg'; then write_manager_script /jffs/scripts/dnsmasq-sdn.postconf 'dnsmasq-sdn $2'; fi
 	del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	if ! setup_dnscrypt "" "${1:-install}"; then
@@ -1720,6 +1729,7 @@ uninst_all() {
 	mv "${TARG_DIR}/installer" "${HOME}/installer"
 	rm -rf "${TARG_DIR}"
 	del_jffs_script /jffs/scripts/dnsmasq.postconf
+	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
 	del_jffs_script /jffs/scripts/init-start
 	del_jffs_script /jffs/scripts/services-stop
 	{ kill -s 9 "$(pidof haveged rngd stty dnscrypt-proxy)" 2>/dev/null || killall -q -9 haveged rngd stty dnscrypt-proxy 2>/dev/null; }
@@ -1743,6 +1753,7 @@ uninst_dnscrypt() {
 	PTXT "${INFO} Uninstalling dnscrypt-proxy..."
 	rm -f "${TARG_DIR}/dnscrypt-proxy" "${TARG_DIR}/nonroot"
 	del_jffs_script /jffs/scripts/dnsmasq.postconf
+	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
 	{ kill -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }
 	service restart_dnsmasq >/dev/null 2>&1
 	PTXT "${INFO} Some configuration files are not removed in case you want to reinstall"

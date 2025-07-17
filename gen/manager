@@ -78,22 +78,34 @@ dnscrypt_proxy_run() {
 }
 
 dnsmasq_params() {
-	local DNS VAR
-	if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && df -h | grep -qoE '/tmp/resolv.conf'; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
+	local DNS VAR CONFIG LAN_IF_SDN
+	if { ! readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf' && df -h | grep -qoE '/tmp/resolv.conf'; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
 	if [ -n "$(pidof dnscrypt-proxy)" ]; then
-		cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
-		append_on_demand /etc/dnsmasq.conf "no-resolv"
-		append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
-		for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
-			sed -i "/^server=${DNS}.*$/d" /jffs/dnscrypt/resolv.dnsmasq
-		done
-		for VAR in 1 2 3; do
-			DNS="$(nvram get "ipv6_dns${VAR}")"
-			[ -n "${DNS}" ] && sed -i "/^server=${DNS}.*$/d" /jffs/dnscrypt/resolv.dnsmasq
-		done
-		sed -i "/^servers-file=.*$/d" /etc/dnsmasq.conf
-		append_on_demand /etc/dnsmasq.conf "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
-		if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
+		if [ -z "$1" ]; then
+			CONFIG="/etc/dnsmasq.conf"
+			cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
+			append_on_demand "${CONFIG}" "no-resolv"
+			append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
+			for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
+				sed -i "/^server=${DNS}.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+			done
+			for VAR in 1 2 3; do
+				DNS="$(nvram get "ipv6_dns${VAR}")"
+				[ -n "${DNS}" ] && sed -i "/^server=${DNS}.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+			done
+			sed -i "/^servers-file=.*$/d" "${CONFIG}"
+			append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+			if { ! readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
+		elif [ -n "$1" ] && nvram get rc_support | grep -q 'mtlancfg'; then
+			CONFIG="/etc/dnsmasq-${1}.conf"
+			LAN_IF_SDN="$(nvram get lan"${1}"_ifname)"
+			[ -z "${LAN_IF_SDN}" ] && LAN_IF_SDN="$(nvram get br"${1}"_ifname)"
+			if [ -n "${LAN_IF_SDN}" ]; then
+				append_on_demand "${CONFIG}" "no-resolv"
+				sed -i "/^servers-file=.*$/d" "${CONFIG}"
+				append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+			fi
+		fi
 	fi
 }
 
@@ -205,7 +217,7 @@ start_dnscrypt_proxy() {
 	DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy ${LOG_FACILITY} -config /jffs/dnscrypt/dnscrypt-proxy.toml"
 	logger -st "${NAME}" "Starting dnscrypt-proxy from ${NAME}."
 	{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
-	if ! grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi
+	if ! grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
 	if [ -n "$(pidof dnscrypt-proxy)" ] && { service_wait netcheck 300; }; then return "0"; else return "1"; fi
 }
 
@@ -285,7 +297,7 @@ stop_dnscrypt_proxy() {
 	{ cd /jffs/dnscrypt; } || exit
 	logger -st "${NAME}" "Stopping dnscrypt-proxy from ${NAME}."
 	{ killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }
-	if grep -qF "servers-file=/jffs/dnscrypt/resolv.dnsmasq" "/etc/dnsmasq.conf"; then { service restart_dnsmasq >/dev/null 2>&1; }; fi
+	if grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
 	if [ -z "$(pidof dnscrypt-proxy)" ] && { service_wait netcheck 300; }; then return 0; else return 1; fi
 }
 
@@ -338,8 +350,8 @@ if { [ "$2" != "x" ] && printf "%s" "$1" | /bin/grep -qE "^(((dnscrypt-)?(start|
 
 unset TZ
 case "$1" in
-"dnsmasq")
-	dnsmasq_params
+"dnsmasq" | "dnsmasq-sdn")
+	if [ -n "${2}" ]; then { dnsmasq_params "${2}"; }; else { dnsmasq_params; }; fi
 	;;
 "start" | "restart" | "dnscrypt-start")
 	{ "$0" init-start >/dev/null 2>&1; }
