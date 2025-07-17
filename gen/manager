@@ -79,7 +79,7 @@ dnscrypt_proxy_run() {
 
 dnsmasq_params() {
 	local DNS VAR CONFIG LAN_IF_SDN
-	if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && df -h | grep -qoE '/tmp/resolv.conf'; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
+	if { ! readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf' && df -h | grep -qoE '/tmp/resolv.conf'; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
 	if [ -n "$(pidof dnscrypt-proxy)" ]; then
 		if [ -z "$1" ]; then
 			CONFIG="/etc/dnsmasq.conf"
@@ -95,7 +95,7 @@ dnsmasq_params() {
 			done
 			sed -i "/^servers-file=.*$/d" "${CONFIG}"
 			append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
-			if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
+			if { ! readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
 		elif [ -n "$1" ] && nvram get rc_support | grep -q 'mtlancfg'; then
 			CONFIG="/etc/dnsmasq-${1}.conf"
 			LAN_IF_SDN="$(nvram get lan"${1}"_ifname)"
