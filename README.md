@@ -4,6 +4,7 @@ To resolve all problems associated with installing Dnscrypt-Proxy with Entware (
 # Requirements:
 - ARM based ASUS routers that use Asuswrt-Merlin Firmware
 - JFFS support and enabled
+- Service commands require Firmware version 384.11, or higher
 # Incompatibilities:
 - No known issue
 # Current features:
