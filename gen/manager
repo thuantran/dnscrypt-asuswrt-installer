@@ -97,7 +97,7 @@ dnsmasq_params() {
 			if { ! readlink -f /etc/resolv.conf | grep -qE ^'/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
 		elif [ -n "$1" ] && nvram get rc_support | grep -q 'mtlancfg'; then
 			CONFIG="/etc/dnsmasq-${1}.conf"
-   			LAN_IF_SDN="$(nvram get lan"${1}"_ifname)"
+			LAN_IF_SDN="$(nvram get lan"${1}"_ifname)"
 			[ -z "${LAN_IF_SDN}" ] && LAN_IF_SDN="$(nvram get br"${1}"_ifname)"
 			if [ -n "${LAN_IF_SDN}" ]; then
 				append_on_demand "${CONFIG}" "no-resolv"
