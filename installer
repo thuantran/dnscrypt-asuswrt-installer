@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.7                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.8                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,28 +30,23 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.5.7"
+DI_VERSION="v2.5.8"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
-if openssl version | grep -q "1.1.1"; then
-	API_AUTH="$(printf "%s\n" "U2FsdGVkX180OojciT3jpna9rvuWTN53DO+tY12B58x6rQojAyi/iaNNI0VoU+wp" | openssl enc -aes-256-cbc -d -base64 -pass pass:dnscrypt -pbkdf2)"
-	API_SECRET="$(printf "%s\n" "U2FsdGVkX1+qpRJubYofTMJlfRGUlysrDHZ/64wvj1idmhGz+WklLfjkpArv+O0xNsVGffL6TV/BCWIztdhYMEzjycBFD146Ftz2ju9miXHUWy0HX++gJMO3bio1ueTmf5LE51KWxpkZkWVbZvPpOg==" | openssl enc -aes-256-cbc -d -base64 -pass pass:dnscrypt -pbkdf2)"
-	API_HEADER="-H "\""${API_AUTH} ${API_SECRET}"\"""
-fi
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
-	if [ "${varcnt}" -lt "${MAX_RETRIES}" ] || { [ "${varcnt}" -eq "${MAX_RETRIES}" ] && [ -z "${API_HEADER}" ]; }; then
-		curl -D /tmp/$$_headers.out --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" -o "${API_FILE}"
-	elif { [ "${varcnt}" -eq "${MAX_RETRIES}" ] && [ -n "${API_HEADER}" ]; }; then
-		curl -D /tmp/$$_headers.out --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" -o "${API_FILE}" "${API_HEADER}"
-	elif [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
-		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit (60req./hr), and our token work around did not work (5000req./hr)." "For more information, please read /tmp/$$_headers.out." "Please be sure to check your internet connection, and please try again later." "The installer script will now exit."
+	curl -D /tmp/$$_headers.out --retry 3 --connect-timeout 3 --retry-delay 1 --max-time $((3 * 5)) --retry-connrefused -sL "${LATEST_URL}" -o "${API_FILE}"
+	if [ -s "${API_FILE}" ]; then
+		DNSCRYPT_VER="$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"
+		break
+	fi
+	if [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
+		printf "%s\n" "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit (60req./hr) per requesters IP." "For more information, please read /tmp/$$_headers.out." "Please be sure to check your internet connection, and please try again later." "The installer script will now exit."
 		sleep 3s
 		exit 1
 	fi
-	if [ -z "${DNSCRYPT_VER}" ] && [ -f "${API_FILE}" ]; then DNSCRYPT_VER="$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"; fi
 	varcnt="$((varcnt + 1))"
 done
 rm -rf "$API_FILE" "/tmp/$$_headers.out"
