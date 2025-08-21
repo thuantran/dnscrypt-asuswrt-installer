@@ -98,8 +98,7 @@ dnsmasq_params() {
 			if { ! readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf' && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
 		elif [ -n "$1" ] && nvram get rc_support | grep -q 'mtlancfg'; then
 			CONFIG="/etc/dnsmasq-${1}.conf"
-			LAN_IF_SDN="$(nvram get lan"${1}"_ifname)"
-			[ -z "${LAN_IF_SDN}" ] && LAN_IF_SDN="$(nvram get br"${1}"_ifname)"
+			LAN_IF_SDN="$(get_mtlan | awk -v idx="$1" '/^[[:space:]]*\|-enable:/ {e=""; br=""; sdn=""} /^[[:space:]]*\|-enable:/ {s=index($0,"["); c=index($0,"]"); if(s>0&&c>s) e=substr($0,s+1,c-s-1)} /^[[:space:]]*\|-br_ifname:/ {s=index($0,"["); c=index($0,"]"); if(s>0&&c>s) br=substr($0,s+1,c-s-1)} /^[[:space:]]*\|-sdn_idx:/ {s=index($0,"["); c=index($0,"]"); if(s>0&&c>s) {sdn=substr($0,s+1,c-s-1); if(sdn==idx&&e=="1"){print br; exit}}}')"
 			if [ -n "${LAN_IF_SDN}" ]; then
 				append_on_demand "${CONFIG}" "no-resolv"
 				sed -i "/^servers-file=.*$/d" "${CONFIG}"
