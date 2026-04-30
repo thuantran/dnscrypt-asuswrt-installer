@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.5.9                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.0                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,7 +30,7 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.5.9"
+DI_VERSION="v2.6.0"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1028,9 +1028,11 @@ download_file() {
 end_op_message() {
 	case "${1:-0}" in
 	0)
+		[ "$2" = "update" ] && exit 0
 		PTXT "${INFO} Operation completed, returning to Main Menu. You can quit or continue."
 		;;
 	1)
+		[ "$2" = "update" ] && exit 1
 		PTXT "${INFO} Operation aborted, returning to Main Menu. You can quit or continue."
 		;;
 	2)
@@ -1091,16 +1093,16 @@ inst_dnscrypt() {
 		fi
 		if [ -z "${DNSCRYPT_VER}" ] || { ! check_connection; }; then
 			PTXT "${ERROR} Unable to detect the Internet!"
-			end_op_message 1
+			end_op_message 1 "$1"
 			return
 		fi
 		if ! create_dir "${TARG_DIR}"; then
-			end_op_message 1
+			end_op_message 1 "$1"
 			return
 		fi
 		if ! download_file "${TARG_DIR}" 755 "${RURL}/installer" || ! awk '{ print }' "${TARG_DIR}/installer" | grep -m1 "^DI_VERSION=" | grep -qoE '[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})'; then
 			PTXT "${ERROR} Failed to download installer."
-			end_op_message 1
+			end_op_message 1 "$1"
 			return
 		fi
 		download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
@@ -1124,7 +1126,7 @@ inst_dnscrypt() {
 	else
 		if ! download_file "${TARG_DIR}" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${2}/${DNSCRYPT_TAR}"; then
 			PTXT "${ERROR} Unable to download dnscrypt-proxy package for your router"
-			end_op_message 1
+			end_op_message 1 "$1"
 			return
 		fi
 		tar xzv -C "${TARG_DIR}" -f "${TARG_DIR}/${DNSCRYPT_TAR}"
@@ -1133,7 +1135,7 @@ inst_dnscrypt() {
 		rm -r "${TARG_DIR:?}/${DNSCRYPT_ARCH_TAR}" "${TARG_DIR:?}/${DNSCRYPT_TAR}"
 		if ! chmod 755 "${TARG_DIR}/dnscrypt-proxy" && [ -z "$("${TARG_DIR}/dnscrypt-proxy" -version)" ]; then
 			PTXT "${ERROR} Failed to download dnscrypt-proxy package for your router"
-			end_op_message 1
+			end_op_message 1 "$1"
 			return
 		fi
 	fi
@@ -1164,9 +1166,11 @@ inst_dnscrypt() {
 	if nvram get rc_support | grep -q 'mtlancfg'; then write_manager_script /jffs/scripts/dnsmasq-sdn.postconf 'dnsmasq-sdn $2'; fi
 	del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	write_command_script /jffs/scripts/service-event-end 'if printf "%s" "$@" | /bin/grep -qE "^(((((dnscrypt-)?(start|stop)|restart|kill))_?.*dnscrypt-proxy)$)"; then { sh /jffs/dnscrypt/manager "$(printf "%s" "$@" | /bin/grep -oE "^(((dnscrypt-)?(start|stop)|restart|kill))")" x & }; fi # Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
-	if ! setup_dnscrypt "" "${1:-install}"; then
-		end_op_message 1
-		return
+	if [ "${1:-update}" != "update" ]; then
+		if ! setup_dnscrypt "" "${1:-install}"; then
+			end_op_message 1
+			return
+		fi
 	fi
 	PTXT "${INFO} Starting dnscrypt-proxy..."
 	service start_dnscrypt-proxy >/dev/null 2>&1
@@ -1174,7 +1178,7 @@ inst_dnscrypt() {
 	if [ -z "$(pidof dnscrypt-proxy)" ]; then
 		PTXT "${ERROR} Couldn't start dnscrypt-proxy" \
 			"${ERROR} Please send WebUI System Log to dev"
-		end_op_message 1
+		end_op_message 1 "$1"
 		return
 	fi
 	service restart_dnscrypt-proxy >/dev/null 2>&1
@@ -1182,7 +1186,7 @@ inst_dnscrypt() {
 		"${INFO}  - Add swap" \
 		"${INFO}  - Add a RNG" \
 		"${INFO}  - Set your timezone"
-	end_op_message 0
+	end_op_message 0 "$1"
 }
 
 manager_monitor_restart() {
@@ -1499,6 +1503,18 @@ static_chosen_relays() {
 		fi
 	fi
 	static_chosen_relays 1
+}
+
+setup_amtmupdate() {
+	local AMTM_UPDATE
+	if [ ! -f "${CONF_FILE}" ] || [ -z "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" ] || { [ -f "${CONF_FILE}" ] && [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "DISABLED" ]; }; then
+		AMTM_UPDATE="ENABLED"
+	else
+		AMTM_UPDATE="DISABLED"
+	fi
+	PTXT "${INFO} The installer will now set AMTM Update to ${AMTM_UPDATE}."
+	write_conf AMTM_UPDATE "\"${AMTM_UPDATE}\""
+	end_op_message 0
 }
 
 setup_dnscrypt() {
@@ -1913,13 +1929,13 @@ menu() {
 			"  7) Uninstall (P)RNG" \
 			"  8) Install swap file" \
 			"  9) Uninstall ALL"
-		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; }; then { PTXT "  b) Backup"; }; fi
+		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; }; then { PTXT "  a) Enable/Disable AMTM updates" "  b) Backup"; }; fi
 		if { [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { PTXT "  r) Restore"; }; fi
 		PTXT "  q) Quit"
 		if { [ ! -d "${TARG_DIR}" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 q; }; fi
 		if { [ ! -d "${TARG_DIR}" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 r q; }; fi
-		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 b q; }; fi
-		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 b r q; }; fi
+		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 a b q; }; fi
+		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 a b r q; }; fi
 		;;
 	*)
 		CHOSEN="$1"
@@ -1927,12 +1943,16 @@ menu() {
 	esac
 	[ -n "${CHOSEN}" ] && trap 'clear; end_op_message 2' HUP INT QUIT ABRT TERM
 	case "${CHOSEN}" in
-	"1" | "install" | "update")
-		[ "${CHOSEN}" = "update" ] && AUTO_UPDATE="update"
-		PTXT "${INFO} This operation will install dnscrypt-proxy and related files (<6MB)" \
-			"${INFO} to jffs, no other data will be changed." \
-			"${INFO} Also some start scripts will be installed/modified as required."
-		if read_yesno "Do you want to install dnscrypt-proxy to /jffs?"; then inst_dnscrypt "${AUTO_UPDATE:-install}"; else end_op_message 1; fi
+	"1" | "install" | "update" | "amtmupdate")
+		if [ "${CHOSEN}" = "amtmupdate" ] || [ "${CHOSEN}" = "update" ]; then
+			AUTO_UPDATE="update"
+			inst_dnscrypt "${AUTO_UPDATE:-update}"
+		else
+			PTXT "${INFO} This operation will install dnscrypt-proxy and related files (<6MB)" \
+				"${INFO} to jffs, no other data will be changed." \
+				"${INFO} Also some start scripts will be installed/modified as required."
+			if read_yesno "Do you want to install dnscrypt-proxy to /jffs?"; then inst_dnscrypt "${AUTO_UPDATE:-install}"; else end_op_message 1; fi
+		fi
 		;;
 	"2" | "uninstall")
 		PTXT "${INFO} This operation will uninstall dnscrypt-proxy and related files" \
@@ -1972,6 +1992,12 @@ menu() {
 		PTXT "${INFO} This operation will cleanup everything installed by this script (except swap)."
 		if read_yesno "Do you want to continue?"; then uninst_all; else end_op_message 1; fi
 		;;
+	"a" | "A" | "setAMTMUPDATE")
+		PTXT "${INFO} This operation allows you to enable or disable AMTM's ability to manage updates for this script and by extension, Dnscrypt-Proxy."
+		PTXT "${INFO} If the option is already disabled and you choose to proceed, then you will be enabling."
+		PTXT "${INFO} The same is true if the opposite is true and you choose to proceed."
+		if read_yesno "Do you want to proceed?"; then setup_amtmupdate; else end_op_message 1; fi
+		;;
 	"b" | "B" | "backup")
 		PTXT "${INFO} This operation will backup everything!"
 		if read_yesno "Do you want to continue?"; then backup_restore BACKUP; else end_op_message 1; fi
@@ -1998,11 +2024,11 @@ case "$2" in
 	check_version
 	menu
 	;;
-[1-9] | "install" | "update" | "uninstall" | "configure" | "setTZ" | "unsetTZ" | "instRNG" | "unstRNG" | "instSWAP" | "unstALL" | [bB] | "backup" | [rR] | "restore")
+[1-9] | "install" | "update" | "amtmupdate" | "uninstall" | "configure" | "setTZ" | "unsetTZ" | "instRNG" | "unstRNG" | "instSWAP" | "unstALL" | [aA] | "setAMTMUPDATE" | [bB] | "backup" | [rR] | "restore")
 	menu "$2"
 	;;
 *)
-	PTXT "${INFO} Usage: sh installer {master|dev?|""} (1 - {install/update} | 2 - uninstall | 3 - configure | 4 - setTZ | 5 - unsetTZ | 6 - instRNG | 7 - unstRNG | 8 - instSWAP | 9 - unstALL | {b/B} - backup | {r/R} - restore)" \
+	PTXT "${INFO} Usage: sh installer {master|dev?|""} (1 - {install/update/amtmupdate} | 2 - uninstall | 3 - configure | 4 - setTZ | 5 - unsetTZ | 6 - instRNG | 7 - unstRNG | 8 - instSWAP | 9 - unstALL | {a/A} - setAMTMUPDATE | {b/B} - backup | {r/R} - restore)" \
 		"${INFO} Branch or Tag must be represented by a value or empty quotes in place of string e.g. \"\" in the \$1 string position." \
 		"${INFO} Action must be represented by a usage value in the \$2 string position." \
 		"${INFO} An update example: sh installer master update, or just use the regular menu by not specifying an action e.g: sh installer master."
