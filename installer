@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.0                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.1                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,7 +30,7 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.6.0"
+DI_VERSION="v2.6.1"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1854,6 +1854,23 @@ write_manager_script() {
 		fi
 	fi
 }
+
+case "$1" in
+"amtmupdate")
+	case "$2" in
+	"check")
+		if [ !-f "${CONF_FILE}" ] || [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "DISABLED" ]; then
+			exit 1
+		elif [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "ENABLED" ]; then
+			exit 0
+		fi
+		;;
+	"")
+		exec "${SCRIPT_LOC}" "" "$@" > /dev/null 2>&1
+		;;
+	esac
+	;;
+esac
 
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
