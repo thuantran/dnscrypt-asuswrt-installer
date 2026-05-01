@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.1                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.2                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,7 +30,7 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.6.1"
+DI_VERSION="v2.6.2"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1045,16 +1045,17 @@ end_op_message() {
 	sleep 3s && clear
 	if [ -f "${TARG_DIR}/installer" ]; then
 		chmod 755 "${TARG_DIR}/installer" >/dev/null 2>&1
-		exec "${TARG_DIR}/installer" "${BRANCH}" && exit
+		exec "${TARG_DIR}/installer" "${BRANCH}"
 	elif [ ! -f "${TARG_DIR}/installer" ] && [ -f "${SCRIPT_LOC}" ]; then
 		chmod 755 "${SCRIPT_LOC}" >/dev/null 2>&1
-		exec "${SCRIPT_LOC}" "${BRANCH}" && exit
+		exec "${SCRIPT_LOC}" "${BRANCH}"
 	elif [ -f "${HOME}/installer" ]; then
 		chmod 755 "${HOME}/installer"
-		exec "${HOME}/installer" "${BRANCH}" && exit
+		exec "${HOME}/installer" "${BRANCH}"
 	else
-		clear && { end_op_header 2>/dev/null; } && exit
+		clear && { end_op_header 2>/dev/null; }
 	fi
+	exit $?
 }
 
 end_op_header() {
@@ -1867,6 +1868,7 @@ case "$1" in
 		;;
 	"")
 		exec "${SCRIPT_LOC}" "" "$@" > /dev/null 2>&1
+		exit $?
 		;;
 	esac
 	;;
