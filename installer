@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.2                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.3                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,7 +30,7 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.6.2"
+DI_VERSION="v2.6.3"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1856,6 +1856,7 @@ write_manager_script() {
 	fi
 }
 
+[ "$1" ] && BRANCH="$1" || BRANCH="master"
 case "$1" in
 "amtmupdate")
 	case "$2" in
@@ -1867,14 +1868,12 @@ case "$1" in
 		fi
 		;;
 	"")
-		exec "${SCRIPT_LOC}" "" "$@" > /dev/null 2>&1
+		exec "${SCRIPT_LOC}" "${BRANCH}" update >/dev/null 2>&1
 		exit $?
 		;;
 	esac
 	;;
 esac
-
-[ "$1" ] && BRANCH="$1" || BRANCH="master"
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
 URL_GEN="${RURL}/gen"
@@ -1962,8 +1961,8 @@ menu() {
 	esac
 	[ -n "${CHOSEN}" ] && trap 'clear; end_op_message 2' HUP INT QUIT ABRT TERM
 	case "${CHOSEN}" in
-	"1" | "install" | "update" | "amtmupdate")
-		if [ "${CHOSEN}" = "amtmupdate" ] || [ "${CHOSEN}" = "update" ]; then
+	"1" | "install" | "update")
+		if [ "${CHOSEN}" = "update" ]; then
 			AUTO_UPDATE="update"
 			inst_dnscrypt "${AUTO_UPDATE:-update}"
 		else
@@ -2043,11 +2042,11 @@ case "$2" in
 	check_version
 	menu
 	;;
-[1-9] | "install" | "update" | "amtmupdate" | "uninstall" | "configure" | "setTZ" | "unsetTZ" | "instRNG" | "unstRNG" | "instSWAP" | "unstALL" | [aA] | "setAMTMUPDATE" | [bB] | "backup" | [rR] | "restore")
+[1-9] | "install" | "update" | "uninstall" | "configure" | "setTZ" | "unsetTZ" | "instRNG" | "unstRNG" | "instSWAP" | "unstALL" | [aA] | "setAMTMUPDATE" | [bB] | "backup" | [rR] | "restore")
 	menu "$2"
 	;;
 *)
-	PTXT "${INFO} Usage: sh installer {master|dev?|""} (1 - {install/update/amtmupdate} | 2 - uninstall | 3 - configure | 4 - setTZ | 5 - unsetTZ | 6 - instRNG | 7 - unstRNG | 8 - instSWAP | 9 - unstALL | {a/A} - setAMTMUPDATE | {b/B} - backup | {r/R} - restore)" \
+	PTXT "${INFO} Usage: sh installer {master|dev?|""} (1 - {install/update} | 2 - uninstall | 3 - configure | 4 - setTZ | 5 - unsetTZ | 6 - instRNG | 7 - unstRNG | 8 - instSWAP | 9 - unstALL | {a/A} - setAMTMUPDATE | {b/B} - backup | {r/R} - restore)" \
 		"${INFO} Branch or Tag must be represented by a value or empty quotes in place of string e.g. \"\" in the \$1 string position." \
 		"${INFO} Action must be represented by a usage value in the \$2 string position." \
 		"${INFO} An update example: sh installer master update, or just use the regular menu by not specifying an action e.g: sh installer master."
