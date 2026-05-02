@@ -16,7 +16,7 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.3                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.4                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
@@ -30,7 +30,7 @@
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.6.3"
+DI_VERSION="v2.6.4"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1857,7 +1857,7 @@ write_manager_script() {
 }
 
 [ "$1" ] && BRANCH="$1" || BRANCH="master"
-case "$1" in
+case "${BRANCH}" in
 "amtmupdate")
 	case "$2" in
 	"check")
@@ -1868,7 +1868,9 @@ case "$1" in
 		fi
 		;;
 	"")
-		exec "${SCRIPT_LOC}" "${BRANCH}" update >/dev/null 2>&1
+		unset BRANCH
+		BRANCH="master"
+		exec "${SCRIPT_LOC}" "${BRANCH}" "${1}" >/dev/null 2>&1
 		exit $?
 		;;
 	esac
