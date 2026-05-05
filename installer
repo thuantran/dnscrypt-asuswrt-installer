@@ -82,19 +82,19 @@ _quote() {
 
 PTXT() {
 	case "$1" in
-	-n)
-		shift
-		while [ $# -gt 0 ]; do
-			printf "%s" "$1"
+		-n)
 			shift
-		done
-		;;
-	*)
-		while [ $# -gt 0 ]; do
-			printf "%s\n" "$1"
-			shift
-		done
-		;;
+			while [ $# -gt 0 ]; do
+				printf "%s" "$1"
+				shift
+			done
+			;;
+		*)
+			while [ $# -gt 0 ]; do
+				printf "%s\n" "$1"
+				shift
+			done
+			;;
 	esac
 }
 
@@ -300,14 +300,14 @@ check_dns_filter() {
 check_dns_local() {
 	local LOCAL_CACHE
 	case "$1" in
-	0)
-		LOCAL_CACHE="NO"
-		write_conf DNSCRYPT_LOCAL "\"${LOCAL_CACHE}\""
-		;;
-	1)
-		LOCAL_CACHE="YES"
-		write_conf DNSCRYPT_LOCAL "\"${LOCAL_CACHE}\""
-		;;
+		0)
+			LOCAL_CACHE="NO"
+			write_conf DNSCRYPT_LOCAL "\"${LOCAL_CACHE}\""
+			;;
+		1)
+			LOCAL_CACHE="YES"
+			write_conf DNSCRYPT_LOCAL "\"${LOCAL_CACHE}\""
+			;;
 	esac
 }
 
@@ -372,15 +372,15 @@ check_opendns() {
 					"  3) Disable OpenDNS account authen"
 				read_input_num "Your choice" 1 3
 				case "${CHOSEN}" in
-				1)
-					PTXT "${INFO} Use previous account ${BOLD}${OPENDNS_USER}${NORM}"
-					;;
-				2)
-					opendns_authen 1
-					;;
-				3)
-					opendns_authen 0
-					;;
+					1)
+						PTXT "${INFO} Use previous account ${BOLD}${OPENDNS_USER}${NORM}"
+						;;
+					2)
+						opendns_authen 1
+						;;
+					3)
+						opendns_authen 0
+						;;
 				esac
 			else
 				if read_yesno "Do you want to set up OpenDNS account ip update?"; then opendns_authen 1; else opendns_authen 0; fi
@@ -427,53 +427,53 @@ check_relays() {
 			if PTXT "${ODOH_ARGS}" | grep -qoF "${SERVER}"; then ODOH="${SERVER}"; fi
 			if PTXT "${FRAGSBLOCKED_ARGS}" | grep -qoF "${SERVER}"; then FRAGSBLOCKED="${SERVER}"; fi
 			case "${SERVER}" in
-			"${DNSCRYPT}")
-				if read_yesno "Do you want to add relays for ${SERVER}?"; then ADD_RELAYS="YES"; else ADD_RELAYS="NO"; fi
-				if [ "${ADD_RELAYS}" = "YES" ]; then PTXT "${INFO} You may manually choose relays for ${SERVER} or you may specify wildcard relay (via=['*'])."; fi
-				if [ "${COUNT}" -eq 0 ] && [ "${ADD_RELAYS}" = "YES" ]; then
-					toml_avar_enable routes
-					if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
-					if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
-						PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
-						choose_relays_manual
+				"${DNSCRYPT}")
+					if read_yesno "Do you want to add relays for ${SERVER}?"; then ADD_RELAYS="YES"; else ADD_RELAYS="NO"; fi
+					if [ "${ADD_RELAYS}" = "YES" ]; then PTXT "${INFO} You may manually choose relays for ${SERVER} or you may specify wildcard relay (via=['*'])."; fi
+					if [ "${COUNT}" -eq 0 ] && [ "${ADD_RELAYS}" = "YES" ]; then
+						toml_avar_enable routes
+						if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
+						if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
+							PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
+							choose_relays_manual
+						fi
+						COUNT="$((COUNT + 1))"
+					elif [ "${COUNT}" -gt 0 ] && [ "${ADD_RELAYS}" = "YES" ]; then
+						if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
+						if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
+							PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
+							choose_relays_manual
+						fi
+					elif [ "${ADD_RELAYS}" = "NO" ]; then
+						PTXT "${INFO} Skipping relays for ${SERVER}."
 					fi
-					COUNT="$((COUNT + 1))"
-				elif [ "${COUNT}" -gt 0 ] && [ "${ADD_RELAYS}" = "YES" ]; then
-					if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
-					if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
-						PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
-						choose_relays_manual
+					;;
+				"${ODOH}")
+					PTXT "${INFO} Found ${SERVER}, Oblivious DNS-over-HTTPS relays are required for Oblivious DNS-over-HTTPS servers." \
+						"${INFO} You may manually choose relays for ${SERVER} server or you may specify wildcard relay (via=['*'])."
+					if [ "${COUNT}" -eq 0 ]; then
+						if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
+						if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
+							PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
+							choose_relays_manual_odoh
+						fi
+						COUNT="$((COUNT + 1))"
+					elif [ "${COUNT}" -gt 0 ]; then
+						if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
+						if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
+							PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
+							choose_relays_manual_odoh
+						fi
 					fi
-				elif [ "${ADD_RELAYS}" = "NO" ]; then
-					PTXT "${INFO} Skipping relays for ${SERVER}."
-				fi
-				;;
-			"${ODOH}")
-				PTXT "${INFO} Found ${SERVER}, Oblivious DNS-over-HTTPS relays are required for Oblivious DNS-over-HTTPS servers." \
-					"${INFO} You may manually choose relays for ${SERVER} server or you may specify wildcard relay (via=['*'])."
-				if [ "${COUNT}" -eq 0 ]; then
-					if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
-					if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
-						PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
-						choose_relays_manual_odoh
+					;;
+				"${FRAGSBLOCKED}")
+					if [ "${NUMFRAG}" -eq 0 ] && [ "${COUNT}" -gt 0 ]; then
+						local USE_BROKEN
+						if read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?"; then USE_BROKEN="true"; else USE_BROKEN="false"; fi
+						toml_avars_prep skip_incompatible "${USE_BROKEN}"
+						NUMFRAG="$((NUMFRAG + 1))"
 					fi
-					COUNT="$((COUNT + 1))"
-				elif [ "${COUNT}" -gt 0 ]; then
-					if read_yesno "Do you want to use wildcard relay (via=['*']) option for ${SERVER}?"; then USE_WILDCARD="YES"; else USE_WILDCARD="NO"; fi
-					if [ "${USE_WILDCARD}" = "YES" ]; then choose_relays_manual_wildcard; elif [ "${USE_WILDCARD}" = "NO" ]; then
-						PTXT "${INFO} You chose not to use wildcard for relay selection." "${INFO} Instead you will manually choose relays from a list."
-						choose_relays_manual_odoh
-					fi
-				fi
-				;;
-			"${FRAGSBLOCKED}")
-				if [ "${NUMFRAG}" -eq 0 ] && [ "${COUNT}" -gt 0 ]; then
-					local USE_BROKEN
-					if read_yesno "Do you want to skip using resolvers that are incompatible with anonymization instead of using them directly?"; then USE_BROKEN="true"; else USE_BROKEN="false"; fi
-					toml_avars_prep skip_incompatible "${USE_BROKEN}"
-					NUMFRAG="$((NUMFRAG + 1))"
-				fi
-				;;
+					;;
 			esac
 		fi
 	done
@@ -597,18 +597,18 @@ choose_dnscrypt_server() {
 		"  4) random"
 	read_input_num "Select your strategy" 1 4
 	case "${CHOSEN}" in
-	1)
-		toml_avars_prep lb_strategy "\'p2\'"
-		;;
-	2)
-		toml_avars_prep lb_strategy "\'ph\'"
-		;;
-	3)
-		toml_avars_prep lb_strategy "\'first\'"
-		;;
-	4)
-		toml_avars_prep lb_strategy "\'random\'"
-		;;
+		1)
+			toml_avars_prep lb_strategy "\'p2\'"
+			;;
+		2)
+			toml_avars_prep lb_strategy "\'ph\'"
+			;;
+		3)
+			toml_avars_prep lb_strategy "\'first\'"
+			;;
+		4)
+			toml_avars_prep lb_strategy "\'random\'"
+			;;
 	esac
 	if read_yesno "Do you want to use load balance estimator to adjust resolvers based on latency calculations?"; then USE_LBE="true"; else USE_LBE="false"; fi
 	toml_avars_prep lb_estimator "${USE_LBE}"
@@ -618,21 +618,21 @@ choose_dnscrypt_server() {
 		"  3) Static"
 	read_input_num "Select your mode" 1 3
 	case "${CHOSEN}" in
-	1)
-		choose_dnscrypt_server_auto
-		if grep -q '^dnscrypt_servers = .*true.*' "${TOML_FILE}" && [ -z "${CRYPT_COUNT}" ]; then CRYPT_COUNT="1"; fi
-		if read_yesno "Do you want to choose which servers to disable (this can be a long process)?"; then CHOOSE_DISABLED="true"; else CHOOSE_DISABLED="false"; fi
-		if [ "${CHOOSE_DISABLED}" = "true" ]; then choose_dnscrypt_server_disabled; elif [ "${CHOOSE_DISABLED}" = "false" ]; then toml_avar_disable disabled_server_names; fi
-		;;
-	2)
-		toml_avar_disable disabled_server_names
-		if read_yesno "Do you only want to use the Oblivious DNS-over-HTTPS protocol?"; then ODOH_ONLY="true"; else ODOH_ONLY="false"; fi
-		if [ "${ODOH_ONLY}" = "true" ]; then choose_dnscrypt_server_odoh; elif [ "${ODOH_ONLY}" = "false" ]; then choose_dnscrypt_server_manual; fi
-		;;
-	3)
-		toml_avar_disable disabled_server_names
-		static_chosen 0
-		;;
+		1)
+			choose_dnscrypt_server_auto
+			if grep -q '^dnscrypt_servers = .*true.*' "${TOML_FILE}" && [ -z "${CRYPT_COUNT}" ]; then CRYPT_COUNT="1"; fi
+			if read_yesno "Do you want to choose which servers to disable (this can be a long process)?"; then CHOOSE_DISABLED="true"; else CHOOSE_DISABLED="false"; fi
+			if [ "${CHOOSE_DISABLED}" = "true" ]; then choose_dnscrypt_server_disabled; elif [ "${CHOOSE_DISABLED}" = "false" ]; then toml_avar_disable disabled_server_names; fi
+			;;
+		2)
+			toml_avar_disable disabled_server_names
+			if read_yesno "Do you only want to use the Oblivious DNS-over-HTTPS protocol?"; then ODOH_ONLY="true"; else ODOH_ONLY="false"; fi
+			if [ "${ODOH_ONLY}" = "true" ]; then choose_dnscrypt_server_odoh; elif [ "${ODOH_ONLY}" = "false" ]; then choose_dnscrypt_server_manual; fi
+			;;
+		3)
+			toml_avar_disable disabled_server_names
+			static_chosen 0
+			;;
 	esac
 }
 
@@ -1027,17 +1027,17 @@ download_file() {
 
 end_op_message() {
 	case "${1:-0}" in
-	0)
-		[ "$2" = "update" ] && exit 0
-		PTXT "${INFO} Operation completed, returning to Main Menu. You can quit or continue."
-		;;
-	1)
-		[ "$2" = "update" ] && exit 1
-		PTXT "${INFO} Operation aborted, returning to Main Menu. You can quit or continue."
-		;;
-	2)
-		PTXT "${INFO} Abnormal operations, returning to Main Menu. You can quit or continue."
-		;;
+		0)
+			[ "$2" = "update" ] && exit 0
+			PTXT "${INFO} Operation completed, returning to Main Menu. You can quit or continue."
+			;;
+		1)
+			[ "$2" = "update" ] && exit 1
+			PTXT "${INFO} Operation aborted, returning to Main Menu. You can quit or continue."
+			;;
+		2)
+			PTXT "${INFO} Abnormal operations, returning to Main Menu. You can quit or continue."
+			;;
 	esac
 	PTXT "====================================================="
 	PTXT " "
@@ -1239,22 +1239,22 @@ inst_random() {
 		"${INFO} proceeding with your selection."
 	read_input_num "Please enter the number designates your selection" 1 2
 	case "${CHOSEN}" in
-	1)
-		rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-		{ kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }
-		download_file "${TARG_DIR}" 755 "${URL_ARCH}/haveged" "${URL_GEN}/manager"
-		write_conf RAN_PRV haveged
-		${TARG_DIR}/haveged -w 1024 -d 32 -i 32 -v 1
-		;;
-	2)
-		local RNG_DEV
-		{ kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }
-		download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
-		inst_ran_dev || return
-		write_conf RAN_PRV rngd
-		${TARG_DIR}/stty raw -echo -ixoff -F "/dev/${RNG_DEV}" speed 115200
-		${TARG_DIR}/rngd -r "/dev/${RNG_DEV}"
-		;;
+		1)
+			rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
+			{ kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }
+			download_file "${TARG_DIR}" 755 "${URL_ARCH}/haveged" "${URL_GEN}/manager"
+			write_conf RAN_PRV haveged
+			${TARG_DIR}/haveged -w 1024 -d 32 -i 32 -v 1
+			;;
+		2)
+			local RNG_DEV
+			{ kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }
+			download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
+			inst_ran_dev || return
+			write_conf RAN_PRV rngd
+			${TARG_DIR}/stty raw -echo -ixoff -F "/dev/${RNG_DEV}" speed 115200
+			${TARG_DIR}/rngd -r "/dev/${RNG_DEV}"
+			;;
 	esac
 	write_manager_script /jffs/scripts/init-start init-start
 	end_op_message 0
@@ -1340,14 +1340,14 @@ read_input_dns() {
 		read_input_dns "$@"
 	fi
 	case "$1" in
-	"Default is")
-		BOOTSTRAP="'${DNS_SERVER}:53'"
-		PROBE="${DNS_SERVER}:53"
-		DNS_SERVER1="${DNS_SERVER}"
-		;;
-	"2nd Default is")
-		BOOTSTRAP2="${BOOTSTRAP}, '${DNS_SERVER}:53'"
-		;;
+		"Default is")
+			BOOTSTRAP="'${DNS_SERVER}:53'"
+			PROBE="${DNS_SERVER}:53"
+			DNS_SERVER1="${DNS_SERVER}"
+			;;
+		"2nd Default is")
+			BOOTSTRAP2="${BOOTSTRAP}, '${DNS_SERVER}:53'"
+			;;
 	esac
 }
 
@@ -1360,36 +1360,36 @@ read_input_num() {
 	PTXT -n "${INPUT} $1, ${BOLD}${RANGE}${NORM}: "
 	read -r CHOSEN
 	case "$1" in
-	"Set log level, default is 2, 0 is the most verbose")
-		if [ -z "${CHOSEN}" ]; then CHOSEN="2"; fi
-		;;
-	"Select your strategy" | "Select your mode")
-		if [ -z "${CHOSEN}" ]; then CHOSEN="1"; fi
-		;;
-	*)
-		if [ -z "${CHOSEN}" ]; then
-			PTXT "${ERROR} Invalid character(s) entered! Retrying..."
-			read_input_num "$@"
-			return
-		fi
-		;;
+		"Set log level, default is 2, 0 is the most verbose")
+			if [ -z "${CHOSEN}" ]; then CHOSEN="2"; fi
+			;;
+		"Select your strategy" | "Select your mode")
+			if [ -z "${CHOSEN}" ]; then CHOSEN="1"; fi
+			;;
+		*)
+			if [ -z "${CHOSEN}" ]; then
+				PTXT "${ERROR} Invalid character(s) entered! Retrying..."
+				read_input_num "$@"
+				return
+			fi
+			;;
 	esac
 	case "${CHOSEN}" in
-	"$4" | "$5" | "$6")
-		return 1
-		;;
-	"$2" | "$3" | *)
-		if ! PTXT "${CHOSEN}" | grep -qE '^[0-9]+$'; then
-			PTXT "${ERROR} Invalid character(s) entered! Retrying..."
-			read_input_num "$@"
-			return
-		fi
-		if [ "${CHOSEN}" -lt "$2" ] || [ "${CHOSEN}" -gt "$3" ]; then
-			PTXT "${ERROR} Chosen number is not in range! Retrying..."
-			read_input_num "$@"
-			return
-		fi
-		;;
+		"$4" | "$5" | "$6")
+			return 1
+			;;
+		"$2" | "$3" | *)
+			if ! PTXT "${CHOSEN}" | grep -qE '^[0-9]+$'; then
+				PTXT "${ERROR} Invalid character(s) entered! Retrying..."
+				read_input_num "$@"
+				return
+			fi
+			if [ "${CHOSEN}" -lt "$2" ] || [ "${CHOSEN}" -gt "$3" ]; then
+				PTXT "${ERROR} Chosen number is not in range! Retrying..."
+				read_input_num "$@"
+				return
+			fi
+			;;
 	esac
 }
 
@@ -1398,16 +1398,16 @@ read_yesno() {
 	local YESNO
 	read -r YESNO
 	case "${YESNO}" in
-	y | Y)
-		return 0
-		;;
-	n | N)
-		return 1
-		;;
-	*)
-		PTXT "${ERROR} Invalid input!"
-		read_yesno "$@"
-		;;
+		y | Y)
+			return 0
+			;;
+		n | N)
+			return 1
+			;;
+		*)
+			PTXT "${ERROR} Invalid input!"
+			read_yesno "$@"
+			;;
 	esac
 }
 
@@ -1562,60 +1562,60 @@ setup_dnscrypt_impl() {
 				"${INFO}   2) Start from default config"
 			read_input_num "Your selection" 1 2
 			case "${CHOSEN}" in
-			1)
-				PTXT "${INFO} Use previous settings file"
-				;;
-			2)
-				PTXT "${INFO} Backing up previous settings file..."
-				mv "${TOML_FILE}" "${TOML_BAK}"
-				cp -f "${TOML_ORI}" "${TOML_FILE}"
-				;;
+				1)
+					PTXT "${INFO} Use previous settings file"
+					;;
+				2)
+					PTXT "${INFO} Backing up previous settings file..."
+					mv "${TOML_FILE}" "${TOML_BAK}"
+					cp -f "${TOML_ORI}" "${TOML_FILE}"
+					;;
 			esac
 		else
 			cp -f "${TOML_ORI}" "${TOML_FILE}"
 		fi
 		case "${2:-reconfig}" in
-		"install" | "reconfig")
-			if read_yesno "Do you want to redirect all DNS resolutions on your network through to Dnscrypt-Proxy?"; then check_dns_filter 1; else check_dns_filter 0; fi
-			if [ "$(nvram get dns_local_cache)" != "1" ]; then { if read_yesno "Do you want to run Dnsmasq as a local caching DNS service which includes sending the routers traffic to Dnscrypt-Proxy?"; then check_dns_local 1; else check_dns_local 0; fi; }; else { check_dns_local 0; }; fi
-			toml_avar_enable disabled_server_names
-			local PHX NXT
-			PHX="$(grep -wn "sources.odoh-servers" "${TOML_FILE}" | cut -f1 -d:)"
-			NXT="$((PHX + 11))"
-			sed -i "${PHX},${NXT} s/#//g" "${TOML_FILE}"
-			choose_dnscrypt_server
-			PTXT "${INFO} Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
-			check_relays
-			PTXT "${INFO} Set the DNS server(s) for initializing dnscrypt-proxy" \
-				"${INFO} and router services (e.g. ntp) at boot"
-			read_input_dns "Default is" 9.9.9.9
-			read_input_dns "2nd Default is" 8.8.8.8
-			read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
-			toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP2]" "$TOML_FILE"
-			if read_yesno "Do you want to use TLSv1.3 (http3)?"; then
-				toml_avar_disable tls_cipher_suite
-				toml_avars_prep http3 true
-			else
-				toml_avar_enable tls_cipher_suite
-				toml_avars_prep http3 false tls_cipher_suite "\"[52393, 52392, 49199, 49195, 4867, 4865]\""
-			fi
-			toml_avars_prep bootstrap_resolvers "\"[${BOOTSTRAP2}]\"" log_level "${CHOSEN}" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'${PROBE}\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
-			case "${ROUTER_MODEL}" in
-			RT-AX56U | RT-AX58U | RT-AX3000)
-				toml_avar_disable user_name
+			"install" | "reconfig")
+				if read_yesno "Do you want to redirect all DNS resolutions on your network through to Dnscrypt-Proxy?"; then check_dns_filter 1; else check_dns_filter 0; fi
+				if [ "$(nvram get dns_local_cache)" != "1" ]; then { if read_yesno "Do you want to run Dnsmasq as a local caching DNS service which includes sending the routers traffic to Dnscrypt-Proxy?"; then check_dns_local 1; else check_dns_local 0; fi; }; else { check_dns_local 0; }; fi
+				toml_avar_enable disabled_server_names
+				local PHX NXT
+				PHX="$(grep -wn "sources.odoh-servers" "${TOML_FILE}" | cut -f1 -d:)"
+				NXT="$((PHX + 11))"
+				sed -i "${PHX},${NXT} s/#//g" "${TOML_FILE}"
+				choose_dnscrypt_server
+				PTXT "${INFO} Evaluating the possibilities for other dnscrypt-proxy configurations such as relay support..."
+				check_relays
+				PTXT "${INFO} Set the DNS server(s) for initializing dnscrypt-proxy" \
+					"${INFO} and router services (e.g. ntp) at boot"
+				read_input_dns "Default is" 9.9.9.9
+				read_input_dns "2nd Default is" 8.8.8.8
+				read_input_num "Set log level, default is 2, 0 is the most verbose" 0 6
+				toml_nvars_replace "fallback_resolvers =" "bootstrap_resolvers = [$BOOTSTRAP2]" "$TOML_FILE"
+				if read_yesno "Do you want to use TLSv1.3 (http3)?"; then
+					toml_avar_disable tls_cipher_suite
+					toml_avars_prep http3 true
+				else
+					toml_avar_enable tls_cipher_suite
+					toml_avars_prep http3 false tls_cipher_suite "\"[52393, 52392, 49199, 49195, 4867, 4865]\""
+				fi
+				toml_avars_prep bootstrap_resolvers "\"[${BOOTSTRAP2}]\"" log_level "${CHOSEN}" ignore_system_dns true listen_addresses "[\'127.0.1.1:53\']" cache false cert_ignore_timestamp true max_clients 25000 keepalive 120 netprobe_timeout 120 netprobe_address "\'${PROBE}\'" tls_disable_session_tickets true dnscrypt_ephemeral_keys true
+				case "${ROUTER_MODEL}" in
+					RT-AX56U | RT-AX58U | RT-AX3000)
+						toml_avar_disable user_name
+						;;
+					*)
+						toml_avars_prep user_name "\'nobody\'"
+						;;
+				esac
+				PTXT "${INFO} Writing dnscrypt-proxy configuration..."
+				if ! check_dnscrypt_toml; then
+					PTXT "${INFO} Writing dnscrypt-proxy configuration failed " \
+						"${INFO} Please send ${TOML_ERR} file and screen log of " \
+						"${INFO} all operations you have made to this script dev"
+					return 1
+				fi
 				;;
-			*)
-				toml_avars_prep user_name "\'nobody\'"
-				;;
-			esac
-			PTXT "${INFO} Writing dnscrypt-proxy configuration..."
-			if ! check_dnscrypt_toml; then
-				PTXT "${INFO} Writing dnscrypt-proxy configuration failed " \
-					"${INFO} Please send ${TOML_ERR} file and screen log of " \
-					"${INFO} all operations you have made to this script dev"
-				return 1
-			fi
-			;;
 		esac
 	fi
 }
@@ -1625,12 +1625,12 @@ set_timezone() {
 	TMP="/root"
 	TZ_ARCH="$(uname -m)"
 	case "${TZ_ARCH}" in
-	"aarch64" | "arm64")
-		TZ_ARCH="aarch64"
-		;;
-	"armv7l")
-		TZ_ARCH="arm"
-		;;
+		"aarch64" | "arm64")
+			TZ_ARCH="aarch64"
+			;;
+		"armv7l")
+			TZ_ARCH="arm"
+			;;
 	esac
 	TZ_DATA="tzdata-2021e-1-${TZ_ARCH}.pkg.tar.bz2"
 	download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
@@ -1899,163 +1899,163 @@ if [ -z "$2" ]; then
 fi
 
 case "${ROUTER_MODEL}" in
-#RT-AX56U|RT-AX58U|RT-AX3000)
-#  PTXT "${ERROR} This is an unsupported router, sorry."
-#  exit 1
-#  ;;
-*)
-	[ -z "$2" ] && PTXT "${INFO} Detected ${ROUTER_MODEL} router."
-	;;
+	#RT-AX56U|RT-AX58U|RT-AX3000)
+	#  PTXT "${ERROR} This is an unsupported router, sorry."
+	#  exit 1
+	#  ;;
+	*)
+		[ -z "$2" ] && PTXT "${INFO} Detected ${ROUTER_MODEL} router."
+		;;
 esac
 
 case "${ROUTER_OS}" in
-"Linux")
-	[ -z "$2" ] && PTXT "${INFO} Detected ${ROUTER_OS} platform."
-	ROUTER_OS="linux"
-	;;
-*)
-	PTXT "${ERROR} This is an unsupported platform, sorry."
-	exit 1
-	;;
+	"Linux")
+		[ -z "$2" ] && PTXT "${INFO} Detected ${ROUTER_OS} platform."
+		ROUTER_OS="linux"
+		;;
+	*)
+		PTXT "${ERROR} This is an unsupported platform, sorry."
+		exit 1
+		;;
 esac
 
 case "${ROUTER_ARCH}" in
-"aarch64" | "arm64")
-	ROUTER_ARCH="arm64"
-	URL_ARCH="${RURL}/armv8"
-	DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
-	DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
-	[ -z "$2" ] && PTXT "${INFO} Detected ARMv8 architecture."
-	;;
-"armv7l")
-	ROUTER_ARCH="arm"
-	URL_ARCH="${RURL}/armv7"
-	DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
-	DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
-	[ -z "$2" ] && PTXT "${INFO} Detected ARMv7 architecture."
-	;;
-*)
-	PTXT "${ERROR} This is an unsupported architecture, sorry."
-	exit 1
-	;;
+	"aarch64" | "arm64")
+		ROUTER_ARCH="arm64"
+		URL_ARCH="${RURL}/armv8"
+		DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
+		DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
+		[ -z "$2" ] && PTXT "${INFO} Detected ARMv8 architecture."
+		;;
+	"armv7l")
+		ROUTER_ARCH="arm"
+		URL_ARCH="${RURL}/armv7"
+		DNSCRYPT_ARCH="${ROUTER_OS}_${ROUTER_ARCH}"
+		DNSCRYPT_ARCH_TAR="${ROUTER_OS}-${ROUTER_ARCH}"
+		[ -z "$2" ] && PTXT "${INFO} Detected ARMv7 architecture."
+		;;
+	*)
+		PTXT "${ERROR} This is an unsupported architecture, sorry."
+		exit 1
+		;;
 esac
 
 menu() {
 	trap - HUP INT QUIT ABRT TERM
 	case "$1" in
-	"")
-		PTXT "${INFO} Choose what you want to do:" \
-			"  1) Install/Update dnscrypt-proxy" \
-			"  2) Uninstall dnscrypt-proxy" \
-			"  3) Configure dnscrypt-proxy" \
-			"  4) Set timezone" \
-			"  5) Unset timezone" \
-			"  6) Install (P)RNG" \
-			"  7) Uninstall (P)RNG" \
-			"  8) Install swap file" \
-			"  9) Uninstall ALL"
-		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; }; then { PTXT "  a) Enable/Disable AMTM updates" "  b) Backup"; }; fi
-		if { [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { PTXT "  r) Restore"; }; fi
-		PTXT "  q) Quit"
-		if { [ ! -d "${TARG_DIR}" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 q; }; fi
-		if { [ ! -d "${TARG_DIR}" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 r q; }; fi
-		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 a b q; }; fi
-		if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 a b r q; }; fi
-		;;
-	*)
-		CHOSEN="$1"
-		;;
+		"")
+			PTXT "${INFO} Choose what you want to do:" \
+				"  1) Install/Update dnscrypt-proxy" \
+				"  2) Uninstall dnscrypt-proxy" \
+				"  3) Configure dnscrypt-proxy" \
+				"  4) Set timezone" \
+				"  5) Unset timezone" \
+				"  6) Install (P)RNG" \
+				"  7) Uninstall (P)RNG" \
+				"  8) Install swap file" \
+				"  9) Uninstall ALL"
+			if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; }; then { PTXT "  a) Enable/Disable AMTM updates" "  b) Backup"; }; fi
+			if { [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { PTXT "  r) Restore"; }; fi
+			PTXT "  q) Quit"
+			if { [ ! -d "${TARG_DIR}" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 q; }; fi
+			if { [ ! -d "${TARG_DIR}" ] || [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; } && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then { read_input_num "Please enter the number that designates your selection:" 1 9 r q; }; fi
+			if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ ! -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 a b q; }; fi
+			if { [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; }; then { read_input_num "Please enter the number that designates your selection:" 1 9 a b r q; }; fi
+			;;
+		*)
+			CHOSEN="$1"
+			;;
 	esac
 	[ -n "${CHOSEN}" ] && trap 'clear; end_op_message 2' HUP INT QUIT ABRT TERM
 	case "${CHOSEN}" in
-	"1" | "install" | "update")
-		if [ "${CHOSEN}" = "update" ]; then
-			AUTO_UPDATE="update"
-			inst_dnscrypt "${AUTO_UPDATE:-update}"
-		else
-			PTXT "${INFO} This operation will install dnscrypt-proxy and related files (<6MB)" \
-				"${INFO} to jffs, no other data will be changed." \
+		"1" | "install" | "update")
+			if [ "${CHOSEN}" = "update" ]; then
+				AUTO_UPDATE="update"
+				inst_dnscrypt "${AUTO_UPDATE:-update}"
+			else
+				PTXT "${INFO} This operation will install dnscrypt-proxy and related files (<6MB)" \
+					"${INFO} to jffs, no other data will be changed." \
+					"${INFO} Also some start scripts will be installed/modified as required."
+				if read_yesno "Do you want to install dnscrypt-proxy to /jffs?"; then inst_dnscrypt "${AUTO_UPDATE:-install}"; else end_op_message 1; fi
+			fi
+			;;
+		"2" | "uninstall")
+			PTXT "${INFO} This operation will uninstall dnscrypt-proxy and related files" \
+				"${INFO} from jffs, no other data will be changed." \
+				"${INFO} Also some start scripts will be modified as required."
+			if read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?"; then uninst_dnscrypt; else end_op_message 1; fi
+			;;
+		"3" | "configure")
+			PTXT "${INFO} This operation allows you to configure dnscrypt-proxy"
+			if read_yesno "Do you want to proceed?"; then setup_dnscrypt reconfig; else end_op_message 1; fi
+			;;
+		"4" | "setTZ")
+			PTXT "${INFO} This operation allows you to set your router timezone for background services and processes."
+			if read_yesno "Do you want to proceed?"; then set_timezone; else end_op_message 1; fi
+			;;
+		"5" | "unsetTZ")
+			PTXT "${INFO} This operation allows you to unset your router timezone for background services and processes."
+			if read_yesno "Do you want to proceed?"; then unset_timezone; else end_op_message 1; fi
+			;;
+		"6" | "instRNG")
+			PTXT "${INFO} This operation will install a (P)RNG (<0.5MB) to jffs, no other data will be changed." \
 				"${INFO} Also some start scripts will be installed/modified as required."
-			if read_yesno "Do you want to install dnscrypt-proxy to /jffs?"; then inst_dnscrypt "${AUTO_UPDATE:-install}"; else end_op_message 1; fi
-		fi
-		;;
-	"2" | "uninstall")
-		PTXT "${INFO} This operation will uninstall dnscrypt-proxy and related files" \
-			"${INFO} from jffs, no other data will be changed." \
-			"${INFO} Also some start scripts will be modified as required."
-		if read_yesno "Do you want to uninstall dnscrypt-proxy from /jffs?"; then uninst_dnscrypt; else end_op_message 1; fi
-		;;
-	"3" | "configure")
-		PTXT "${INFO} This operation allows you to configure dnscrypt-proxy"
-		if read_yesno "Do you want to proceed?"; then setup_dnscrypt reconfig; else end_op_message 1; fi
-		;;
-	"4" | "setTZ")
-		PTXT "${INFO} This operation allows you to set your router timezone for background services and processes."
-		if read_yesno "Do you want to proceed?"; then set_timezone; else end_op_message 1; fi
-		;;
-	"5" | "unsetTZ")
-		PTXT "${INFO} This operation allows you to unset your router timezone for background services and processes."
-		if read_yesno "Do you want to proceed?"; then unset_timezone; else end_op_message 1; fi
-		;;
-	"6" | "instRNG")
-		PTXT "${INFO} This operation will install a (P)RNG (<0.5MB) to jffs, no other data will be changed." \
-			"${INFO} Also some start scripts will be installed/modified as required."
-		if read_yesno "Do you want to install (P)RNG to /jffs?"; then inst_random; else end_op_message 1; fi
-		;;
-	"7" | "unstRNG")
-		PTXT "${INFO} This operation will uninstall (P)RNG" \
-			"${INFO} from jffs, no other data will be changed." \
-			"${INFO} Also some start scripts will be installed/modified as required."
-		if read_yesno "Do you want to uninstall (P)RNG from /jffs?"; then uninst_random; else end_op_message 1; fi
-		;;
-	"8" | "instSWAP")
-		PTXT "${INFO} This operation will install a swap file for your device." \
-			"${INFO} You need an external USB storage to host this file."
-		if read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?"; then check_swap; else end_op_message 1; fi
-		;;
-	"9" | "unstALL")
-		PTXT "${INFO} This operation will cleanup everything installed by this script (except swap)."
-		if read_yesno "Do you want to continue?"; then uninst_all; else end_op_message 1; fi
-		;;
-	"a" | "A" | "setAMTMUPDATE")
-		PTXT "${INFO} This operation allows you to enable or disable AMTM's ability to manage updates for this script and by extension, Dnscrypt-Proxy."
-		PTXT "${INFO} If the option is already disabled and you choose to proceed, then you will be enabling."
-		PTXT "${INFO} The same is true if the opposite is true and you choose to proceed."
-		if read_yesno "Do you want to proceed?"; then setup_amtmupdate; else end_op_message 1; fi
-		;;
-	"b" | "B" | "backup")
-		PTXT "${INFO} This operation will backup everything!"
-		if read_yesno "Do you want to continue?"; then backup_restore BACKUP; else end_op_message 1; fi
-		;;
-	"r" | "R" | "restore")
-		PTXT "${INFO} This operation will restore everything!"
-		if read_yesno "Do you want to continue?"; then backup_restore RESTORE; else end_op_message 1; fi
-		;;
-	"q" | "Q")
-		PTXT "${INFO} Operations have been applied if any has been made" \
-			"${INFO} In case of anomaly, please reboot your router!"
-		if [ -f "${HOME}/installer" ]; then rm -rf "${HOME}/installer"; fi
-		sleep 3s
-		clear
-		;;
+			if read_yesno "Do you want to install (P)RNG to /jffs?"; then inst_random; else end_op_message 1; fi
+			;;
+		"7" | "unstRNG")
+			PTXT "${INFO} This operation will uninstall (P)RNG" \
+				"${INFO} from jffs, no other data will be changed." \
+				"${INFO} Also some start scripts will be installed/modified as required."
+			if read_yesno "Do you want to uninstall (P)RNG from /jffs?"; then uninst_random; else end_op_message 1; fi
+			;;
+		"8" | "instSWAP")
+			PTXT "${INFO} This operation will install a swap file for your device." \
+				"${INFO} You need an external USB storage to host this file."
+			if read_yesno "Do you want to install a swap file (512MB on ext filesystem partition)?"; then check_swap; else end_op_message 1; fi
+			;;
+		"9" | "unstALL")
+			PTXT "${INFO} This operation will cleanup everything installed by this script (except swap)."
+			if read_yesno "Do you want to continue?"; then uninst_all; else end_op_message 1; fi
+			;;
+		"a" | "A" | "setAMTMUPDATE")
+			PTXT "${INFO} This operation allows you to enable or disable AMTM's ability to manage updates for this script and by extension, Dnscrypt-Proxy."
+			PTXT "${INFO} If the option is already disabled and you choose to proceed, then you will be enabling."
+			PTXT "${INFO} The same is true if the opposite is true and you choose to proceed."
+			if read_yesno "Do you want to proceed?"; then setup_amtmupdate; else end_op_message 1; fi
+			;;
+		"b" | "B" | "backup")
+			PTXT "${INFO} This operation will backup everything!"
+			if read_yesno "Do you want to continue?"; then backup_restore BACKUP; else end_op_message 1; fi
+			;;
+		"r" | "R" | "restore")
+			PTXT "${INFO} This operation will restore everything!"
+			if read_yesno "Do you want to continue?"; then backup_restore RESTORE; else end_op_message 1; fi
+			;;
+		"q" | "Q")
+			PTXT "${INFO} Operations have been applied if any has been made" \
+				"${INFO} In case of anomaly, please reboot your router!"
+			if [ -f "${HOME}/installer" ]; then rm -rf "${HOME}/installer"; fi
+			sleep 3s
+			clear
+			;;
 	esac
 }
 
 case "$2" in
-"")
-	cleanup
-	check_jffs_enabled
-	check_dns_environment
-	check_version
-	menu
-	;;
-[1-9] | "install" | "update" | "uninstall" | "configure" | "setTZ" | "unsetTZ" | "instRNG" | "unstRNG" | "instSWAP" | "unstALL" | [aA] | "setAMTMUPDATE" | [bB] | "backup" | [rR] | "restore")
-	menu "$2"
-	;;
-*)
-	PTXT "${INFO} Usage: sh installer {master|dev?|""} (1 - {install/update} | 2 - uninstall | 3 - configure | 4 - setTZ | 5 - unsetTZ | 6 - instRNG | 7 - unstRNG | 8 - instSWAP | 9 - unstALL | {a/A} - setAMTMUPDATE | {b/B} - backup | {r/R} - restore)" \
-		"${INFO} Branch or Tag must be represented by a value or empty quotes in place of string e.g. \"\" in the \$1 string position." \
-		"${INFO} Action must be represented by a usage value in the \$2 string position." \
-		"${INFO} An update example: sh installer master update, or just use the regular menu by not specifying an action e.g: sh installer master."
-	;;
+	"")
+		cleanup
+		check_jffs_enabled
+		check_dns_environment
+		check_version
+		menu
+		;;
+	[1-9] | "install" | "update" | "uninstall" | "configure" | "setTZ" | "unsetTZ" | "instRNG" | "unstRNG" | "instSWAP" | "unstALL" | [aA] | "setAMTMUPDATE" | [bB] | "backup" | [rR] | "restore")
+		menu "$2"
+		;;
+	*)
+		PTXT "${INFO} Usage: sh installer {master|dev?|""} (1 - {install/update} | 2 - uninstall | 3 - configure | 4 - setTZ | 5 - unsetTZ | 6 - instRNG | 7 - unstRNG | 8 - instSWAP | 9 - unstALL | {a/A} - setAMTMUPDATE | {b/B} - backup | {r/R} - restore)" \
+			"${INFO} Branch or Tag must be represented by a value or empty quotes in place of string e.g. \"\" in the \$1 string position." \
+			"${INFO} Action must be represented by a usage value in the \$2 string position." \
+			"${INFO} An update example: sh installer master update, or just use the regular menu by not specifying an action e.g: sh installer master."
+		;;
 esac
