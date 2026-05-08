@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.8                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.6.9                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.6.8"
+DI_VERSION="v2.6.9"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
@@ -1854,7 +1854,7 @@ write_manager_script() {
 case "${BRANCH}" in
 	"amtmupdate")
 		unset BRANCH
-		BRANCH="$(awk -F'=' '/INSTALLER_BRANCH/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')"
+		[ "$(awk -F'=' '/INSTALLER_BRANCH/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" ] && BRANCH="$(awk -F'=' '/INSTALLER_BRANCH/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" || BRANCH="master"
 		case "$2" in
 			"check")
 				if [ ! -f "${CONF_FILE}" ] || [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "DISABLED" ]; then
@@ -1865,9 +1865,7 @@ case "${BRANCH}" in
 				;;
 			"")
 				CHOSEN="${1#amtm}"
-				chmod 755 "${SCRIPT_LOC}" >/dev/null 2>&1
-				exec "${SCRIPT_LOC}" "${BRANCH}" "${CHOSEN}" >/dev/null 2>&1
-				exit $?
+				set -- "$BRANCH" "$CHOSEN"
 				;;
 		esac
 		;;
