@@ -49,6 +49,7 @@ jobs:
           dash -n tools/list-shell-scripts.sh
           dash -n tools/check-md5.sh
           dash -n tools/update-md5.sh
+          dash -n tools/code-quality.sh
 
   shellcheck:
     name: ShellCheck POSIX ash profile

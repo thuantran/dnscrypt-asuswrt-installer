@@ -79,6 +79,24 @@ I also need following information:
 - Which dns server you selected during dnscrypt installation
 - Which router you're using
 - Firmware and its version
+# Development checks:
+Repository shell scripts are written for POSIX/BusyBox `ash` compatibility. Avoid Bash-only syntax such as arrays, process substitution, `[[ ... ]]`, and non-portable `pipefail`.
+
+Run the repository quality helper before opening a pull request:
+```
+tools/code-quality.sh
+```
+
+The helper validates installer artifact `.md5sum` files, runs ShellCheck on detected shell scripts, and checks formatting with `shfmt`.
+
+To apply `shfmt` formatting locally, run:
+```
+tools/code-quality.sh --fix
+```
+
+If CI reports `shfmt` formatting differences, you can also run the `Create shfmt formatting PR` workflow against the affected branch to open an automated formatting pull request.
+
+Pull requests that change shell scripts, checksum files, tools, prompts, or workflows are also reviewed by the Codex Code Improvement workflow when the repository has an `OPENAI_API_KEY` Actions secret configured. The Codex prompt includes the local code-quality output so formatting failures can be reported with the same remediation steps shown in CI.
 # How I made this:
 - Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
 - Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
