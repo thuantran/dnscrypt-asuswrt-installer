@@ -6,6 +6,21 @@
 
 Install, update, reconfigure, and remove [dnscrypt-proxy v2](https://github.com/jedisct1/dnscrypt-proxy) on supported ASUS routers running Asuswrt-Merlin firmware. The installer handles the router-specific setup work that is usually required when installing through Entware or similar package managers, including startup scripts and the boot-time NTP timestamp issue.
 
+## Table of contents
+
+- [Requirements](#requirements)
+- [Incompatibilities](#incompatibilities)
+- [Features](#features)
+- [Install, update, reconfigure, or uninstall](#install-update-reconfigure-or-uninstall)
+  - [Legacy dnscrypt-proxy v1](#legacy-dnscrypt-proxy-v1)
+- [Managing dnscrypt-proxy](#managing-dnscrypt-proxy)
+- [Verify that dnscrypt-proxy is running](#verify-that-dnscrypt-proxy-is-running)
+- [Troubleshooting and issue reports](#troubleshooting-and-issue-reports)
+- [Changelog](#changelog)
+- [Development checks](#development-checks)
+- [Project notes](#project-notes)
+- [Donate](#donate)
+
 ## Requirements
 
 - ASUS router running custom [Asuswrt-Merlin](https://www.asuswrt-merlin.net/) firmware.
