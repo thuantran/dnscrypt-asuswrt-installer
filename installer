@@ -288,7 +288,6 @@ dnscrypt_complete_startup() {
 	return 0
 }
 
-
 backup_restore() {
 	if [ "$1" = "BACKUP" ] && [ -d "${TARG_DIR}" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
 		if [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
@@ -1188,7 +1187,6 @@ del_jffs_script() {
 	[ "$(awk '{ print }' "${TARG}")" = "#!/bin/sh" ] && rm -f "${TARG}"
 }
 
-
 download_file() {
 	local TARG PERM URL RET FILENAME TMP_FILE MD5SUM_OLD MD5SUM_CURR COUNT
 	TARG="$1"
@@ -1235,7 +1233,6 @@ download_file() {
 	fi
 	return "${RET}"
 }
-
 
 end_op_message() {
 	case "${1:-0}" in
