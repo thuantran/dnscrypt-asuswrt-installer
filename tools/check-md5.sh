@@ -36,7 +36,7 @@ while IFS= read -r target; do
 		continue
 	fi
 
-	expected=$(sed -n '1s/[[:space:]].*$//p' "${sum_file}")
+	expected=$(awk '{print $1; exit}' "${sum_file}")
 	actual=$(md5sum "${target}" | awk '{print $1}')
 
 	if [ "${expected}" != "${actual}" ]; then
