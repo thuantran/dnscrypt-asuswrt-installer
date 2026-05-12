@@ -1,106 +1,172 @@
-<a href="https://ibb.co/82v4nFh"><img src="https://i.ibb.co/ft6GVmc/image.png" alt="image" border="0"></a>
+<p align="center">
+  <a href="https://ibb.co/82v4nFh"><img src="https://i.ibb.co/ft6GVmc/image.png" alt="Asuswrt-Merlin Dnscrypt-Proxy Installer" border="0"></a>
+</p>
 
-To resolve all problems associated with installing Dnscrypt-Proxy with Entware (or similar) along with setting up various scripts to handle dnscrypt-proxy starting up including the ntp issue, this installer of dnscrypt-proxy resolves all these concerns... The only requirement is an Asus Router flashed with custom Asuswrt-Merlin Firmware.
-# Requirements:
-- ARM based ASUS routers that use Asuswrt-Merlin Firmware
-- JFFS support and enabled
-- Service commands require Firmware version 384.11, or higher
-# Incompatibilities:
-- No known issue
-# Current features:
-- [dnscrypt-proxy version 2](https://github.com/jedisct1/dnscrypt-proxy) with ODoH, DoH, and DNSCrypt version 2 protocols, multiple resolvers, and other features
-- Running as nobody through nonroot binary (using --user requires change to passwd)
-- Support ARM based routers
-- Support OpenDNS dynamic IP update by entering your OpenDNS account information
-- Handling ntp update at router boot up by starting dnscrypt-proxy with cert_ignore_timestamp option
-- Redirect all DNS queries on your network to dnscrypt if user chooses to using DNS Filter Option
-- Install haveged/rngd for better speed with dnscrypt and other cryptographic applications
-- Support various HW RNG such as TrueRNG (tested with v3), TrueRNGpro, OneRNG, EntropyKey
-- Ability to setup a swap file
-- Ability to setup timezone file (/etc/localtime) used by dnscrypt-proxy and other apps
-- Ability to reconfigure dnscrypt-proxy without reinstalling unlike previous installer for dnscrypt-proxy version 1.x.x
-- Ability to configure anonymized relay support per Dnscrypt server through menu option or Wildcard Relay Support to cover all dnscrypt servers when automatic is selected.
-- Support for NextDNS.io Account SDNS stamp as Static server.
-- Support for addition of multiple static servers using SDNS Stamp and Custom Server Naming that can be mixed with servers on the resolvers list.
-- Improved Installer/Update/Backup Functions.
-# Changelog:
-https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master
-# Install/Update/Reconfig/Uninstall:
-Run this command from ssh shell and following the prompt for dnscrypt-proxy version 2:
-```
+# Asuswrt-Merlin Dnscrypt-Proxy Installer
+
+Install, update, reconfigure, and remove [dnscrypt-proxy v2](https://github.com/jedisct1/dnscrypt-proxy) on supported ASUS routers running Asuswrt-Merlin firmware. The installer handles the router-specific setup work that is usually required when installing through Entware or similar package managers, including startup scripts and the boot-time NTP timestamp issue.
+
+## Table of contents
+
+- [Requirements](#requirements)
+- [Incompatibilities](#incompatibilities)
+- [Features](#features)
+- [Install, update, reconfigure, or uninstall](#install-update-reconfigure-or-uninstall)
+  - [Legacy dnscrypt-proxy v1](#legacy-dnscrypt-proxy-v1)
+- [Managing dnscrypt-proxy](#managing-dnscrypt-proxy)
+- [Verify that dnscrypt-proxy is running](#verify-that-dnscrypt-proxy-is-running)
+- [Troubleshooting and issue reports](#troubleshooting-and-issue-reports)
+- [Changelog](#changelog)
+- [Development checks](#development-checks)
+- [Project notes](#project-notes)
+- [Donate](#donate)
+
+## Requirements
+
+- ASUS router running custom [Asuswrt-Merlin](https://www.asuswrt-merlin.net/) firmware.
+- ARMv7 or ARMv8/aarch64 router architecture.
+- Router operating in router mode.
+- JFFS custom scripts and configs enabled. If they are disabled, the installer attempts to enable them automatically.
+- Firmware version `384.11` or newer for `service` command support.
+- SSH access to the router.
+
+## Incompatibilities
+
+- No known issues.
+
+## Features
+
+- Installs [dnscrypt-proxy v2](https://github.com/jedisct1/dnscrypt-proxy) with support for ODoH, DoH, DNSCrypt v2, multiple resolvers, and other dnscrypt-proxy features.
+- Runs dnscrypt-proxy as `nobody` through the bundled `nonroot` helper.
+- Supports ARMv7 and ARMv8/aarch64 ASUS routers.
+- Supports OpenDNS dynamic IP updates by storing your OpenDNS account information during setup.
+- Starts dnscrypt-proxy with `cert_ignore_timestamp` at boot to work around NTP timestamp availability during router startup.
+- Optionally redirects LAN DNS queries to dnscrypt-proxy through the ASUS DNS Filter option.
+- Optionally installs `haveged` or `rngd` to improve entropy availability for dnscrypt-proxy and other cryptographic applications.
+- Supports hardware random number generators including TrueRNG, TrueRNGpro, OneRNG, and EntropyKey.
+- Can create a swap file.
+- Can configure `/etc/localtime` for dnscrypt-proxy and other router applications.
+- Allows dnscrypt-proxy reconfiguration without a full reinstall.
+- Supports anonymized DNSCrypt relay configuration through menu options, including wildcard relay support for compatible DNSCrypt servers.
+- Supports NextDNS account SDNS stamps as static servers.
+- Supports multiple static servers using SDNS stamps and custom server names that can be mixed with resolver-list servers.
+- Includes installer, update, backup, reconfiguration, and uninstall workflows.
+
+## Install, update, reconfigure, or uninstall
+
+SSH into your router and run:
+
+```sh
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/installer && sh installer; rm installer
 ```
-User can safely update from dnscrypt-proxy version 1 to version 2 with above command.
 
-If you want to use dnscrypt-proxy version 1, run this command:
-```
+Follow the interactive prompts. You can safely use the same command to update from dnscrypt-proxy v1 to v2.
+
+### Legacy dnscrypt-proxy v1
+
+If you specifically need the legacy dnscrypt-proxy v1 installer, run:
+
+```sh
 curl -L -s -k -O https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/dnscrypt-proxy-v1/installer && sh installer dnscrypt-proxy-v1; rm installer
 ```
-# Terminal commands to for Dnscrypt-Proxy are:
-```
-/jffs/dnscrypt/manager {(dnscrypt-)?(start|stop)|restart|kill}
-```
-or (recommended commands)
-```
-service {(dnscrypt-)?(start|stop)|restart|kill}_dnscrypt-proxy
-```
-# How to check if it works:
-If you use OpenDNS, run this command on Windows cmd
-```
-nslookup -type=txt debug.opendns.com
-```
-You should see something like
-```
-"dnscrypt enabled (717473654A614970)"
-```
-in result.
 
-Otherwise running this command:
+## Managing dnscrypt-proxy
+
+Recommended service commands:
+
+```sh
+service {start|stop|restart|kill}_dnscrypt-proxy
 ```
+
+The manager script also supports equivalent commands:
+
+```sh
+/jffs/dnscrypt/manager {start|stop|restart|kill}
+```
+
+## Verify that dnscrypt-proxy is running
+
+Check for a running dnscrypt-proxy process:
+
+```sh
 pidof dnscrypt-proxy
 ```
-will return a number.
-# How to report issue:
-I need following directory and files:
+
+A numeric process ID means dnscrypt-proxy is running.
+
+If you use OpenDNS, you can also run this from a Windows Command Prompt:
+
+```cmd
+nslookup -type=txt debug.opendns.com
 ```
+
+A successful OpenDNS result includes text similar to:
+
+```text
+"dnscrypt enabled (717473654A614970)"
+```
+
+## Troubleshooting and issue reports
+
+When reporting an issue, include the following directory and files:
+
+```text
 /jffs/dnscrypt
 /jffs/scripts/init-start
 /jffs/scripts/dnsmasq.postconf
 /jffs/scripts/services-stop
 /jffs/scripts/service-event-end
 ```
-One can use this command to create a tar archive of these files:
-```
-echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/init-start /jffs/scripts/dnsmasq.postconf /jffs/scripts/services-stop /jffs/scripts/service-event-end ; rm exclude-files
-```
-in current directory and send me the archive for debug.
 
-I also need following information:
-- Which dns server you selected during dnscrypt installation
-- Which router you're using
-- Firmware and its version
-# Development checks:
+You can create a debug archive from the router shell with:
+
+```sh
+echo .config > exclude-files; tar -cvf dnscrypt.tar -X exclude-files /jffs/dnscrypt /jffs/scripts/init-start /jffs/scripts/dnsmasq.postconf /jffs/scripts/services-stop /jffs/scripts/service-event-end; rm exclude-files
+```
+
+Send `dnscrypt.tar` with your issue report and include:
+
+- The DNS server selected during dnscrypt-proxy installation.
+- Router model.
+- Firmware name and version.
+- Any relevant error output from the installer or manager script.
+
+## Changelog
+
+See the [commit history](https://github.com/thuantran/dnscrypt-asuswrt-installer/commits/master) for changes.
+
+## Development checks
+
 Repository shell scripts are written for POSIX/BusyBox `ash` compatibility. Avoid Bash-only syntax such as arrays, process substitution, `[[ ... ]]`, and non-portable `pipefail`.
 
 Run the repository quality helper before opening a pull request:
-```
+
+```sh
 tools/code-quality.sh
 ```
 
 The helper validates installer artifact `.md5sum` files, runs ShellCheck on detected shell scripts, and checks formatting with `shfmt`.
 
 To apply `shfmt` formatting locally, run:
-```
+
+```sh
 tools/code-quality.sh --fix
 ```
 
 If CI reports `shfmt` formatting differences, you can also run the `Create shfmt formatting PR` workflow against the affected branch to open an automated formatting pull request.
 
 Pull requests that change shell scripts, checksum files, tools, prompts, or workflows are also reviewed by the Codex Code Improvement workflow when the repository has an `OPENAI_API_KEY` Actions secret configured. The Codex prompt includes the local code-quality output so formatting failures can be reported with the same remediation steps shown in CI.
-# How I made this:
-- Use dnscrypt-proxy binary packages from https://github.com/jedisct1/dnscrypt-proxy
-- Compiling and stripping required binaries using firmware building toolchain from asuswrt-merlin
-- I wrote the installer script with stuff inspired from entware-setup.sh from asuswrt-merlin
-- You can look at all the stuff here https://github.com/thuantran/dnscrypt-asuswrt-installer
-# Donate:
-This script will always be open source and free to use under [GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE), but if you want to support future development you can do so by [Donating With PayPal.](https://paypal.me/swotrb) or [Buy me a coffee](https://www.buymeacoffee.com/swotrb).
+
+## Project notes
+
+- Dnscrypt-Proxy binaries come from [jedisct1/dnscrypt-proxy](https://github.com/jedisct1/dnscrypt-proxy).
+- Required helper binaries are compiled and stripped with the Asuswrt-Merlin firmware build toolchain.
+- The installer script was inspired by `entware-setup.sh` from Asuswrt-Merlin.
+- Project source is available in this repository: <https://github.com/thuantran/dnscrypt-asuswrt-installer>.
+- License:[GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE)
+
+## Donate
+
+This project is open source and free to use under the GPL-3.0 license. If you want to support future development, you can donate through:
+- [PayPal](https://paypal.me/swotrb)
+- [Buy Me a Coffee](https://www.buymeacoffee.com/swotrb)
