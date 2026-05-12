@@ -8,6 +8,34 @@ have_cmd() {
 	which "$1" >/dev/null 2>&1
 }
 
+curl_help() {
+	if [ -z "${CURL_HELP_CACHE_SET:-}" ]; then
+		CURL_HELP_CACHE="$(
+			curl --help all 2>&1
+			curl --help 2>&1
+		)"
+		CURL_HELP_CACHE_SET="1"
+	fi
+	printf '%s\n' "${CURL_HELP_CACHE}"
+}
+
+curl_has_option() {
+	curl_help | grep -q -e "$1"
+}
+
+curl_common_args() {
+	if [ -z "${CURL_COMMON_ARGS_SET:-}" ]; then
+		CURL_COMMON_ARGS="-f -sL"
+		curl_has_option '--retry ' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --retry 5"
+		curl_has_option '--connect-timeout' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --connect-timeout 25"
+		curl_has_option '--retry-delay' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --retry-delay 5"
+		curl_has_option '--max-time' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --max-time $((5 * 25))"
+		curl_has_option '--retry-connrefused' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --retry-connrefused"
+		CURL_COMMON_ARGS_SET="1"
+	fi
+	printf '%s' "${CURL_COMMON_ARGS}"
+}
+
 wget_help() {
 	if [ -z "${WGET_HELP_CACHE_SET:-}" ]; then
 		WGET_HELP_CACHE="$(wget --help 2>&1)"
@@ -35,10 +63,11 @@ wget_common_args() {
 }
 
 http_probe() {
-	local URL WGET_ARGS
+	local URL CURL_ARGS WGET_ARGS
 	URL="$1"
 	if have_cmd curl; then
-		curl --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -sL -I -o /dev/null "${URL}"
+		CURL_ARGS="$(curl_common_args)"
+		curl ${CURL_ARGS} -I -o /dev/null "${URL}"
 	elif have_cmd wget; then
 		WGET_ARGS="$(wget_common_args)"
 		if wget_has_option '--spider'; then
@@ -62,6 +91,86 @@ append_on_demand() {
 	done
 }
 
+remove_dnsmasq_server() {
+	local DNS TARGET TMP
+	TARGET="$1"
+	DNS="$2"
+	[ -n "${DNS}" ] || return 0
+	[ -f "${TARGET}" ] || return 0
+	TMP="${TARGET}.$$"
+	awk -v dns="${DNS}" '
+		BEGIN { prefix = "server=" dns; prefix_len = length(prefix) }
+		substr($0, 1, prefix_len) == prefix {
+			suffix = substr($0, prefix_len + 1, 1)
+			if (suffix == "" || suffix == "#" || suffix == " " || suffix == "	") { next }
+		}
+		{ print }
+	' "${TARGET}" >"${TMP}" && cat "${TMP}" >"${TARGET}"
+	rm -f "${TMP}"
+}
+
+kill_processes() {
+	local PID PIDS PROCESS
+	for PROCESS in "$@"; do
+		PIDS="$(pidof "${PROCESS}" 2>/dev/null)"
+		for PID in ${PIDS}; do
+			kill -s 9 "${PID}" 2>/dev/null
+		done
+	done
+	killall -q -9 "$@" 2>/dev/null
+}
+
+flock_supports_fd() {
+	local TEST_LOCK
+	TEST_LOCK="/tmp/dnscrypt-proxy-flock-test.$$"
+	(
+		: >"${TEST_LOCK}" || exit 1
+		exec 8>"${TEST_LOCK}" || exit 1
+		flock -n 8 >/dev/null 2>&1
+	)
+	rm -f "${TEST_LOCK}"
+}
+
+nvram_int_gt() {
+	local VALUE MIN
+	VALUE="$(nvram get "$1" 2>/dev/null)"
+	MIN="$2"
+	case "${VALUE}" in
+		"" | *[!0-9]*)
+			return 1
+			;;
+	esac
+	[ "${VALUE}" -gt "${MIN}" ]
+}
+
+dnscrypt_process_count() {
+	pidof dnscrypt-proxy | wc -w
+}
+
+dnscrypt_wait_stopped() {
+	local elapsed maxwait
+	elapsed="0"
+	maxwait="${1:-60}"
+	while [ "$(dnscrypt_process_count)" -ge "1" ]; do
+		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
+		sleep 1s
+		elapsed="$((elapsed + 1))"
+	done
+	return 0
+}
+
+dnscrypt_wait_started() {
+	local elapsed maxwait
+	elapsed="0"
+	maxwait="${1:-60}"
+	while [ "$(dnscrypt_process_count)" -lt "1" ]; do
+		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
+		sleep 1s
+		elapsed="$((elapsed + 1))"
+	done
+	return 0
+}
+
 check_dns_environment() {
 	local NVCHECK
 	NVCHECK="0"
@@ -70,7 +179,7 @@ check_dns_environment() {
 		NVCHECK="$((NVCHECK + 1))"
 	fi
 	if [ "$(pidof stubby)" ]; then
-		{ killall -q -9 stubby 2>/dev/null; }
+		{ kill_processes stubby; }
 		NVCHECK="$((NVCHECK + 1))"
 	fi
 	if [ "$(nvram get dhcp_dns1_x)" ] && [ "${NVCHECK}" != "0" ]; then
@@ -92,8 +201,80 @@ check_dns_environment() {
 	fi
 }
 
+dnscrypt_proxy_run_execute() {
+	local action end owner pid_file runtime start status
+	action="$1"
+	pid_file="$2"
+	owner="${3:-$$}"
+	printf "%s\n" "${owner}" >"${pid_file}"
+	start="$(date +%s)"
+	service_wait "${action}" 30
+	status="$?"
+	end="$(date +%s)"
+	runtime="$((end - start))"
+	printf "%s\n" "${runtime}" >>"${pid_file}"
+	if [ "${status}" -eq 0 ]; then
+		logger -st "${NAME}" "${action} took ${runtime} second(s) to complete."
+	else
+		logger -st "${NAME}" "Warning: ${action} did not complete within ${runtime} second(s)."
+	fi
+	return "${status}"
+}
+
+dnscrypt_proxy_run_flock() {
+	local action lock_dir lock_file owner pid_file status
+	action="$1"
+	lock_dir="/tmp/dnscrypt-proxy"
+	lock_file="${lock_dir}.lock"
+	pid_file="${lock_dir}/pid"
+	if ! mkdir -p "${lock_dir}"; then
+		logger -st "${NAME}" "Unable to create ${lock_dir}; cannot run ${action}."
+		return 1
+	fi
+	exec 9>"${lock_file}" || return 1
+	if [ "${action}" = "stop_dnscrypt_proxy" ]; then
+		if ! flock 9; then
+			logger -st "${NAME}" "Unable to acquire flock for ${action}."
+			exec 9>&-
+			return 1
+		fi
+	elif ! flock -n 9; then
+		owner="$(sed -n '1p' "${pid_file}" 2>/dev/null)"
+		logger -st "${NAME}" "Lock owned by ${owner:-unknown} exists; preventing duplicate runs!"
+		exec 9>&-
+		return 1
+	fi
+	dnscrypt_proxy_run_execute "${action}" "${pid_file}" "$$"
+	status="$?"
+	flock -u 9 >/dev/null 2>&1
+	exec 9>&-
+	rm -rf "${lock_dir}"
+	rm -f "${lock_file}"
+	return "${status}"
+}
+
+dnscrypt_proxy_run_mkdir() {
+	local action lock_dir pid pid_file status
+	action="$1"
+	lock_dir="/tmp/dnscrypt-proxy"
+	pid_file="${lock_dir}/pid"
+	if (mkdir "${lock_dir}") 2>/dev/null || { [ -e "${pid_file}" ] && [ -n "$(sed -n '2p' "${pid_file}" 2>/dev/null)" ]; } || { [ "${action}" = "stop_dnscrypt_proxy" ]; }; then
+		(
+			trap 'rm -rf "${lock_dir}"; exit $?' EXIT
+			{ service_wait dnscrypt_proxy_run; }
+			rm -rf "${lock_dir}"
+		) &
+		pid="$!"
+		dnscrypt_proxy_run_execute "${action}" "${pid_file}" "${pid}"
+		status="$?"
+		return "${status}"
+	fi
+	logger -st "${NAME}" "Lock owned by $(sed -n '1p' "${pid_file}" 2>/dev/null) exists; preventing duplicate runs!"
+	return 1
+}
+
 dnscrypt_proxy_run() {
-	local lock_dir pid pid_file start end runtime
+	local lock_dir pid_file
 	lock_dir="/tmp/dnscrypt-proxy"
 	pid_file="${lock_dir}/pid"
 	case "$1" in
@@ -101,24 +282,10 @@ dnscrypt_proxy_run() {
 			if [ -z "$(sed -n '2p' "${pid_file}" 2>/dev/null)" ]; then return 1; else return 0; fi
 			;;
 		*)
-			if (mkdir "${lock_dir}") 2>/dev/null || { [ -e "${pid_file}" ] && [ -n "$(sed -n '2p' "${pid_file}" 2>/dev/null)" ]; } || { [ "$1" = "stop_dnscrypt_proxy" ]; }; then
-				(
-					trap 'rm -rf "${lock_dir}"; exit $?' EXIT
-					{ service_wait dnscrypt_proxy_run; }
-					rm -rf "${lock_dir}"
-				) &
-				pid="$!"
-				{
-					printf "%s\n" "${pid}" >"${pid_file}"
-					start="$(date +%s)"
-					{ service_wait "$1" 30; }
-					end="$(date +%s)"
-					runtime="$((end - start))"
-					printf "%s\n" "${runtime}" >>"${pid_file}"
-					logger -st "${NAME}" "$1 took ${runtime} second(s) to complete."
-				}
+			if have_cmd flock && flock_supports_fd; then
+				dnscrypt_proxy_run_flock "$1"
 			else
-				logger -st "${NAME}" "Lock owned by $(sed -n '1p' "${pid_file}" 2>/dev/null) exists; preventing duplicate runs!"
+				dnscrypt_proxy_run_mkdir "$1"
 			fi
 			;;
 	esac
@@ -134,11 +301,11 @@ dnsmasq_params() {
 			append_on_demand "${CONFIG}" "no-resolv"
 			append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
 			for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
-				sed -i "/^server=${DNS}.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+				remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"
 			done
 			for VAR in 1 2 3; do
 				DNS="$(nvram get "ipv6_dns${VAR}")"
-				[ -n "${DNS}" ] && sed -i "/^server=${DNS}.*$/d" /jffs/dnscrypt/resolv.dnsmasq
+				remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"
 			done
 			sed -i "/^servers-file=.*$/d" "${CONFIG}"
 			append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
@@ -179,8 +346,16 @@ init_hwrng() {
 }
 
 netcheck() {
-	local livecheck="0" i
-	until { [ "$(/bin/date -u +"%Y")" -gt "1970" ] || [ "$(/bin/date -u '+%s')" -ge "$(/bin/date -u -r "$0" '+%s')" ]; } && [ "$(nvram get ntp_ready)" -gt 0 ]; do sleep 1s; done
+	local livecheck="0" i timewait
+	timewait="0"
+	until { [ "$(/bin/date -u +"%Y")" -gt "1970" ] || [ "$(/bin/date -u '+%s')" -ge "$(/bin/date -u -r "$0" '+%s')" ]; } && nvram_int_gt ntp_ready 0; do
+		if [ "${timewait}" -ge "300" ]; then
+			logger -st "${NAME}" "Warning: timed out waiting for NTP readiness."
+			return 1
+		fi
+		sleep 1s
+		timewait="$((timewait + 1))"
+	done
 	while [ "${livecheck}" != "4" ]; do
 		for i in google.com github.com snbforums.com; do
 			if { ! nslookup "${i}" 127.0.0.1 >/dev/null 2>&1; } && { ping -q -w3 -c1 "${i}" >/dev/null 2>&1; }; then
@@ -259,12 +434,16 @@ start_dnscrypt_proxy() {
 	local DNSCRYPT_START LOG_FACILITY
 	{ cd /jffs/dnscrypt; } || exit
 	if [ "$(grep -cE '^# use_syslog = true' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "1" ] && [ "$(grep -cE '^# log_file =' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "5" ]; then LOG_FACILITY="-syslog"; fi
-	{ killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }
+	{ kill_processes dnscrypt-proxy; }
+	if ! dnscrypt_wait_stopped 30; then
+		logger -st "${NAME}" "Warning: unable to stop existing dnscrypt-proxy processes before start."
+		return 1
+	fi
 	DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy ${LOG_FACILITY} -config /jffs/dnscrypt/dnscrypt-proxy.toml"
 	logger -st "${NAME}" "Starting dnscrypt-proxy from ${NAME}."
 	{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
 	if ! grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
-	if [ -n "$(pidof dnscrypt-proxy)" ] && { service_wait netcheck 300; }; then return "0"; else return "1"; fi
+	if dnscrypt_wait_started 30 && { service_wait netcheck 300; }; then return "0"; else return "1"; fi
 }
 
 start_monitor() {
@@ -272,79 +451,91 @@ start_monitor() {
 	trap 'EXIT="1"' USR1
 	trap 'EXIT="2"' USR2
 	{ service_wait netcheck; }
-	local COUNT EXIT RANDOM
+	local COUNT EXIT MISSING_BINARY RANDOM
 	EXIT="0"
 	RANDOM="0"
 	logger -st "${NAME}" "Starting Monitor!"
 	while true; do
-		if [ -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
-			case "${EXIT}" in
-				"0")
-					timezone
-					case "${RANDOM}" in
-						"4320")
-							RANDOM="0"
-							if [ -n "${COUNT}" ]; then
-								logger -st "${NAME}" "Randomization: Health Check; Monitor will randomize it!"
-								unset COUNT
-							fi
-							;;
-						*)
-							if [ -z "${COUNT}" ]; then RANDOM="0"; else RANDOM="$((RANDOM + 1))"; fi
-							;;
-					esac
-					case "${COUNT}" in
-						"")
-							COUNT="0"
-							"$0" opendns-update
-							{ dnscrypt_proxy_run start_dnscrypt_proxy; }
-							;;
-					esac
-					case "$(pidof dnscrypt-proxy)" in
-						"")
-							logger -st "${NAME}" "Warning: dnscrypt-proxy is dead; Monitor will start it!"
-							unset COUNT
-							;;
-						*)
-							case "${COUNT}" in
-								"30" | "60" | "90")
-									"$0" opendns-update
-									if [ "${COUNT}" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi
-									if { ! service_wait netcheck 150; }; then
-										logger -st "${NAME}" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"
-										unset COUNT
-									fi
-									;;
-								*)
-									COUNT="$((COUNT + 1))"
-									;;
-							esac
-							;;
-					esac
-					if [ -n "${COUNT}" ]; then sleep 10s; fi
-					;;
-				"1")
-					logger -st "${NAME}" "Stopping Monitor!"
-					trap - HUP INT QUIT ABRT USR1 USR2 TERM
-					{ dnscrypt_proxy_run stop_dnscrypt_proxy; }
-					break
-					;;
-				"2")
-					logger -st "${NAME}" "Monitor is restarting dnscrypt-proxy!"
-					unset COUNT
-					EXIT="0"
-					;;
-			esac
+		if [ ! -f "/jffs/dnscrypt/dnscrypt-proxy" ]; then
+			if [ -z "${MISSING_BINARY}" ]; then
+				logger -st "${NAME}" "Warning: dnscrypt-proxy binary is missing; Monitor will wait."
+				MISSING_BINARY="1"
+			fi
+			sleep 10s
+			continue
 		fi
+		if [ -n "${MISSING_BINARY}" ]; then
+			logger -st "${NAME}" "dnscrypt-proxy binary is available; Monitor will resume."
+			unset MISSING_BINARY COUNT
+		fi
+		case "${EXIT}" in
+			"0")
+				timezone
+				case "${RANDOM}" in
+					"4320")
+						RANDOM="0"
+						if [ -n "${COUNT}" ]; then
+							logger -st "${NAME}" "Randomization: Health Check; Monitor will randomize it!"
+							unset COUNT
+						fi
+						;;
+					*)
+						if [ -z "${COUNT}" ]; then RANDOM="0"; else RANDOM="$((RANDOM + 1))"; fi
+						;;
+				esac
+				case "${COUNT}" in
+					"")
+						COUNT="0"
+						"$0" opendns-update
+						{ dnscrypt_proxy_run start_dnscrypt_proxy; }
+						;;
+				esac
+				case "$(pidof dnscrypt-proxy)" in
+					"")
+						logger -st "${NAME}" "Warning: dnscrypt-proxy is dead; Monitor will start it!"
+						unset COUNT
+						sleep 10s
+						;;
+					*)
+						case "${COUNT}" in
+							"30" | "60" | "90")
+								"$0" opendns-update
+								if [ "${COUNT}" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi
+								if { ! service_wait netcheck 150; }; then
+									logger -st "${NAME}" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"
+									unset COUNT
+									sleep 10s
+								fi
+								;;
+							*)
+								COUNT="$((COUNT + 1))"
+								;;
+						esac
+						;;
+				esac
+				if [ -n "${COUNT}" ]; then sleep 10s; fi
+				;;
+			"1")
+				logger -st "${NAME}" "Stopping Monitor!"
+				trap - HUP INT QUIT ABRT USR1 USR2 TERM
+				{ dnscrypt_proxy_run stop_dnscrypt_proxy; }
+				break
+				;;
+			"2")
+				logger -st "${NAME}" "Monitor is restarting dnscrypt-proxy!"
+				unset COUNT
+				EXIT="0"
+				;;
+		esac
 	done
 }
 
 stop_dnscrypt_proxy() {
 	{ cd /jffs/dnscrypt; } || exit
 	logger -st "${NAME}" "Stopping dnscrypt-proxy from ${NAME}."
-	{ killall -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }
+	{ kill_processes dnscrypt-proxy; }
 	if grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
-	if [ -z "$(pidof dnscrypt-proxy)" ] && { service_wait netcheck 300; }; then return 0; else return 1; fi
+	if dnscrypt_wait_stopped 30 && { service_wait netcheck 300; }; then return 0; else return 1; fi
 }
 
 stop_monitor() {
@@ -369,8 +560,13 @@ timezone() {
 }
 
 update_opendns() {
+	local RET
 	if [ -z "${OPENDNS_USER}" ] || [ -z "${OPENDNS_PASSWORD}" ] || [ "$1" -gt 2 ]; then
 		return
+	fi
+	if ! have_cmd curl; then
+		logger -st "${NAME}" "OpenDNS: curl is unavailable; skipping IP update."
+		return 1
 	fi
 	sleep 5s
 	RET="$(curl -k -s -u "${OPENDNS_USER}:${OPENDNS_PASSWORD}" "https://updates.opendns.com/nic/update?hostname=")"
@@ -413,7 +609,7 @@ case "$1" in
 		;;
 	"init-start" | "services-stop")
 		timezone
-		if [ -n "${RAN_PRV}" ]; then { kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }; fi
+		if [ -n "${RAN_PRV}" ]; then { kill_processes haveged jitterentropy-rngd rngd stty; }; fi
 		case "$1" in
 			"init-start")
 				proc_optimizations
