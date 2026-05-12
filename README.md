@@ -163,7 +163,7 @@ Pull requests that change shell scripts, checksum files, tools, prompts, or work
 - Required helper binaries are compiled and stripped with the Asuswrt-Merlin firmware build toolchain.
 - The installer script was inspired by `entware-setup.sh` from Asuswrt-Merlin.
 - Project source is available in this repository: <https://github.com/thuantran/dnscrypt-asuswrt-installer>.
-- License:[GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE)
+- License: [GPL-3.0 License](https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/master/LICENSE)
 
 ## Donate
 
