@@ -16,21 +16,66 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.0                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.1                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.7.0"
+DI_VERSION="v2.7.1"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+readonly DNSCRYPT_WAIT_TIMEOUT="60"
+readonly DNSCRYPT_READY_TIMEOUT="180"
+
+cleanup_api_files() {
+	rm -f "${API_FILE}" "${API_HEADERS}"
+}
+
+trap cleanup_api_files EXIT
 
 di_have_cmd() {
 	which "$1" >/dev/null 2>&1
+}
+
+curl_help() {
+	if [ -z "${CURL_HELP_CACHE_SET:-}" ]; then
+		CURL_HELP_CACHE="$(
+			curl --help all 2>&1
+			curl --help 2>&1
+		)"
+		CURL_HELP_CACHE_SET="1"
+	fi
+	printf '%s\n' "${CURL_HELP_CACHE}"
+}
+
+curl_has_option() {
+	curl_help | grep -q -e "$1"
+}
+
+curl_common_args() {
+	if [ -z "${CURL_COMMON_ARGS_SET:-}" ]; then
+		CURL_COMMON_ARGS="-f -sL"
+		curl_has_option '--retry ' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --retry 5"
+		curl_has_option '--connect-timeout' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --connect-timeout 25"
+		curl_has_option '--retry-delay' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --retry-delay 5"
+		curl_has_option '--max-time' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --max-time $((5 * 25))"
+		curl_has_option '--retry-connrefused' && CURL_COMMON_ARGS="${CURL_COMMON_ARGS} --retry-connrefused"
+		CURL_COMMON_ARGS_SET="1"
+	fi
+	printf '%s' "${CURL_COMMON_ARGS}"
+}
+
+curl_insecure_arg() {
+	if [ -z "${CURL_INSECURE_ARG_SET:-}" ]; then
+		CURL_INSECURE_ARG=""
+		curl_has_option '--insecure' && CURL_INSECURE_ARG=" -k"
+		CURL_INSECURE_ARG_SET="1"
+	fi
+	printf '%s' "${CURL_INSECURE_ARG}"
 }
 
 wget_help() {
@@ -69,22 +114,18 @@ wget_insecure_arg() {
 }
 
 http_get_file() {
-	local URL OUT HEADERS INSECURE WGET_ARGS
+	local URL OUT HEADERS INSECURE CURL_ARGS WGET_ARGS
 	URL="$1"
 	OUT="$2"
 	HEADERS="${3:-}"
 	INSECURE="${4:-}"
 	if di_have_cmd curl; then
+		CURL_ARGS="$(curl_common_args)"
+		[ "${INSECURE}" = "insecure" ] && CURL_ARGS="${CURL_ARGS}$(curl_insecure_arg)"
 		if [ -n "${HEADERS}" ]; then
-			if [ "${INSECURE}" = "insecure" ]; then
-				curl -D "${HEADERS}" --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -k -sL "${URL}" -o "${OUT}"
-			else
-				curl -D "${HEADERS}" --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -sL "${URL}" -o "${OUT}"
-			fi
-		elif [ "${INSECURE}" = "insecure" ]; then
-			curl --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -k -sL "${URL}" -o "${OUT}"
+			curl -D "${HEADERS}" ${CURL_ARGS} "${URL}" -o "${OUT}"
 		else
-			curl --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -sL "${URL}" -o "${OUT}"
+			curl ${CURL_ARGS} "${URL}" -o "${OUT}"
 		fi
 	elif di_have_cmd wget; then
 		WGET_ARGS="$(wget_common_args)"
@@ -101,15 +142,13 @@ http_get_file() {
 }
 
 http_get_stdout() {
-	local URL INSECURE WGET_ARGS
+	local URL INSECURE CURL_ARGS WGET_ARGS
 	URL="$1"
 	INSECURE="${2:-}"
 	if di_have_cmd curl; then
-		if [ "${INSECURE}" = "insecure" ]; then
-			curl --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -k -sL "${URL}"
-		else
-			curl --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -sL "${URL}"
-		fi
+		CURL_ARGS="$(curl_common_args)"
+		[ "${INSECURE}" = "insecure" ] && CURL_ARGS="${CURL_ARGS}$(curl_insecure_arg)"
+		curl ${CURL_ARGS} "${URL}"
 	elif di_have_cmd wget; then
 		WGET_ARGS="$(wget_common_args)"
 		[ "${INSECURE}" = "insecure" ] && WGET_ARGS="${WGET_ARGS}$(wget_insecure_arg)"
@@ -120,10 +159,11 @@ http_get_stdout() {
 }
 
 http_probe() {
-	local URL WGET_ARGS
+	local URL CURL_ARGS WGET_ARGS
 	URL="$1"
 	if di_have_cmd curl; then
-		curl --retry 5 --connect-timeout 25 --retry-delay 5 --max-time $((5 * 25)) --retry-connrefused -f -sL -I -o /dev/null "${URL}"
+		CURL_ARGS="$(curl_common_args)"
+		curl ${CURL_ARGS} -I -o /dev/null "${URL}"
 	elif di_have_cmd wget; then
 		WGET_ARGS="$(wget_common_args)"
 		if wget_has_option '--spider'; then
@@ -151,7 +191,7 @@ until [ -n "${DNSCRYPT_VER}" ]; do
 	fi
 	varcnt="$((varcnt + 1))"
 done
-rm -f "${API_FILE}" "${API_HEADERS}"
+cleanup_api_files
 wait
 unset varcnt
 readonly DNSCRYPT_VER
@@ -200,6 +240,27 @@ PTXT() {
 	esac
 }
 
+md5_is_valid() {
+	[ "$(printf '%s' "$1" | wc -c)" -eq 32 ] || return 1
+	case "$1" in
+		*[!0123456789abcdefABCDEF]*)
+			return 1
+			;;
+	esac
+	return 0
+}
+
+kill_processes() {
+	local PID PIDS PROCESS
+	for PROCESS in "$@"; do
+		PIDS="$(pidof "${PROCESS}" 2>/dev/null)"
+		for PID in ${PIDS}; do
+			kill -s 9 "${PID}" 2>/dev/null
+		done
+	done
+	killall -q -9 "$@" 2>/dev/null
+}
+
 dnscrypt_is_running() {
 	[ -n "$(pidof dnscrypt-proxy)" ]
 }
@@ -209,15 +270,39 @@ dnscrypt_process_count() {
 }
 
 dnscrypt_wait_stopped() {
-	until [ "$(dnscrypt_process_count)" -lt "1" ]; do sleep 1s; done
+	local elapsed maxwait
+	elapsed="0"
+	maxwait="${1:-${DNSCRYPT_WAIT_TIMEOUT}}"
+	while [ "$(dnscrypt_process_count)" -ge "1" ]; do
+		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
+		sleep 1s
+		elapsed="$((elapsed + 1))"
+	done
+	return 0
 }
 
 dnscrypt_wait_started() {
-	until dnscrypt_is_running; do sleep 1s; done
+	local elapsed maxwait
+	elapsed="0"
+	maxwait="${1:-${DNSCRYPT_WAIT_TIMEOUT}}"
+	while ! dnscrypt_is_running; do
+		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
+		sleep 1s
+		elapsed="$((elapsed + 1))"
+	done
+	return 0
 }
 
 dnscrypt_wait_ready() {
-	until { check_connection && dnscrypt_is_running; }; do sleep 1s; done
+	local elapsed maxwait
+	elapsed="0"
+	maxwait="${1:-${DNSCRYPT_READY_TIMEOUT}}"
+	while ! { check_connection && dnscrypt_is_running; }; do
+		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
+		sleep 1s
+		elapsed="$((elapsed + 1))"
+	done
+	return 0
 }
 
 dnscrypt_stop() {
@@ -227,12 +312,12 @@ dnscrypt_stop() {
 		elif [ -x "${TARG_DIR}/manager" ] && "${TARG_DIR}/manager" stop x >/dev/null 2>&1; then
 			sleep 1s
 		else
-			killall -q -9 dnscrypt-proxy 2>/dev/null
+			kill_processes dnscrypt-proxy
 			sleep 1s
 		fi
 	fi
 	sleep 1s
-	dnscrypt_wait_stopped
+	dnscrypt_wait_stopped "${DNSCRYPT_WAIT_TIMEOUT}" || return 1
 }
 
 dnscrypt_start() {
@@ -246,7 +331,7 @@ dnscrypt_start() {
 		fi
 	fi
 	sleep 1s
-	dnscrypt_wait_started
+	dnscrypt_wait_started "${DNSCRYPT_WAIT_TIMEOUT}" || return 1
 	dnscrypt_is_running
 }
 
@@ -263,7 +348,7 @@ dnscrypt_restart() {
 		dnscrypt_start || return 1
 	fi
 	sleep 1s
-	dnscrypt_wait_ready
+	dnscrypt_wait_ready "${DNSCRYPT_READY_TIMEOUT}" || return 1
 	dnscrypt_is_running
 }
 
@@ -373,7 +458,7 @@ check_dns_environment() {
 		NVCHECK="$((NVCHECK + 1))"
 	fi
 	if [ "$(pidof stubby)" ]; then
-		{ killall -q -9 stubby 2>/dev/null; }
+		{ kill_processes stubby; }
 		NVCHECK="$((NVCHECK + 1))"
 	fi
 	if [ "$(nvram get dhcp_dns1_x)" ] && [ "${NVCHECK}" != "0" ]; then
@@ -552,8 +637,8 @@ check_opendns() {
 	if grep -q '^server_names = .*cisco.*' "${TOML_FILE}"; then
 		if [ -f "${CONF_FILE}" ]; then
 			local OPENDNS_USER OPENDNS_PASSWORD
-			OPENDNS_USER="$(awk -F'=' '/OPENDNS_USER/ {print $2}' "${CONF_FILE}")"
-			OPENDNS_PASSWORD="$(awk -F'=' '/OPENDNS_PASSWORD/ {print $2}' "${CONF_FILE}")"
+			OPENDNS_USER="$(read_conf OPENDNS_USER)"
+			OPENDNS_PASSWORD="$(read_conf OPENDNS_PASSWORD)"
 			if [ "${OPENDNS_USER}" ] && [ "${OPENDNS_PASSWORD}" ]; then
 				PTXT "${INFO} Found OpenDNS account ${BOLD}${OPENDNS_USER}" \
 					"${INFO} What do you want to do:" \
@@ -702,30 +787,41 @@ check_swap() {
 }
 
 check_version() {
-	local RMNSTALL LINSTALL MD5SUM_L MD5SUM_R REMOTE_INSTALLER varcnt
+	local RMNSTALL LINSTALL MD5SUM_L MD5SUM_R MD5SUM_REMOTE REMOTE_INSTALLER REMOTE_INSTALLER_MD5 varcnt
 	if [ -f "${TARG_DIR}/installer" ] && [ -f "${TARG_DIR}/dnscrypt-proxy" ] && [ -z "$2" ]; then
 		if [ -n "$1" ] || { check_connection; }; then
 			REMOTE_INSTALLER="${TARG_DIR}/.installer.remote.$$"
+			REMOTE_INSTALLER_MD5="${REMOTE_INSTALLER}.md5sum"
 			varcnt="0"
 			until [ -n "${LINSTALL}" ] && [ -n "${RMNSTALL}" ] && [ -n "${MD5SUM_L}" ] && [ -n "${MD5SUM_R}" ]; do
 				if [ -z "${LINSTALL}" ]; then LINSTALL="$(awk -F= '/^DI_VERSION=/ { gsub(/"/, "", $2); sub(/^v/, "", $2); if ($2 ~ /^[0-9]{1,2}(\.[0-9]{1,2}){2}$/) print $2; exit }' "${TARG_DIR}/installer")"; fi
 				if [ -z "${MD5SUM_L}" ]; then MD5SUM_L="$(md5sum "${TARG_DIR}/installer" | awk '{print $1; exit}')"; fi
 				if [ -z "${RMNSTALL}" ] || [ -z "${MD5SUM_R}" ]; then
-					rm -f "${REMOTE_INSTALLER}"
+					MD5SUM_REMOTE=""
+					rm -f "${REMOTE_INSTALLER}" "${REMOTE_INSTALLER_MD5}"
 					if http_get_file "${RURL}/installer" "${REMOTE_INSTALLER}" && [ -s "${REMOTE_INSTALLER}" ]; then
-						RMNSTALL="$(awk -F= '/^DI_VERSION=/ { gsub(/"/, "", $2); sub(/^v/, "", $2); if ($2 ~ /^[0-9]{1,2}(\.[0-9]{1,2}){2}$/) print $2; exit }' "${REMOTE_INSTALLER}")"
+						if http_get_file "${RURL}/installer.md5sum" "${REMOTE_INSTALLER_MD5}" && [ -s "${REMOTE_INSTALLER_MD5}" ]; then
+							MD5SUM_REMOTE="$(awk '{print $1; exit}' "${REMOTE_INSTALLER_MD5}")"
+						fi
 						MD5SUM_R="$(md5sum "${REMOTE_INSTALLER}" | awk '{print $1; exit}')"
+						if md5_is_valid "${MD5SUM_REMOTE}" && [ "${MD5SUM_REMOTE}" != "${MD5SUM_R}" ]; then
+							RMNSTALL=""
+							MD5SUM_R=""
+							rm -f "${REMOTE_INSTALLER}" "${REMOTE_INSTALLER_MD5}"
+						else
+							RMNSTALL="$(awk -F= '/^DI_VERSION=/ { gsub(/"/, "", $2); sub(/^v/, "", $2); if ($2 ~ /^[0-9]{1,2}(\.[0-9]{1,2}){2}$/) print $2; exit }' "${REMOTE_INSTALLER}")"
+						fi
 					fi
 				fi
 				varcnt="$((varcnt + 1))"
 				if [ "${varcnt}" -ge 2 ]; then
-					rm -f "${REMOTE_INSTALLER}"
+					rm -f "${REMOTE_INSTALLER}" "${REMOTE_INSTALLER_MD5}"
 					printf "%s\n" "One or more critical variables could not be set in a timely manner." "Please check your internet connection, or try again later." "The installer script will now exit."
 					sleep 3s
 					exit 1
 				fi
 			done
-			rm -f "${REMOTE_INSTALLER}"
+			rm -f "${REMOTE_INSTALLER}" "${REMOTE_INSTALLER_MD5}"
 			if { [ -n "${LINSTALL}" ] && [ -n "${RMNSTALL}" ]; }; then
 				[ -z "${LINSTALL}" ] && exit 1
 				[ -z "${RMNSTALL}" ] && exit 1
@@ -1160,6 +1256,38 @@ del_conf() {
 	done
 }
 
+read_conf() {
+	[ -f "${CONF_FILE}" ] || return 1
+	awk -v KEY="$1" '
+		index($0, KEY "=") == 1 {
+			VALUE = substr($0, length(KEY) + 2)
+			gsub(/^"|"$/, "", VALUE)
+			print VALUE
+			exit
+		}
+	' "${CONF_FILE}"
+}
+
+branch_is_safe() {
+	case "$1" in
+		"" | /* | */ | *..* | *//* | *\* | *[!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._/-]*)
+			return 1
+			;;
+	esac
+	return 0
+}
+
+sanitize_branch() {
+	local CANDIDATE
+	CANDIDATE="$1"
+	if branch_is_safe "${CANDIDATE}"; then
+		printf '%s\n' "${CANDIDATE}"
+	else
+		printf '%s\n' "${WARNING} Ignoring unsafe installer branch '${CANDIDATE}', using master instead." >&2
+		printf '%s\n' "master"
+	fi
+}
+
 del_jffs_script() {
 	local TARG LINE_NUM LINE_ABOVE OP
 	TARG="$1"
@@ -1188,7 +1316,7 @@ del_jffs_script() {
 }
 
 download_file() {
-	local TARG PERM URL RET FILENAME TMP_FILE MD5SUM_OLD MD5SUM_CURR COUNT
+	local TARG PERM URL RET FILENAME TMP_FILE TMP_MD5_FILE MD5SUM_OLD MD5SUM_CURR MD5SUM_EXPECTED COUNT
 	TARG="$1"
 	shift
 	PERM="$1"
@@ -1197,34 +1325,46 @@ download_file() {
 	for URL in "$@"; do
 		FILENAME="$(basename "${URL}")"
 		TMP_FILE="${TARG}/.${FILENAME}.$$"
+		TMP_MD5_FILE="${TMP_FILE}.md5sum"
 		MD5SUM_OLD=""
 		MD5SUM_CURR=""
+		MD5SUM_EXPECTED=""
 		COUNT="0"
 		[ -f "${TARG}/${FILENAME}" ] && MD5SUM_OLD="$(md5sum "${TARG}/${FILENAME}" | awk '{print $1; exit}')"
 		while [ "${COUNT}" -lt 3 ]; do
 			PTXT "${INFO} Downloading ${FILENAME}"
-			rm -f "${TMP_FILE}"
+			rm -f "${TMP_FILE}" "${TMP_MD5_FILE}"
+			MD5SUM_EXPECTED=""
 			if http_get_file "${URL}" "${TMP_FILE}" "" insecure && [ -s "${TMP_FILE}" ]; then
+				if http_get_file "${URL}.md5sum" "${TMP_MD5_FILE}" "" insecure && [ -s "${TMP_MD5_FILE}" ]; then
+					MD5SUM_EXPECTED="$(awk '{print $1; exit}' "${TMP_MD5_FILE}")"
+				fi
 				MD5SUM_CURR="$(md5sum "${TMP_FILE}" | awk '{print $1; exit}')"
+				if md5_is_valid "${MD5SUM_EXPECTED}" && [ "${MD5SUM_EXPECTED}" != "${MD5SUM_CURR}" ]; then
+					PTXT "${WARNING} ${FILENAME} checksum mismatch. Retrying..."
+					COUNT="$((COUNT + 1))"
+					continue
+				fi
 				break
 			fi
 			COUNT="$((COUNT + 1))"
 		done
 		if [ "${COUNT}" -eq 3 ]; then
-			rm -f "${TMP_FILE}"
+			rm -f "${TMP_FILE}" "${TMP_MD5_FILE}"
 			PTXT "${ERROR} Unable to download ${BOLD}${URL}${NORM}"
 			RET="$((RET + 1))"
 			continue
 		fi
-		if [ "$(PTXT -n "${MD5SUM_CURR}" | wc -c)" -eq 32 ] && [ "${MD5SUM_CURR}" = "${MD5SUM_OLD}" ]; then
-			rm -f "${TMP_FILE}"
+		if md5_is_valid "${MD5SUM_CURR}" && [ "${MD5SUM_CURR}" = "${MD5SUM_OLD}" ]; then
+			rm -f "${TMP_FILE}" "${TMP_MD5_FILE}"
 			PTXT "${INFO} ${FILENAME} is up to date. Skipping..."
 			continue
 		fi
+		rm -f "${TMP_MD5_FILE}"
 		if mv "${TMP_FILE}" "${TARG}/${FILENAME}" && chmod "${PERM}" "${TARG}/${FILENAME}"; then
 			continue
 		fi
-		rm -f "${TMP_FILE}"
+		rm -f "${TMP_FILE}" "${TMP_MD5_FILE}"
 		PTXT "${ERROR} Unable to install ${BOLD}${FILENAME}${NORM}"
 		RET="$((RET + 1))"
 	done
@@ -1444,14 +1584,14 @@ inst_random() {
 	case "${CHOSEN}" in
 		1)
 			rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-			{ kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }
+			{ kill_processes haveged jitterentropy-rngd rngd stty; }
 			download_file "${TARG_DIR}" 755 "${URL_ARCH}/haveged" "${URL_GEN}/manager"
 			write_conf RAN_PRV haveged
 			${TARG_DIR}/haveged -w 1024 -d 32 -i 32 -v 1
 			;;
 		2)
 			local RNG_DEV
-			{ kill -s 9 "$(pidof haveged jitterentropy-rngd rngd stty)" 2>/dev/null || killall -q -9 haveged jitterentropy-rngd rngd stty 2>/dev/null; }
+			{ kill_processes haveged jitterentropy-rngd rngd stty; }
 			download_file "$TARG_DIR" 755 "${URL_ARCH}/haveged" "${URL_ARCH}/rngd" "${URL_ARCH}/stty" "${URL_GEN}/manager"
 			inst_ran_dev || return
 			write_conf RAN_PRV rngd
@@ -1711,8 +1851,9 @@ static_chosen_relays() {
 }
 
 setup_amtmupdate() {
-	local AMTM_UPDATE
-	if [ ! -f "${CONF_FILE}" ] || [ -z "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" ] || { [ -f "${CONF_FILE}" ] && [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "DISABLED" ]; }; then
+	local AMTM_UPDATE CURRENT_AMTM_UPDATE
+	CURRENT_AMTM_UPDATE="$(read_conf AMTM_UPDATE)"
+	if [ -z "${CURRENT_AMTM_UPDATE}" ] || [ "${CURRENT_AMTM_UPDATE}" = "DISABLED" ]; then
 		AMTM_UPDATE="ENABLED"
 	else
 		AMTM_UPDATE="DISABLED"
@@ -1952,7 +2093,7 @@ uninst_all() {
 	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
 	del_jffs_script /jffs/scripts/init-start
 	del_jffs_script /jffs/scripts/services-stop
-	{ kill -s 9 "$(pidof haveged rngd stty dnscrypt-proxy)" 2>/dev/null || killall -q -9 haveged rngd stty dnscrypt-proxy 2>/dev/null; }
+	{ kill_processes haveged rngd stty dnscrypt-proxy; }
 	del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	local MAN_PID PID
 	MAN_PID="$(pidof manager)"
@@ -1974,7 +2115,7 @@ uninst_dnscrypt() {
 	rm -f "${TARG_DIR}/dnscrypt-proxy" "${TARG_DIR}/nonroot"
 	del_jffs_script /jffs/scripts/dnsmasq.postconf
 	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
-	{ kill -s 9 "$(pidof dnscrypt-proxy)" 2>/dev/null || killall -q -9 dnscrypt-proxy 2>/dev/null; }
+	{ kill_processes dnscrypt-proxy; }
 	service restart_dnsmasq >/dev/null 2>&1
 	PTXT "${INFO} Some configuration files are not removed in case you want to reinstall"
 	end_op_message 0
@@ -1983,7 +2124,7 @@ uninst_dnscrypt() {
 uninst_random() {
 	PTXT "${INFO} Uninstalling (P)RNG..."
 	rm -f "${TARG_DIR}/haveged" "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-	{ kill -s 9 "$(pidof haveged rngd stty)" 2>/dev/null || killall -q -9 haveged rngd stty 2>/dev/null; }
+	{ kill_processes haveged rngd stty; }
 	del_conf RAN_PRV RNG_DEV
 	if [ ! -f "${TARG_DIR}/localtime" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
 		del_jffs_script /jffs/scripts/init-start
@@ -1994,7 +2135,7 @@ uninst_random() {
 
 unset_timezone() {
 	rm -f "${TARG_DIR}/localtime"
-	if ! grep -q "^RAN_PRV=.*$" "${TARG_DIR}/.config" && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
+	if [ -z "$(read_conf RAN_PRV)" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
 		del_jffs_script /jffs/scripts/init-start
 		del_jffs_script /jffs/scripts/services-stop
 	fi
@@ -2010,9 +2151,12 @@ write_conf() {
 		chmod 644 "${CONF_FILE}"
 	fi
 	if [ ! -f "${CONF_FILE}" ]; then
-		touch "${CONF_FILE}" && chmod 644 "${CONF_FILE}"
+		if ! { touch "${CONF_FILE}" && chmod 644 "${CONF_FILE}"; }; then
+			PTXT "${ERROR} Unable to create ${CONF_FILE}"
+			return 1
+		fi
 	fi
-	if grep -q "${VAR}" "${CONF_FILE}"; then
+	if grep -q "^${VAR}=" "${CONF_FILE}"; then
 		VALUE=$(_quote "${VALUE}")
 		sed -i "/^${VAR}=/s/=.*/=${VALUE}/" "${CONF_FILE}"
 	else
@@ -2068,12 +2212,15 @@ write_manager_script() {
 case "${BRANCH}" in
 	"amtmupdate")
 		unset BRANCH
-		[ "$(awk -F'=' '/INSTALLER_BRANCH/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" ] && BRANCH="$(awk -F'=' '/INSTALLER_BRANCH/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" || BRANCH="master"
+		BRANCH="$(read_conf INSTALLER_BRANCH)"
+		[ -n "${BRANCH}" ] || BRANCH="master"
+		BRANCH="$(sanitize_branch "${BRANCH}")"
 		case "$2" in
 			"check")
-				if [ ! -f "${CONF_FILE}" ] || [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "DISABLED" ]; then
+				AMTM_UPDATE="$(read_conf AMTM_UPDATE)"
+				if [ "${AMTM_UPDATE}" = "DISABLED" ] || [ -z "${AMTM_UPDATE}" ]; then
 					exit 1
-				elif [ "$(awk -F'=' '/AMTM_UPDATE/ {print $2}' "${CONF_FILE}" | sed -e 's/^"//' -e 's/"$//')" = "ENABLED" ]; then
+				elif [ "${AMTM_UPDATE}" = "ENABLED" ]; then
 					exit 0
 				fi
 				;;
@@ -2084,6 +2231,7 @@ case "${BRANCH}" in
 		esac
 		;;
 	*)
+		BRANCH="$(sanitize_branch "${BRANCH}")"
 		write_conf INSTALLER_BRANCH "\"${BRANCH}\""
 		;;
 esac
