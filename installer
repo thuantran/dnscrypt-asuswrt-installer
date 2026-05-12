@@ -159,13 +159,23 @@ http_get_stdout() {
 }
 
 http_probe() {
-	local URL CURL_ARGS WGET_ARGS
+	local URL CURL_ARGS WGET_ARGS maxwait
 	URL="$1"
+	maxwait="${2:-}"
 	if di_have_cmd curl; then
 		CURL_ARGS="$(curl_common_args)"
+		if [ -n "${maxwait}" ]; then
+			curl_has_option '--retry ' && CURL_ARGS="${CURL_ARGS} --retry 0"
+			curl_has_option '--connect-timeout' && CURL_ARGS="${CURL_ARGS} --connect-timeout ${maxwait}"
+			curl_has_option '--max-time' && CURL_ARGS="${CURL_ARGS} --max-time ${maxwait}"
+		fi
 		curl ${CURL_ARGS} -I -o /dev/null "${URL}"
 	elif di_have_cmd wget; then
 		WGET_ARGS="$(wget_common_args)"
+		if [ -n "${maxwait}" ]; then
+			wget_has_option '--tries' && WGET_ARGS="${WGET_ARGS} --tries=1"
+			wget_has_option '--timeout' && WGET_ARGS="${WGET_ARGS} --timeout=${maxwait}"
+		fi
 		if wget_has_option '--spider'; then
 			wget ${WGET_ARGS} -q --spider "${URL}"
 		else
@@ -293,16 +303,34 @@ dnscrypt_wait_started() {
 	return 0
 }
 
+monotonic_seconds() {
+	local uptime
+	if read -r uptime _ </proc/uptime; then
+		uptime="${uptime%%.*}"
+		case "${uptime}" in
+			"" | *[!0-9]*) return 1 ;;
+		esac
+		printf '%s\n' "${uptime}"
+		return 0
+	fi
+	return 1
+}
+
 dnscrypt_wait_ready() {
-	local elapsed maxwait
-	elapsed="0"
+	local elapsed maxwait now remaining start
 	maxwait="${1:-${DNSCRYPT_READY_TIMEOUT}}"
-	while ! { check_connection && dnscrypt_is_running; }; do
+	start="$(monotonic_seconds)" || return 1
+	while :; do
+		now="$(monotonic_seconds)" || return 1
+		elapsed="$((now - start))"
+		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
+		remaining="$((maxwait - elapsed))"
+		if check_connection "${remaining}" && dnscrypt_is_running; then return 0; fi
+		now="$(monotonic_seconds)" || return 1
+		elapsed="$((now - start))"
 		if [ "${elapsed}" -ge "${maxwait}" ]; then return 1; fi
 		sleep 1s
-		elapsed="$((elapsed + 1))"
 	done
-	return 0
 }
 
 dnscrypt_stop() {
@@ -412,11 +440,30 @@ backup_restore() {
 
 ########################Modified Version of @Adamm Check_Connection####################################################
 check_connection() {
-	local livecheck="0" i
+	local deadline i livecheck="0" maxwait now remaining sleep_for
+	maxwait="${1:-}"
+	if [ -n "${maxwait}" ]; then
+		now="$(monotonic_seconds)" || return 1
+		deadline="$((now + maxwait))"
+	fi
 	while [ "${livecheck}" != "4" ]; do
 		for i in google.com github.com snbforums.com; do
+			if [ -n "${deadline}" ]; then
+				now="$(monotonic_seconds)" || return 1
+				[ "${now}" -ge "${deadline}" ] && return 1
+			fi
 			if { ! nslookup "${i}" 127.0.0.1 >/dev/null 2>&1; } && { ping -q -w3 -c1 "${i}" >/dev/null 2>&1; }; then
-				if ! http_probe "http://${i}" >/dev/null 2>&1; then
+				remaining=""
+				if [ -n "${deadline}" ]; then
+					now="$(monotonic_seconds)" || return 1
+					remaining="$((deadline - now))"
+					[ "${remaining}" -le 0 ] && return 1
+				fi
+				if ! http_probe "http://${i}" "${remaining}" >/dev/null 2>&1; then
+					if [ -n "${deadline}" ]; then
+						now="$(monotonic_seconds)" || return 1
+						[ "${now}" -ge "${deadline}" ] && return 1
+					fi
 					sleep 1s
 					continue
 				fi
@@ -425,7 +472,15 @@ check_connection() {
 		done
 		livecheck="$((livecheck + 1))"
 		if [ "${livecheck}" != "4" ]; then
-			sleep 10s
+			if [ -n "${deadline}" ]; then
+				now="$(monotonic_seconds)" || return 1
+				sleep_for="$((deadline - now))"
+				[ "${sleep_for}" -le 0 ] && return 1
+				[ "${sleep_for}" -gt 10 ] && sleep_for="10"
+				sleep "${sleep_for}s"
+			else
+				sleep 10s
+			fi
 			continue
 		fi
 		return 1
@@ -814,7 +869,7 @@ check_version() {
 					fi
 				fi
 				varcnt="$((varcnt + 1))"
-				if [ "${varcnt}" -ge 2 ]; then
+				if [ "${varcnt}" -ge 2 ] && { [ -z "${LINSTALL}" ] || [ -z "${RMNSTALL}" ] || [ -z "${MD5SUM_L}" ] || [ -z "${MD5SUM_R}" ]; }; then
 					rm -f "${REMOTE_INSTALLER}" "${REMOTE_INSTALLER_MD5}"
 					printf "%s\n" "One or more critical variables could not be set in a timely manner." "Please check your internet connection, or try again later." "The installer script will now exit."
 					sleep 3s
@@ -861,7 +916,7 @@ check_version() {
 							fi
 						fi
 						varcnt="$((varcnt + 1))"
-						if [ "${varcnt}" -ge 2 ]; then
+						if [ "${varcnt}" -ge 2 ] && { [ -z "${MD5SUM_LM}" ] || [ -z "${MD5SUM_M}" ]; }; then
 							rm -f "${REMOTE_MANAGER}"
 							printf "%s\n" "One or more critical variables could not be set in a timely manner." "Please check your internet connection, or try again later." "The installer script will now exit."
 							sleep 3s
