@@ -550,7 +550,7 @@ start_dnscrypt_proxy() {
 	local DNSCRYPT_START LOG_FACILITY
 	{ cd /jffs/dnscrypt; } || exit
 	if [ "$(grep -cE '^# use_syslog = true' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "1" ] && [ "$(grep -cE '^# log_file =' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "5" ]; then LOG_FACILITY="-syslog"; fi
-	if [ -n "${LOG_FACILITY}" ]; then DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy "${LOG_FACILITY}" -config /jffs/dnscrypt/dnscrypt-proxy.toml"; else DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"; fi
+	if [ -n "${LOG_FACILITY}" ]; then DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy ${LOG_FACILITY} -config /jffs/dnscrypt/dnscrypt-proxy.toml"; else DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"; fi
 	{ kill_processes dnscrypt-proxy; }
 	if ! dnscrypt_wait_stopped 30; then
 		logger -st "${NAME}" "Warning: unable to stop existing dnscrypt-proxy processes before start."
@@ -698,8 +698,8 @@ timezone() {
 
 update_opendns() {
 	local RET
-	case "${OPENDNS_USER}:${OPENDNS_PASSWORD}" in
-		"":* | *:"" | "":"")
+	case "${OPENDNS_USER:-}:${OPENDNS_PASSWORD:-}" in
+		"":* | *:"" )
 			logger -st "${NAME}" "OpenDNS: one or more variable not set correctly; skipping IP update."
 			return
 			;;
@@ -707,7 +707,7 @@ update_opendns() {
 			if ! have_cmd curl; then
 				logger -st "${NAME}" "OpenDNS: curl is unavailable; skipping IP update."
 				return
-			elif [ "$1" -gt 2 ]; then
+			elif [ "${1:-0}" -gt 2 ]; then
 				logger -st "${NAME}" "OpenDNS: Retry count exceeded; skipping IP update."
 				return
 			fi
