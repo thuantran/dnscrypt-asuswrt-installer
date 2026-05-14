@@ -699,7 +699,7 @@ timezone() {
 update_opendns() {
 	local RET
 	case "${OPENDNS_USER:-}:${OPENDNS_PASSWORD:-}" in
-		"":* | *:"" )
+		"":* | *:"")
 			logger -st "${NAME}" "OpenDNS: one or more variable not set correctly; skipping IP update."
 			return
 			;;
