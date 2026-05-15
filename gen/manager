@@ -239,8 +239,23 @@ dnscrypt_proxy_run_legacy_mkdir_active() {
 	kill -0 "${owner}" 2>/dev/null
 }
 
+dnscrypt_proxy_run_flock_cleanup() {
+	local pid_file
+	pid_file="$1"
+	[ -n "${pid_file}" ] && rm -f "${pid_file}"
+	flock -u 9 >/dev/null 2>&1
+	exec 9>&-
+}
+
+dnscrypt_proxy_run_flock_restore_traps() {
+	local saved_traps
+	saved_traps="$1"
+	trap - EXIT HUP INT QUIT ABRT TERM TSTP
+	[ -n "${saved_traps}" ] && eval "${saved_traps}"
+}
+
 dnscrypt_proxy_run_flock() {
-	local action lock_dir lock_file owner pid_file status
+	local action lock_dir lock_file owner pid_file saved_traps status
 	action="$1"
 	lock_dir="/tmp/dnscrypt-proxy"
 	lock_file="${lock_dir}.lock"
@@ -267,11 +282,14 @@ dnscrypt_proxy_run_flock() {
 		exec 9>&-
 		return 1
 	fi
+	saved_traps="$(trap)"
+	trap 'dnscrypt_proxy_run_flock_cleanup "${pid_file}"; dnscrypt_proxy_run_flock_restore_traps "${saved_traps}"; exit 1' HUP INT QUIT ABRT TERM
+	trap 'status="$?"; dnscrypt_proxy_run_flock_cleanup "${pid_file}"; dnscrypt_proxy_run_flock_restore_traps "${saved_traps}"; exit "${status}"' EXIT
 	rm -f "${pid_file}"
 	dnscrypt_proxy_run_execute "${action}" "${pid_file}" "$$"
 	status="$?"
-	flock -u 9 >/dev/null 2>&1
-	exec 9>&-
+	dnscrypt_proxy_run_flock_cleanup "${pid_file}"
+	dnscrypt_proxy_run_flock_restore_traps "${saved_traps}"
 	return "${status}"
 }
 
@@ -563,51 +581,55 @@ start_dnscrypt_proxy() {
 }
 
 start_monitor() {
+	local BINARY_UNAVAILABLE_LOGGED MONITOR_BINARY_RETRY_INTERVAL MONITOR_ELAPSED MONITOR_HEALTHCHECK_INTERVAL MONITOR_HEALTHCHECK_TIMEOUT MONITOR_SLEEP_INTERVAL MONITOR_STATE RANDOM_STATE
+	MONITOR_BINARY_RETRY_INTERVAL="10"
+	MONITOR_HEALTHCHECK_INTERVAL="300"
+	MONITOR_HEALTHCHECK_TIMEOUT="150"
+	MONITOR_SLEEP_INTERVAL="10"
+	MONITOR_STATE="running"
 	trap '' HUP INT QUIT ABRT TERM
-	trap 'EXIT="1"' USR1
-	trap 'EXIT="2"' USR2
+	trap 'MONITOR_STATE="stop"' USR1
+	trap 'MONITOR_STATE="restart"' USR2
 	{ service_wait netcheck; }
-	local COUNT EXIT MISSING_BINARY RANDOM
-	EXIT="0"
-	RANDOM="0"
+	RANDOM_STATE="0"
 	logger -st "${NAME}" "Starting Monitor!"
 	while true; do
-		if [ "${EXIT}" = "1" ]; then # A place to exit early if needed, or if binary becomes unavailable before service-stop.
+		if [ "${MONITOR_STATE}" = "stop" ]; then # A place to exit early if needed, or if binary becomes unavailable before service-stop.
 			logger -st "${NAME}" "Stopping Monitor!"
 			trap - HUP INT QUIT ABRT USR1 USR2 TERM
 			{ dnscrypt_proxy_run stop_dnscrypt_proxy; }
 			break
 		fi
 		if [ ! -x "/jffs/dnscrypt/dnscrypt-proxy" ]; then
-			if [ -z "${MISSING_BINARY}" ]; then
+			if [ -z "${BINARY_UNAVAILABLE_LOGGED}" ]; then
 				logger -st "${NAME}" "Warning: dnscrypt-proxy binary is unavailable; Monitor will wait."
-				MISSING_BINARY="1"
+				BINARY_UNAVAILABLE_LOGGED="1"
 			fi
-			sleep 10s
+			sleep "${MONITOR_BINARY_RETRY_INTERVAL}s"
 			continue
 		fi
-		if [ -n "${MISSING_BINARY}" ]; then
+		if [ -n "${BINARY_UNAVAILABLE_LOGGED}" ]; then
 			logger -st "${NAME}" "dnscrypt-proxy binary is available and executable; Monitor will resume."
-			unset MISSING_BINARY COUNT
+			unset BINARY_UNAVAILABLE_LOGGED MONITOR_ELAPSED
 		fi
 		case "${EXIT}" in
-			"0")
+			"running")
 				timezone
-				case "${RANDOM}" in
+				case "${RANDOM_STATE}" in
 					"4320")
-						RANDOM="0"
-						if [ -n "${COUNT}" ]; then
+						RANDOM_STATE="0"
+						if [ -n "${MONITOR_ELAPSED}" ]; then
 							logger -st "${NAME}" "Randomization: Health Check; Monitor will randomize it!"
-							unset COUNT
+							unset MONITOR_ELAPSED
 						fi
 						;;
 					*)
-						if [ -z "${COUNT}" ]; then RANDOM="0"; else RANDOM="$((RANDOM + 1))"; fi
+						if [ -z "${MONITOR_ELAPSED}" ]; then RANDOM_STATE="0"; else RANDOM_STATE="$((RANDOM_STATE + 1))"; fi
 						;;
 				esac
-				case "${COUNT}" in
+				case "${MONITOR_ELAPSED}" in
 					"")
-						COUNT="0"
+						MONITOR_ELAPSED="0"
 						"$0" opendns-update
 						{ dnscrypt_proxy_run start_dnscrypt_proxy; }
 						;;
@@ -615,38 +637,33 @@ start_monitor() {
 				case "$(pidof dnscrypt-proxy)" in
 					"")
 						logger -st "${NAME}" "Warning: dnscrypt-proxy is dead; Monitor will start it!"
-						unset COUNT
-						sleep 10s
+						unset MONITOR_ELAPSED
+						sleep "${MONITOR_SLEEP_INTERVAL}s"
 						;;
 					*)
-						case "${COUNT}" in
-							"30" | "60" | "90")
-								"$0" opendns-update
-								if [ "${COUNT}" = "90" ]; then COUNT="0"; else COUNT="$((COUNT + 1))"; fi
-								if { ! service_wait netcheck 150; }; then
-									logger -st "${NAME}" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"
-									unset COUNT
-									sleep 10s
-								fi
-								;;
-							*)
-								COUNT="$((COUNT + 1))"
-								;;
-						esac
+						if [ "${MONITOR_ELAPSED}" -ge "${MONITOR_HEALTHCHECK_INTERVAL}" ]; then
+							MONITOR_ELAPSED="0"
+							if { ! service_wait netcheck "${MONITOR_HEALTHCHECK_TIMEOUT}"; }; then
+								logger -st "${NAME}" "Warning: dnscrypt-proxy is not responding; Monitor will re-start it!"
+								unset MONITOR_ELAPSED
+							fi
+						else
+							MONITOR_ELAPSED="$((MONITOR_ELAPSED + MONITOR_SLEEP_INTERVAL))"
+						fi
+						if [ -n "${MONITOR_ELAPSED}" ]; then sleep "${MONITOR_SLEEP_INTERVAL}s"; fi
 						;;
 				esac
-				if [ -n "${COUNT}" ]; then sleep 10s; fi
 				;;
-			"1")
+			"stop")
 				logger -st "${NAME}" "Stopping Monitor!"
 				trap - HUP INT QUIT ABRT USR1 USR2 TERM
 				{ dnscrypt_proxy_run stop_dnscrypt_proxy; }
 				break
 				;;
-			"2")
+			"restart")
 				logger -st "${NAME}" "Monitor is restarting dnscrypt-proxy!"
-				unset COUNT
-				EXIT="0"
+				unset MONITOR_ELAPSED
+				MONITOR_STATE="running"
 				;;
 		esac
 	done
