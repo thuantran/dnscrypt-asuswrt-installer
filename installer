@@ -275,8 +275,33 @@ dnscrypt_is_running() {
 	[ -n "$(pidof dnscrypt-proxy)" ]
 }
 
+dnscrypt_prepare_binary_replace() {
+	if { [ -f "${TARG_DIR}/dnscrypt-proxy" ] || [ -e "${TARG_DIR}/dnscrypt-proxy" ]; } && [ "$(dnscrypt_process_count)" -ge "1" ]; then
+		PTXT "${INFO} Stopping Dnscrypt-Proxy before replacing the binary."
+		if ! dnscrypt_stop; then
+			PTXT "${ERROR} Unable to safely stop Dnscrypt-Proxy before replacing the binary."
+			return 1
+		fi
+	fi
+	return 0
+}
+
+dnscrypt_monitor_count() {
+	local count pid
+	count="0"
+	for pid in $(pidof manager 2>/dev/null); do
+		if awk '{ print }' "/proc/${pid}/cmdline" 2>/dev/null | grep -q 'monitor-start'; then
+			count="$((count + 1))"
+		fi
+	done
+	PTXT "${count}"
+}
+
 dnscrypt_process_count() {
-	pidof dnscrypt-proxy | wc -w
+	local daemon_count monitor_count
+	daemon_count="$(pidof dnscrypt-proxy 2>/dev/null | wc -w)"
+	monitor_count="$(dnscrypt_monitor_count)"
+	PTXT "$((daemon_count + monitor_count))"
 }
 
 dnscrypt_wait_stopped() {
@@ -334,13 +359,13 @@ dnscrypt_wait_ready() {
 }
 
 dnscrypt_stop() {
-	if dnscrypt_is_running; then
+	if [ "$(dnscrypt_process_count)" -ge "1" ]; then
 		if service stop_dnscrypt-proxy >/dev/null 2>&1; then
 			sleep 1s
 		elif [ -x "${TARG_DIR}/manager" ] && "${TARG_DIR}/manager" stop x >/dev/null 2>&1; then
 			sleep 1s
 		else
-			kill_processes dnscrypt-proxy
+			kill_processes dnscrypt-proxy manager
 			sleep 1s
 		fi
 	fi
@@ -1370,6 +1395,24 @@ del_jffs_script() {
 	[ "$(awk '{ print }' "${TARG}")" = "#!/bin/sh" ] && rm -f "${TARG}"
 }
 
+installer_update_reexec() {
+	local ACTION NEW_MD5 OLD_MD5
+	ACTION="$1"
+	OLD_MD5="$2"
+	[ "${ACTION}" = "update" ] || return 0
+	[ "${DI_REEXECED_INSTALLER:-0}" = "1" ] && return 0
+	[ -n "${OLD_MD5}" ] || return 0
+	[ -f "${TARG_DIR}/installer" ] || return 0
+	NEW_MD5="$(md5sum "${TARG_DIR}/installer" 2>/dev/null | awk '{print $1; exit}')"
+	[ -n "${NEW_MD5}" ] || return 0
+	[ "${OLD_MD5}" != "${NEW_MD5}" ] || return 0
+	PTXT "${INFO} Installer was updated; restarting the update with the new installer."
+	chmod 755 "${TARG_DIR}/installer" >/dev/null 2>&1
+	DI_REEXECED_INSTALLER="1"
+	export DI_REEXECED_INSTALLER
+	exec "${TARG_DIR}/installer" "${BRANCH}" "${ACTION}"
+}
+
 download_file() {
 	local TARG PERM URL RET FILENAME TMP_FILE TMP_MD5_FILE MD5SUM_OLD MD5SUM_CURR MD5SUM_EXPECTED COUNT
 	TARG="$1"
@@ -1469,7 +1512,7 @@ end_op_header() {
 }
 
 inst_dnscrypt() {
-	local DNSCRYPT_TAR RESOLVERS_URL_PREFIX CRYPT_RESOLVERS FULL_RESOLVERS
+	local DNSCRYPT_TAR RESOLVERS_URL_PREFIX CRYPT_RESOLVERS FULL_RESOLVERS INSTALLER_MD5_OLD
 	DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
 	if ping -q -w3 -c1 "download.dnscrypt.info" >/dev/null 2>&1; then
 		RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/"
@@ -1480,6 +1523,8 @@ inst_dnscrypt() {
 	CRYPT_RESOLVERS="v1"
 	CRYPT_RESOLVERS="${RESOLVERS_URL_PREFIX}${CRYPT_RESOLVERS}"
 	RESOLVERS_URL_PREFIX="${RESOLVERS_URL_PREFIX}${FULL_RESOLVERS}"
+	INSTALLER_MD5_OLD=""
+	[ -f "${SCRIPT_LOC}" ] && INSTALLER_MD5_OLD="$(md5sum "${SCRIPT_LOC}" 2>/dev/null | awk '{print $1; exit}')"
 	if [ -z "$2" ]; then
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
 			if [ ! -d "$TARG_DIR" ] && [ -f "${BASE_DIR}/backup_dnscrypt.tar.gz" ]; then
@@ -1510,6 +1555,7 @@ inst_dnscrypt() {
 			end_op_message 1 "$1"
 			return
 		fi
+		installer_update_reexec "${1:-install}" "${INSTALLER_MD5_OLD}"
 		download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
 			if [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
@@ -1531,6 +1577,10 @@ inst_dnscrypt() {
 	else
 		if ! download_file "${TARG_DIR}" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${2}/${DNSCRYPT_TAR}"; then
 			PTXT "${ERROR} Unable to download dnscrypt-proxy package for your router"
+			end_op_message 1 "$1"
+			return
+		fi
+		if ! dnscrypt_prepare_binary_replace; then
 			end_op_message 1 "$1"
 			return
 		fi
