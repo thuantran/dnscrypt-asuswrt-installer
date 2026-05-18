@@ -18,10 +18,31 @@ case "${1:-}" in
 		;;
 esac
 
+
+# Cleanup helpers
+cleanup() {
+	if [ -n "${SCRIPT_LIST}" ] && [ -f "${SCRIPT_LIST}" ]; then
+		rm -f "${SCRIPT_LIST}"
+	fi
+}
+
+# Command helpers
 have_cmd() {
 	which "$1" >/dev/null 2>&1
 }
 
+require_cmd() {
+	_cmd="$1"
+	if have_cmd "${_cmd}"; then
+		return 0
+	fi
+
+	printf '%s\n' "Error: ${_cmd} is required. Install it and re-run this script." >&2
+	FAILED=1
+	return 1
+}
+
+# Check runners
 run_check() {
 	_name="$1"
 	shift
@@ -53,23 +74,6 @@ run_script_list_check() {
 	else
 		printf '%s\n' "FAILED: ${_name}" >&2
 		FAILED=1
-	fi
-}
-
-require_cmd() {
-	_cmd="$1"
-	if have_cmd "${_cmd}"; then
-		return 0
-	fi
-
-	printf '%s\n' "Error: ${_cmd} is required. Install it and re-run this script." >&2
-	FAILED=1
-	return 1
-}
-
-cleanup() {
-	if [ -n "${SCRIPT_LIST}" ] && [ -f "${SCRIPT_LIST}" ]; then
-		rm -f "${SCRIPT_LIST}"
 	fi
 }
 
