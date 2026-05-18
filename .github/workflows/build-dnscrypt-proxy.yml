@@ -110,6 +110,7 @@ jobs:
       - name: Package and sign nightly archive
         env:
           MINISIGN_PRIVATE_KEY: ${{ secrets.MINISIGN_PRIVATE_KEY }}
+          MINISIGN_PRIVATE_KEY_B64: ${{ secrets.MINISIGN_PRIVATE_KEY_B64 }}
         run: |
           set -euo pipefail
 
@@ -118,11 +119,26 @@ jobs:
           archive_path="dist/${archive}"
           key_file="${RUNNER_TEMP}/minisign.key"
 
-          if [ -z "${MINISIGN_PRIVATE_KEY}" ]; then
-            echo "MINISIGN_PRIVATE_KEY secret is required to create ${archive}.minisig." >&2
-            echo "Store an unencrypted minisign secret key in the repository Actions secret MINISIGN_PRIVATE_KEY." >&2
+          if [ -n "${MINISIGN_PRIVATE_KEY_B64}" ]; then
+            printf '%s' "${MINISIGN_PRIVATE_KEY_B64}" | base64 -d > "${key_file}"
+          elif [ -n "${MINISIGN_PRIVATE_KEY}" ]; then
+            printf '%s\n' "${MINISIGN_PRIVATE_KEY}" > "${key_file}"
+          else
+            cat >&2 <<'EOF'
+          MINISIGN_PRIVATE_KEY or MINISIGN_PRIVATE_KEY_B64 is required to create nightly .minisig files.
+
+          Create an unencrypted minisign key and add one of these repository Actions secrets:
+          - MINISIGN_PRIVATE_KEY: full text contents of minisign.key
+          - MINISIGN_PRIVATE_KEY_B64: base64-encoded contents of minisign.key
+
+          Example:
+            minisign -G -W -s minisign.key -p minisign.pub
+            base64 -w0 minisign.key
+          EOF
             exit 1
           fi
+          chmod 600 "${key_file}"
+          minisign -R -s "${key_file}" -p dist/dnscrypt-proxy-nightly.pub -f
 
           cp dnscrypt-proxy-src/LICENSE "${package_dir}/LICENSE"
           cp dnscrypt-proxy-src/dnscrypt-proxy/example-*.txt "${package_dir}/"
@@ -130,8 +146,6 @@ jobs:
           cp dnscrypt-proxy-src/dnscrypt-proxy/localhost.pem "${package_dir}/"
 
           tar -czf "${archive_path}" -C dist "${{ matrix.package_dir }}"
-          printf '%s' "${MINISIGN_PRIVATE_KEY}" > "${key_file}"
-          chmod 600 "${key_file}"
           minisign -S -s "${key_file}" -m "${archive_path}" -x "${archive_path}.minisig" \
             -c "dnscrypt-proxy-nightly ${{ matrix.target }} from DNSCrypt/dnscrypt-proxy master" \
             -t "dnscrypt-proxy-nightly ${{ matrix.target }} ${{ steps.dnscrypt.outputs.full_sha }}"
@@ -147,8 +161,11 @@ jobs:
           repo_dir="${{ matrix.repo_dir }}"
 
           mkdir -p "${repo_dir}"
+          mkdir -p gen
+          cp dist/dnscrypt-proxy-nightly.pub gen/dnscrypt-proxy-nightly.pub
           cp "dist/${archive}" "${repo_dir}/${archive}"
           cp "dist/${archive}.minisig" "${repo_dir}/${archive}.minisig"
+          md5sum gen/dnscrypt-proxy-nightly.pub | awk '{print $1}' > gen/dnscrypt-proxy-nightly.pub.md5sum
           md5sum "${repo_dir}/${archive}" | awk '{print $1}' > "${repo_dir}/${archive}.md5sum"
           md5sum "${repo_dir}/${archive}.minisig" | awk '{print $1}' > "${repo_dir}/${archive}.minisig.md5sum"
 
@@ -161,6 +178,8 @@ jobs:
             ${{ matrix.repo_dir }}/dnscrypt-proxy-${{ matrix.archive_arch }}-nightly.tar.gz.minisig
             ${{ matrix.repo_dir }}/dnscrypt-proxy-${{ matrix.archive_arch }}-nightly.tar.gz.md5sum
             ${{ matrix.repo_dir }}/dnscrypt-proxy-${{ matrix.archive_arch }}-nightly.tar.gz.minisig.md5sum
+            gen/dnscrypt-proxy-nightly.pub
+            gen/dnscrypt-proxy-nightly.pub.md5sum
           if-no-files-found: error
 
   publish:
@@ -187,12 +206,15 @@ jobs:
           set -euo pipefail
 
           mkdir -p armv7 armv8
+          mkdir -p gen
           find _nightly-artifacts/dnscrypt-proxy-nightly-linux-armv7 -type f -name 'dnscrypt-proxy-linux_arm-nightly.tar.gz*' -exec cp -f {} armv7/ \;
           find _nightly-artifacts/dnscrypt-proxy-nightly-linux-armv8 -type f -name 'dnscrypt-proxy-linux_arm64-nightly.tar.gz*' -exec cp -f {} armv8/ \;
+          find _nightly-artifacts -type f -name 'dnscrypt-proxy-nightly.pub*' -exec cp -f {} gen/ \;
           test -f armv7/dnscrypt-proxy-linux_arm-nightly.tar.gz
           test -f armv7/dnscrypt-proxy-linux_arm-nightly.tar.gz.minisig
           test -f armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz
           test -f armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz.minisig
+          test -f gen/dnscrypt-proxy-nightly.pub
 
       - name: Commit nightly packages
         env:
@@ -210,7 +232,9 @@ jobs:
             armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz \
             armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz.minisig \
             armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz.md5sum \
-            armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz.minisig.md5sum
+            armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz.minisig.md5sum \
+            gen/dnscrypt-proxy-nightly.pub \
+            gen/dnscrypt-proxy-nightly.pub.md5sum
 
           if git diff --cached --quiet; then
             echo "No dnscrypt-proxy-nightly package changes to commit."
