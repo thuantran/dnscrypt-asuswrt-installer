@@ -157,6 +157,22 @@ If CI reports `shfmt` formatting differences, you can also run the `Create shfmt
 
 Pull requests that change shell scripts, checksum files, tools, prompts, or workflows are also reviewed by the Codex Code Improvement workflow when the repository has an `OPENAI_API_KEY` Actions secret configured. The Codex prompt includes the local code-quality output so formatting failures can be reported with the same remediation steps shown in CI.
 
+The `Build dnscrypt-proxy-nightly` workflow runs nightly on the GitHub Actions cron schedule `17 7 * * *` and can also be run manually from the Actions tab with `Run workflow`. For manual runs, use the `target_branch` input to publish the generated nightly files to `master`, `dev`, or another installer repository branch. It builds installer-compatible dnscrypt-proxy v2 nightly packages from the `DNSCrypt/dnscrypt-proxy` `master` branch:
+
+- `linux-armv7` with `GOOS=linux`, `GOARCH=arm`, and `GOARM=7`, published to `armv7/dnscrypt-proxy-linux_arm-nightly.tar.gz`.
+- `linux-armv8` with `GOOS=linux` and `GOARCH=arm64`, published to `armv8/dnscrypt-proxy-linux_arm64-nightly.tar.gz`.
+
+The workflow also publishes matching `.minisig` signature files and `.md5sum` files for installer download checks. Before enabling the nightly workflow, configure one repository Actions secret for an unencrypted minisign secret key:
+
+- `MINISIGN_PRIVATE_KEY`: full text contents of `minisign.key`.
+- `MINISIGN_PRIVATE_KEY_B64`: base64-encoded contents of `minisign.key`.
+
+Generate a signing key with `minisign -G -W -s minisign.key -p minisign.pub`, keep `minisign.key` private, and use `minisign.pub` as the public verification key.
+
+The workflow derives and publishes the matching public key as `gen/dnscrypt-proxy-nightly.pub` whenever it signs nightly packages.
+
+The installer lets users choose either the repository-provided `dnscrypt-proxy-nightly` package or the developer latest release package during install/update. The nightly build uses Go cross-compilation with `CGO_ENABLED=0`; Asuswrt-Merlin.ng toolchains are still appropriate for C helper binaries, but they are not required for dnscrypt-proxy unless you intentionally enable cgo.
+
 ## Project notes
 
 - Dnscrypt-Proxy binaries come from [jedisct1/dnscrypt-proxy](https://github.com/jedisct1/dnscrypt-proxy).
