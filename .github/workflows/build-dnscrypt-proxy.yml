@@ -141,7 +141,7 @@ jobs:
           spawn minisign -R -s "${key_file}" -p dist/dnscrypt-proxy-nightly.pub -f
           expect {
             -re "Password:|Enter password:" {
-              send -- "$env(MINISIGN_PASSWORD)\r"
+              send -- "\$env(MINISIGN_PASSWORD)\r"
               exp_continue
             }
             eof
@@ -164,7 +164,7 @@ jobs:
             -t "dnscrypt-proxy-nightly ${{ matrix.target }} ${{ steps.dnscrypt.outputs.full_sha }}"
           expect {
             -re "Password:|Enter password:" {
-              send -- "$env(MINISIGN_PASSWORD)\r"
+              send -- "\$env(MINISIGN_PASSWORD)\r"
               exp_continue
             }
             eof
