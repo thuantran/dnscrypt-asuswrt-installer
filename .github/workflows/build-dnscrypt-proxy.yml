@@ -147,8 +147,8 @@ jobs:
 
           tar -czf "${archive_path}" -C dist "${{ matrix.package_dir }}"
           minisign -S -W -s "${key_file}" -m "${archive_path}" -x "${archive_path}.minisig" \
-              -c "dnscrypt-proxy-nightly ${{ matrix.target }} from DNSCrypt/dnscrypt-proxy master" \
-              -t "dnscrypt-proxy-nightly ${{ matrix.target }} ${{ steps.dnscrypt.outputs.full_sha }}"
+             -c "dnscrypt-proxy-nightly ${{ matrix.target }} from DNSCrypt/dnscrypt-proxy master" \
+             -t "dnscrypt-proxy-nightly ${{ matrix.target }} ${{ steps.dnscrypt.outputs.full_sha }}"
           sha256sum "${archive_path}" > "${archive_path}.sha256"
           sha256sum "${archive_path}.minisig" > "${archive_path}.minisig.sha256"
           tar -tzf "${archive_path}"
