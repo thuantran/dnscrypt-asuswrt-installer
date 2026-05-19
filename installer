@@ -1252,7 +1252,7 @@ inst_dnscrypt() {
 		installer_update_reexec "${1:-install}" "${INSTALLER_MD5_OLD}"
 		download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
-			if [ "${1:-install}" != "update" ]; then choose_dnscrypt_binary_source; fi
+			if [ "${1:-install}" != "update" ] || [ -z "${DNSCRYPT_VER}" ]; then choose_dnscrypt_binary_source; fi
 			DNSCRYPT_BINARY_SOURCE="$(conf_value DNSCRYPT_BINARY_SOURCE)"
 			if [ "${DNSCRYPT_BINARY_SOURCE}" = "nightly" ]; then
 				inst_dnscrypt "${1:-install}" "${DNSCRYPT_NIGHTLY_VER}"
