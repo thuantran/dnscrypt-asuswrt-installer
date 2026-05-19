@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.8                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.9                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.7.8"
+DI_VERSION="v2.7.9"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -1253,7 +1253,7 @@ inst_dnscrypt() {
 		download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
 			if [ "${1:-install}" != "update" ] || [ -z "${DNSCRYPT_VER}" ]; then choose_dnscrypt_binary_source; fi
-			DNSCRYPT_BINARY_SOURCE="$(conf_value DNSCRYPT_BINARY_SOURCE)"
+			DNSCRYPT_BINARY_SOURCE="$(read_conf DNSCRYPT_BINARY_SOURCE)"
 			if [ "${DNSCRYPT_BINARY_SOURCE}" = "nightly" ]; then
 				inst_dnscrypt "${1:-install}" "${DNSCRYPT_NIGHTLY_VER}"
 				return
@@ -2048,7 +2048,7 @@ choose_dnscrypt_binary_source() {
 		write_conf DNSCRYPT_BINARY_SOURCE "\"${DNSCRYPT_BINARY_SOURCE}\""
 		return
 	fi
-	if [ ! -f "${CONF_FILE}" ] || [ -z "$(conf_value DNSCRYPT_BINARY_SOURCE)" ]; then
+	if [ ! -f "${CONF_FILE}" ] || [ -z "$(read_conf DNSCRYPT_BINARY_SOURCE)" ]; then
 		PTXT "${INFO} Available dnscrypt-proxy binary builds:" \
 			"  1) dnscrypt-proxy-nightly, built from DNSCrypt/dnscrypt-proxy master by this installer repository" \
 			"  2) Developer latest release (${DNSCRYPT_VER}) from DNSCrypt/dnscrypt-proxy"
