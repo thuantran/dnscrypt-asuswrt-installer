@@ -2065,7 +2065,7 @@ choose_dnscrypt_binary_source() {
 		esac
 		write_conf DNSCRYPT_BINARY_SOURCE "\"${DNSCRYPT_BINARY_SOURCE}\""
 	else
-		if read_yesno "Do you want to switch dnscrypt-proxy binary sources?"; then choose_branch 1; else PTXT "${INFO} continuing without changing binary sources."; fi
+		if read_yesno "Do you want to switch dnscrypt-proxy binary sources?"; then choose_dnscrypt_binary_source 1; else PTXT "${INFO} continuing without changing binary sources."; fi
 	fi
 }
 
