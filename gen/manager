@@ -618,7 +618,7 @@ start_monitor() {
 			logger -st "${NAME}" "dnscrypt-proxy binary is available and executable; Monitor will resume."
 			unset BINARY_UNAVAILABLE_LOGGED MONITOR_ELAPSED
 		fi
-		case "${EXIT}" in
+		case "${MONITOR_STATE}" in
 			"running")
 				timezone
 				case "${RANDOM_STATE}" in
