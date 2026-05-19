@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.7                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.8                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.7.7"
+DI_VERSION="v2.7.8"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -1252,7 +1252,8 @@ inst_dnscrypt() {
 		installer_update_reexec "${1:-install}" "${INSTALLER_MD5_OLD}"
 		download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
-			choose_dnscrypt_binary_source
+			if [ "${1:-install}" != "update" ]; then choose_dnscrypt_binary_source; fi
+			DNSCRYPT_BINARY_SOURCE="$(conf_value DNSCRYPT_BINARY_SOURCE)"
 			if [ "${DNSCRYPT_BINARY_SOURCE}" = "nightly" ]; then
 				inst_dnscrypt "${1:-install}" "${DNSCRYPT_NIGHTLY_VER}"
 				return
@@ -2036,27 +2037,36 @@ choose_relays_manual_wildcard() {
 }
 
 choose_dnscrypt_binary_source() {
-	DNSCRYPT_BINARY_SOURCE="release"
+	if [ "$1" = "1" ]; then
+		del_conf DNSCRYPT_BINARY_SOURCE
+	fi
+	local DNSCRYPT_BINARY_SOURCE
 	if [ -z "${DNSCRYPT_VER}" ]; then
 		DNSCRYPT_BINARY_SOURCE="nightly"
 		PTXT "${WARNING} Unable to determine the developer latest dnscrypt-proxy release." \
 			"${INFO} Using dnscrypt-proxy-nightly."
+		write_conf DNSCRYPT_BINARY_SOURCE "\"${DNSCRYPT_BINARY_SOURCE}\""
 		return
 	fi
-	PTXT "${INFO} Available dnscrypt-proxy binary builds:" \
-		"  1) dnscrypt-proxy-nightly, built from DNSCrypt/dnscrypt-proxy master by this installer repository" \
-		"  2) Developer latest release (${DNSCRYPT_VER}) from DNSCrypt/dnscrypt-proxy"
-	read_input_num "Please choose dnscrypt-proxy binary source" 1 2
-	case "${CHOSEN}" in
-		1)
-			DNSCRYPT_BINARY_SOURCE="nightly"
-			PTXT "${INFO} Using dnscrypt-proxy-nightly."
-			;;
-		2)
-			DNSCRYPT_BINARY_SOURCE="release"
-			PTXT "${INFO} Using developer latest release ${DNSCRYPT_VER}."
-			;;
-	esac
+	if [ ! -f "${CONF_FILE}" ] || [ -z "$(conf_value DNSCRYPT_BINARY_SOURCE)" ]; then
+		PTXT "${INFO} Available dnscrypt-proxy binary builds:" \
+			"  1) dnscrypt-proxy-nightly, built from DNSCrypt/dnscrypt-proxy master by this installer repository" \
+			"  2) Developer latest release (${DNSCRYPT_VER}) from DNSCrypt/dnscrypt-proxy"
+		read_input_num "Please choose dnscrypt-proxy binary source" 1 2
+		case "${CHOSEN}" in
+			1)
+				DNSCRYPT_BINARY_SOURCE="nightly"
+				PTXT "${INFO} Using dnscrypt-proxy-nightly."
+				;;
+			2)
+				DNSCRYPT_BINARY_SOURCE="release"
+				PTXT "${INFO} Using developer latest release ${DNSCRYPT_VER}."
+				;;
+		esac
+		write_conf DNSCRYPT_BINARY_SOURCE "\"${DNSCRYPT_BINARY_SOURCE}\""
+	else
+		if read_yesno "Do you want to switch dnscrypt-proxy binary sources?"; then choose_dnscrypt_binary_source 1; else PTXT "${INFO} continuing without changing binary sources."; fi
+	fi
 }
 
 read_input_dns() {
