@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.7.9                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.0                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.7.9"
+DI_VERSION="v2.8.0"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -2473,13 +2473,10 @@ cleanup_api_files
 wait
 unset varcnt
 readonly DNSCRYPT_VER
-[ "$1" ] && BRANCH="$1" || BRANCH="master"
-case "${BRANCH}" in
+case "${1}" in
 	"amtmupdate")
-		unset BRANCH
 		BRANCH="$(read_conf INSTALLER_BRANCH)"
-		[ -n "${BRANCH}" ] || BRANCH="master"
-		BRANCH="$(sanitize_branch "${BRANCH}")"
+		[ -n "${BRANCH}" ] && BRANCH="$(sanitize_branch "${BRANCH}")" || BRANCH="master"
 		case "$2" in
 			"check")
 				AMTM_UPDATE="$(read_conf AMTM_UPDATE)"
@@ -2495,11 +2492,15 @@ case "${BRANCH}" in
 				;;
 		esac
 		;;
+	"")
+		BRANCH="master"
+		;;
 	*)
-		BRANCH="$(sanitize_branch "${BRANCH}")"
-		write_conf INSTALLER_BRANCH "\"${BRANCH}\""
+		BRANCH="${1}"
 		;;
 esac
+BRANCH="$(sanitize_branch "${BRANCH}")"
+write_conf INSTALLER_BRANCH "\"${BRANCH}\""
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 RURL="https://raw.githubusercontent.com/thuantran/dnscrypt-asuswrt-installer/${BRANCH}"
 URL_GEN="${RURL}/gen"
