@@ -167,11 +167,11 @@ The workflow also publishes matching `.minisig` signature files and `.md5sum` fi
 - `MINISIGN_PRIVATE_KEY`: full text contents of `minisign.key`.
 - `MINISIGN_PRIVATE_KEY_B64`: base64-encoded contents of `minisign.key`.
 
-Generate a signing key with `minisign -G -W -s minisign.key -p minisign.pub`, keep `minisign.key` private, and use `minisign.pub` as the public verification key.
+Generate a signing key with `minisign -G -s minisign.key -p minisign.pub`, keep `minisign.key` private, and use `minisign.pub` as the public verification key.
 
 The workflow derives and publishes the matching public key as `gen/dnscrypt-proxy-nightly.pub` whenever it signs nightly packages.
 
-The installer lets users choose either the repository-provided `dnscrypt-proxy-nightly` package or the developer latest release package during install/update. The nightly build uses Go cross-compilation with `CGO_ENABLED=0`; Asuswrt-Merlin.ng toolchains are still appropriate for C helper binaries, but they are not required for dnscrypt-proxy unless you intentionally enable cgo.
+The installer lets users choose either the repository-provided `dnscrypt-proxy-nightly` package or the developer latest release package during install/update. The nightly build uses Go cross-compilation with `CGO_ENABLED=0`; Asuswrt-Merlin.ng toolchains are still appropriate for C helper binaries, but they are not required for dnscrypt-proxy unless the intention is to enable cgo.
 
 ## Project notes
 
