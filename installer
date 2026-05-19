@@ -28,6 +28,7 @@ export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+readonly DNSCRYPT_NIGHTLY_VER="nightly"
 readonly DNSCRYPT_WAIT_TIMEOUT="60"
 readonly DNSCRYPT_READY_TIMEOUT="180"
 readonly BASE_DIR="/jffs"
@@ -1117,8 +1118,9 @@ check_version() {
 				local LVERSION
 				LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
 				[ -z "${LVERSION}" ] && exit 1
-				[ -z "${DNSCRYPT_VER}" ] && exit 1
-				if [ "${DNSCRYPT_VER}" != "${LVERSION}" ]; then
+				if [ -z "${DNSCRYPT_VER}" ]; then
+					PTXT "${WARNING} Unable to check the developer latest dnscrypt-proxy release."
+				elif [ "${DNSCRYPT_VER}" != "${LVERSION}" ]; then
 					PTXT "${INFO} New DNSCRYPT_VER=${DNSCRYPT_VER} Available!" \
 						"${INFO} Run Option 1 of the Installer to upgrade DNScrypt Proxy."
 					AUTO_UPDATE="update"
@@ -1205,8 +1207,7 @@ end_op_message() {
 }
 
 inst_dnscrypt() {
-	local DNSCRYPT_TAR RESOLVERS_URL_PREFIX CRYPT_RESOLVERS FULL_RESOLVERS INSTALLER_MD5_OLD
-	DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz
+	local DNSCRYPT_TAR DNSCRYPT_PACKAGE_URL RESOLVERS_URL_PREFIX CRYPT_RESOLVERS FULL_RESOLVERS INSTALLER_MD5_OLD
 	if ping -q -w3 -c1 "download.dnscrypt.info" >/dev/null 2>&1; then
 		RESOLVERS_URL_PREFIX="https://download.dnscrypt.info/resolvers-list/"
 	else
@@ -1234,7 +1235,7 @@ inst_dnscrypt() {
 				if read_yesno "Do you want create a backup before updating?"; then backup_restore BACKUP 0; else PTXT "${INFO} continuing without making a backup."; fi
 			fi
 		fi
-		if [ -z "${DNSCRYPT_VER}" ] || { ! check_connection; }; then
+		if ! check_connection; then
 			PTXT "${ERROR} Unable to detect the Internet!"
 			end_op_message 1 "$1"
 			return
@@ -1251,6 +1252,11 @@ inst_dnscrypt() {
 		installer_update_reexec "${1:-install}" "${INSTALLER_MD5_OLD}"
 		download_file "${TARG_DIR}" 755 "${URL_GEN}/manager"
 		if [ "${1:-RESTORE}" != "RESTORE" ]; then
+			choose_dnscrypt_binary_source
+			if [ "${DNSCRYPT_BINARY_SOURCE}" = "nightly" ]; then
+				inst_dnscrypt "${1:-install}" "${DNSCRYPT_NIGHTLY_VER}"
+				return
+			fi
 			if [ -f "${TARG_DIR}/dnscrypt-proxy" ]; then
 				local LVERSION
 				LVERSION="$("${TARG_DIR}/dnscrypt-proxy" -version)"
@@ -1268,7 +1274,15 @@ inst_dnscrypt() {
 			fi
 		fi
 	else
-		if ! download_file "${TARG_DIR}" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${2}/${DNSCRYPT_TAR}"; then
+		DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${2}.tar.gz
+		if [ "$2" = "${DNSCRYPT_NIGHTLY_VER}" ]; then
+			DNSCRYPT_PACKAGE_URL="${URL_ARCH}/${DNSCRYPT_TAR}"
+			if ! download_file "${TARG_DIR}" 644 "${DNSCRYPT_PACKAGE_URL}" "${DNSCRYPT_PACKAGE_URL}.minisig"; then
+				PTXT "${ERROR} Unable to download dnscrypt-proxy nightly package for your router"
+				end_op_message 1 "$1"
+				return
+			fi
+		elif ! download_file "${TARG_DIR}" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${2}/${DNSCRYPT_TAR}"; then
 			PTXT "${ERROR} Unable to download dnscrypt-proxy package for your router"
 			end_op_message 1 "$1"
 			return
@@ -2021,6 +2035,30 @@ choose_relays_manual_wildcard() {
 	fi
 }
 
+choose_dnscrypt_binary_source() {
+	DNSCRYPT_BINARY_SOURCE="release"
+	if [ -z "${DNSCRYPT_VER}" ]; then
+		DNSCRYPT_BINARY_SOURCE="nightly"
+		PTXT "${WARNING} Unable to determine the developer latest dnscrypt-proxy release." \
+			"${INFO} Using dnscrypt-proxy-nightly."
+		return
+	fi
+	PTXT "${INFO} Available dnscrypt-proxy binary builds:" \
+		"  1) dnscrypt-proxy-nightly, built from DNSCrypt/dnscrypt-proxy master by this installer repository" \
+		"  2) Developer latest release (${DNSCRYPT_VER}) from DNSCrypt/dnscrypt-proxy"
+	read_input_num "Please choose dnscrypt-proxy binary source" 1 2
+	case "${CHOSEN}" in
+		1)
+			DNSCRYPT_BINARY_SOURCE="nightly"
+			PTXT "${INFO} Using dnscrypt-proxy-nightly."
+			;;
+		2)
+			DNSCRYPT_BINARY_SOURCE="release"
+			PTXT "${INFO} Using developer latest release ${DNSCRYPT_VER}."
+			;;
+	esac
+}
+
 read_input_dns() {
 	PTXT -n "${INPUT} $1 ${BOLD}${2}: ${NORM}"
 	local DNS_SERVER
@@ -2415,9 +2453,9 @@ until [ -n "${DNSCRYPT_VER}" ]; do
 		break
 	fi
 	if [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
-		PTXT "One or more critical variables could not be set in a timely manner." "It is possible we have hit the github api ratelimit (60req./hr) per requesters IP." "For more information, please read ${API_HEADERS}." "Please be sure to check your internet connection, and please try again later." "The installer script will now exit."
-		sleep 3s
-		exit 1
+		PTXT "${WARNING} Unable to determine the developer latest dnscrypt-proxy release." "It is possible we have hit the github api ratelimit (60req./hr) per requesters IP." "The installer can still use dnscrypt-proxy-nightly if network access to the installer repository is available."
+		DNSCRYPT_VER=""
+		break
 	fi
 	varcnt="$((varcnt + 1))"
 done
