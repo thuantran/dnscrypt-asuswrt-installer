@@ -744,27 +744,53 @@ check_dns_environment() {
 			"${ERROR} Exiting..."
 		exit 1
 	fi
-	local NVCHECK
+	local i MODE NVCHECK VAR
+	MODE="$1"
 	NVCHECK="0"
-	if [ "$(pidof stubby)" ]; then {
-		kill_processes stubby
-		NVCHECK="$((NVCHECK + 1))"
-	}; fi
-	for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
-		VAR="$(nvram get "${i}" 2>/dev/null)"
-		if [ "${i}" = "dnspriv_enable" ]; then
-			if [ "${VAR}" != "0" ]; then {
-				nvram set "${i}"="0"
-			}; else continue; fi
-		elif [ "${i}" = "dhcpd_dns_router" ]; then
-			if [ "${VAR}" != "1" ]; then {
-				nvram set "${i}"="1"
-			}; else continue; fi
-		elif [ "${VAR}" ] && [ "${NVCHECK}" != "0" ]; then {
-			nvram set "${i}"=""
-		}; else continue; fi
-		NVCHECK="$((NVCHECK + 1))"
-	done
+	case "${MODE}" in
+		0)
+			# Save original values only once.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				save_dns_nvram_environment
+			fi
+			if [ "$(pidof stubby)" ]; then
+				{ kill_processes stubby; }
+				NVCHECK="$((NVCHECK + 1))"
+			fi
+			for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				if [ "${i}" = "dnspriv_enable" ]; then
+					if [ "${VAR}" != "0" ]; then {
+						nvram set "${i}"="0"
+					}; else continue; fi
+				elif [ "${i}" = "dhcpd_dns_router" ]; then
+					if [ "${VAR}" != "1" ]; then {
+						nvram set "${i}"="1"
+					}; else continue; fi
+				elif [ "${VAR}" ]; then {
+					nvram set "${i}"=""
+				}; else continue; fi
+				NVCHECK="$((NVCHECK + 1))"
+			done
+			;;
+		1)
+			# Do not restore if we never saved anything.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				return 0
+			fi
+			for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				eval "OLD_VAR=\${_OLD_${i}}"
+				if [ "${VAR}" != "${OLD_VAR}" ]; then {
+					nvram set "${i}=${OLD_VAR}"
+				}; else continue; fi
+				NVCHECK="$((NVCHECK + 1))"
+			done
+			;;
+		*)
+			return 1
+			;;
+	esac
 	if [ "${NVCHECK}" != "0" ]; then
 		{ nvram commit; }
 		{ service restart_dnsmasq >/dev/null 2>&1; }
@@ -1126,6 +1152,17 @@ check_version() {
 			check_version x x
 		fi
 	fi
+}
+
+save_dns_nvram_environment() {
+	local VAR VALUE
+	for VAR in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+		VALUE="$(nvram get "${VAR}" 2>/dev/null)"
+		eval "_OLD_${VAR}=\${VALUE}"
+		export "_OLD_${VAR}"
+	done
+	_DNS_NVRAM_SAVED="1"
+	export _DNS_NVRAM_SAVED
 }
 
 # Installation and setup operations
@@ -2415,7 +2452,7 @@ menu() {
 	esac
 }
 
-trap cleanup_api_files EXIT
+trap 'cleanup_api_files; check_dns_environment 1' EXIT
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
@@ -2526,7 +2563,7 @@ case "$2" in
 	"")
 		cleanup
 		check_jffs_enabled
-		check_dns_environment
+		check_dns_environment 0
 		check_version
 		menu
 		;;

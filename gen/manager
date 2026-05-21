@@ -307,27 +307,54 @@ append_on_demand() {
 }
 
 check_dns_environment() {
-	local NVCHECK
+	local i MODE NVCHECK VAR
+	MODE="$1"
 	NVCHECK="0"
-	if [ "$(pidof stubby)" ]; then
-		{ kill_processes stubby; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
-		VAR="$(nvram get "${i}" 2>/dev/null)"
-		if [ "${i}" = "dnspriv_enable" ]; then
-			if [ "${VAR}" != "0" ]; then {
-				nvram set "${i}"="0"
-			}; else continue; fi
-		elif [ "${i}" = "dhcpd_dns_router" ]; then
-			if [ "${VAR}" != "1" ]; then {
-				nvram set "${i}"="1"
-			}; else continue; fi
-		elif [ "${VAR}" ] && [ "${NVCHECK}" != "0" ]; then {
-			nvram set "${i}"=""
-		}; else continue; fi
-		NVCHECK="$((NVCHECK + 1))"
-	done
+	case "${MODE}" in
+		running)
+			# Save original values only once.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				save_dns_nvram_environment
+			fi
+			if [ "$(pidof stubby)" ]; then
+				{ kill_processes stubby; }
+				NVCHECK="$((NVCHECK + 1))"
+			fi
+			for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				if [ "${i}" = "dnspriv_enable" ]; then
+					if [ "${VAR}" != "0" ]; then {
+						nvram set "${i}"="0"
+					}; else continue; fi
+				elif [ "${i}" = "dhcpd_dns_router" ]; then
+					if [ "${VAR}" != "1" ]; then {
+						nvram set "${i}"="1"
+					}; else continue; fi
+				elif [ "${VAR}" ]; then {
+					nvram set "${i}"=""
+				}; else continue; fi
+				NVCHECK="$((NVCHECK + 1))"
+			done
+			;;
+		stop)
+			# Do not restore if we never saved anything.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				return 0
+			fi
+			for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				eval "OLD_VAR=\${_OLD_${i}}"
+				if [ "${VAR}" != "${OLD_VAR}" ]; then {
+					nvram set "${i}=${OLD_VAR}"
+				}; else continue; fi
+				NVCHECK="$((NVCHECK + 1))"
+			done
+			;;
+		*)
+			logger -st "${NAME:-dns-manager}" "Invalid DNS environment mode: ${MODE}"
+			return 1
+			;;
+	esac
 	if [ "$NVCHECK" != "0" ]; then
 		{ nvram commit; }
 		{ service restart_dnsmasq >/dev/null 2>&1; }
@@ -400,6 +427,17 @@ resolv_conf_is_tmp_mount() {
 
 resolv_conf_uses_rom() {
 	readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf'
+}
+
+save_dns_nvram_environment() {
+	local VAR VALUE
+	for VAR in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+		VALUE="$(nvram get "${VAR}" 2>/dev/null)"
+		eval "_OLD_${VAR}=\${VALUE}"
+		export "_OLD_${VAR}"
+	done
+	_DNS_NVRAM_SAVED="1"
+	export _DNS_NVRAM_SAVED
 }
 
 sdn_bridge_for_index() {
@@ -597,6 +635,7 @@ start_monitor() {
 	RANDOM_STATE="0"
 	logger -st "${NAME}" "Starting Monitor!"
 	while true; do
+		check_dns_environment "${MONITOR_STATE}"
 		if [ "${MONITOR_STATE}" = "stop" ]; then # A place to exit early if needed, or if binary becomes unavailable before service-stop.
 			logger -st "${NAME}" "Stopping Monitor!"
 			trap - HUP INT QUIT ABRT USR1 USR2 TERM
@@ -796,4 +835,3 @@ case "$1" in
 		esac
 		;;
 esac
-check_dns_environment
