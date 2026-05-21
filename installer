@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.0                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.1                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.8.0"
+DI_VERSION="v2.8.1"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -744,28 +744,53 @@ check_dns_environment() {
 			"${ERROR} Exiting..."
 		exit 1
 	fi
-	local NVCHECK
+	local i MODE NVCHECK VAR
+	MODE="$1"
 	NVCHECK="0"
-	if [ "$(nvram get dnspriv_enable)" != "0" ]; then
-		{ nvram set dnspriv_enable="0"; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(pidof stubby)" ]; then
-		{ kill_processes stubby; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(nvram get dhcp_dns1_x)" ] && [ "${NVCHECK}" != "0" ]; then
-		{ nvram set dhcp_dns1_x=""; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(nvram get dhcp_dns2_x)" ] && [ "${NVCHECK}" != "0" ]; then
-		{ nvram set dhcp_dns2_x=""; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(nvram get dhcpd_dns_router)" != "1" ] && [ "${NVCHECK}" != "0" ]; then
-		{ nvram set dhcpd_dns_router="1"; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
+	case "${MODE}" in
+		0)
+			# Save original values only once.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				save_dns_nvram_environment
+			fi
+			if [ "$(pidof stubby)" ]; then
+				{ kill_processes stubby; }
+				NVCHECK="$((NVCHECK + 1))"
+			fi
+			for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				if [ "${i}" = "dnspriv_enable" ]; then
+					if [ "${VAR}" != "0" ]; then {
+						nvram set "${i}"="0"
+					}; else continue; fi
+				elif [ "${i}" = "dhcpd_dns_router" ]; then
+					if [ "${VAR}" != "1" ]; then {
+						nvram set "${i}"="1"
+					}; else continue; fi
+				elif [ "${VAR}" ]; then {
+					nvram set "${i}"=""
+				}; else continue; fi
+				NVCHECK="$((NVCHECK + 1))"
+			done
+			;;
+		1)
+			# Do not restore if we never saved anything.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				return 0
+			fi
+			for i in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				eval "OLD_VAR=\${_OLD_${i}}"
+				if [ "${VAR}" != "${OLD_VAR}" ]; then {
+					nvram set "${i}=${OLD_VAR}"
+				}; else continue; fi
+				NVCHECK="$((NVCHECK + 1))"
+			done
+			;;
+		*)
+			return 1
+			;;
+	esac
 	if [ "${NVCHECK}" != "0" ]; then
 		{ nvram commit; }
 		{ service restart_dnsmasq >/dev/null 2>&1; }
@@ -780,79 +805,42 @@ check_dns_filter() {
 	local NVCHECK USE_SOME
 	NVCHECK="0"
 	if [ "$1" -eq 0 ]; then
-		if [ "$(nvram get dnsfilter_enable_x)" -ne 0 ]; then
+		if [ "$(nvram get dnsfilter_enable_x 2>/dev/null)" -ne 0 ]; then
 			{ nvram set dnsfilter_enable_x="0"; }
 			NVCHECK="$((NVCHECK + 1))"
 		fi
 		PTXT "${INFO} DNS will not be forced through to Dnscrypt-Proxy."
 	fi
 	if [ "$1" -eq 1 ]; then
-		if [ "$(nvram get dnsfilter_enable_x)" -ne 1 ]; then
+		if [ "$(nvram get dnsfilter_enable_x 2>/dev/null)" -ne 1 ]; then
 			{ nvram set dnsfilter_enable_x="1"; }
 			NVCHECK="$((NVCHECK + 1))"
 		fi
 		PTXT "${INFO} You can choose to keep any custom dnsfilter values by only redirect non-custom traffic or send all traffic through to Dnscrypt-Proxy."
 		if read_yesno "Do you want to redirect only NON-CUSTOM DNS resolutions on your network through to Dnscrypt-Proxy?"; then USE_SOME="0"; else USE_SOME="1"; fi
 		if [ "${USE_SOME}" -eq 0 ]; then
-			if [ "$(nvram get dnsfilter_mode)" != "11" ]; then
+			if [ "$(nvram get dnsfilter_mode 2>/dev/null)" != "11" ]; then
 				{ nvram set dnsfilter_mode="11"; }
 				NVCHECK="$((NVCHECK + 1))"
 			fi
 			PTXT "${INFO} DNSFilter is set to control DNS through to Dnscrypt-Proxy, while leaving any Custom Rules and Values."
 		fi
 		if [ "$USE_SOME" -eq 1 ]; then
-			if [ "$(nvram get dnsfilter_custom1)" ]; then
-				{ nvram set dnsfilter_custom1=""; }
+			for i in dnsfilter_mode dhcpd_dns_router dnsfilter_custom1 dnsfilter_custom2 dnsfilter_custom3 dnsfilter_rulelist dnsfilter_rulelist1 dnsfilter_rulelist2 dnsfilter_rulelist3 dnsfilter_rulelist4 dnsfilter_rulelist5 dhcp_dns1_x dhcp_dns2_x; do
+				VAR="$(nvram get "${i}" 2>/dev/null)"
+				if [ "${i}" = "dnsfilter_mode" ]; then
+					if [ "$VAR" != "11" ]; then {
+						nvram set "${i}"="11"
+					}; else continue; fi
+				elif [ "${i}" = "dhcpd_dns_router" ]; then
+					if [ "$VAR" != "1" ]; then {
+						nvram set "${i}"="1"
+					}; else continue; fi
+				elif [ "$VAR" ]; then {
+					nvram set "${i}"=""
+				}; else continue; fi
 				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_custom2)" ]; then
-				{ nvram set dnsfilter_custom2=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_custom3)" ]; then
-				{ nvram set dnsfilter_custom3=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_mode)" != "11" ]; then
-				{ nvram set dnsfilter_mode="11"; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_rulelist)" ]; then
-				{ nvram set dnsfilter_rulelist=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_rulelist1)" ]; then
-				{ nvram set dnsfilter_rulelist1=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_rulelist2)" ]; then
-				{ nvram set dnsfilter_rulelist2=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_rulelist3)" ]; then
-				{ nvram set dnsfilter_rulelist3=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_rulelist4)" ]; then
-				{ nvram set dnsfilter_rulelist4=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dnsfilter_rulelist5)" ]; then
-				{ nvram set dnsfilter_rulelist5=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dhcp_dns1_x)" ]; then
-				{ nvram set dhcp_dns1_x=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dhcp_dns2_x)" ]; then
-				{ nvram set dhcp_dns2_x=""; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
-			if [ "$(nvram get dhcpd_dns_router)" != "1" ]; then
-				{ nvram set dhcpd_dns_router="1"; }
-				NVCHECK="$((NVCHECK + 1))"
-			fi
+			done
 			PTXT "${INFO} DNS is set to redirect All DNS resolutions through to Dnscrypt-Proxy."
 		fi
 	fi
@@ -891,16 +879,16 @@ check_dnscrypt_toml() {
 }
 
 check_jffs_enabled() {
-	if [ "$(nvram get jffs2_format)" = "1" ]; then
+	if [ "$(nvram get jffs2_format 2>/dev/null)" = "1" ]; then
 		PTXT "${ERROR} JFFS partition is scheduled to be reformatted." \
 			"${ERROR} Please reboot to format or disable that setting and try again." \
 			"${ERROR} Exiting..."
 		exit 1
 	fi
 	local JFFS2_SCRIPTS JFFS2_ENABLED jffs2_on
-	JFFS2_SCRIPTS="$(nvram get jffs2_scripts)"
-	[ -z "$(nvram get jffs2_enable)" ] && JFFS2_ENABLED="$(nvram get jffs2_on)" || JFFS2_ENABLED="$(nvram get jffs2_enable)"
-	[ -z "$(nvram get jffs2_enable)" ] && jffs2_on="jffs2_on" || jffs2_on="jffs2_enable"
+	JFFS2_SCRIPTS="$(nvram get jffs2_scripts 2>/dev/null)"
+	if [ -z "$(nvram get jffs2_enable 2>/dev/null)" ]; then JFFS2_ENABLED="$(nvram get jffs2_on 2>/dev/null)"; else JFFS2_ENABLED="$(nvram get jffs2_enable 2>/dev/null)"; fi
+	if [ -z "$(nvram get jffs2_enable 2>/dev/null)" ]; then jffs2_on="jffs2_on"; else jffs2_on="jffs2_enable"; fi
 	if [ "${JFFS2_ENABLED}" -ne 1 ] || [ "${JFFS2_SCRIPTS}" -ne 1 ]; then
 		PTXT "${INFO} JFFS custom scripts and configs are not enabled." \
 			"${INFO} Enabling them now!"
@@ -1164,6 +1152,17 @@ check_version() {
 			check_version x x
 		fi
 	fi
+}
+
+save_dns_nvram_environment() {
+	local VAR VALUE
+	for VAR in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+		VALUE="$(nvram get "${VAR}" 2>/dev/null)"
+		eval "_OLD_${VAR}=\${VALUE}"
+		export "_OLD_${VAR}"
+	done
+	_DNS_NVRAM_SAVED="1"
+	export _DNS_NVRAM_SAVED
 }
 
 # Installation and setup operations
@@ -2453,7 +2452,7 @@ menu() {
 	esac
 }
 
-trap cleanup_api_files EXIT
+trap 'cleanup_api_files; check_dns_environment 1' EXIT
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
@@ -2564,7 +2563,7 @@ case "$2" in
 	"")
 		cleanup
 		check_jffs_enabled
-		check_dns_environment
+		check_dns_environment 0
 		check_version
 		menu
 		;;
