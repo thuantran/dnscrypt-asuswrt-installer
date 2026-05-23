@@ -334,7 +334,12 @@ check_dns_environment() {
 		changed="0"
 		for key in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
 			cur="$(nvram get "${key}" 2>/dev/null)"
-			eval "old=\${_OLD_${key}}"
+			case "${key}" in
+				dnspriv_enable) old="${_OLD_dnspriv_enable}" ;;
+				dhcpd_dns_router) old="${_OLD_dhcpd_dns_router}" ;;
+				dhcp_dns1_x) old="${_OLD_dhcp_dns1_x}" ;;
+				dhcp_dns2_x) old="${_OLD_dhcp_dns2_x}" ;;
+			esac
 			if [ "${cur}" != "${old}" ]; then
 				nvram set "${key}=${old}"
 				changed="1"
@@ -446,9 +451,14 @@ save_dns_nvram_environment() {
 	local VAR VALUE
 	for VAR in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
 		VALUE="$(nvram get "${VAR}" 2>/dev/null)"
-		eval "_OLD_${VAR}=\${VALUE}"
-		export "_OLD_${VAR}"
+		case "${VAR}" in
+			dnspriv_enable) _OLD_dnspriv_enable="${VALUE}" ;;
+			dhcpd_dns_router) _OLD_dhcpd_dns_router="${VALUE}" ;;
+			dhcp_dns1_x) _OLD_dhcp_dns1_x="${VALUE}" ;;
+			dhcp_dns2_x) _OLD_dhcp_dns2_x="${VALUE}" ;;
+		esac
 	done
+	export _OLD_dnspriv_enable _OLD_dhcpd_dns_router _OLD_dhcp_dns1_x _OLD_dhcp_dns2_x
 	_DNS_NVRAM_SAVED="1"
 	export _DNS_NVRAM_SAVED
 }
@@ -648,7 +658,14 @@ start_monitor() {
 	RANDOM_STATE="0"
 	logger -st "${NAME}" "Starting Monitor!"
 	while true; do
-		check_dns_environment "${MONITOR_STATE}"
+		case "${MONITOR_STATE}" in
+			"running" | "stop")
+				check_dns_environment "${MONITOR_STATE}"
+				;;
+			"restart")
+				check_dns_environment "running"
+				;;
+		esac
 		if [ "${MONITOR_STATE}" = "stop" ]; then # A place to exit early if needed, or if binary becomes unavailable before service-stop.
 			logger -st "${NAME}" "Stopping Monitor!"
 			trap - HUP INT QUIT ABRT USR1 USR2 TERM
