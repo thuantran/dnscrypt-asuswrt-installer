@@ -307,28 +307,72 @@ append_on_demand() {
 }
 
 check_dns_environment() {
-	local NVCHECK
+	local MODE NVCHECK
+	dns_env_set_nvram() {
+		local key expected cur changed
+		key="$1"
+		expected="$2"
+		cur="$(nvram get "${key}" 2>/dev/null)"
+		if [ "${cur}" = "${expected}" ]; then
+			return 1
+		fi
+		nvram set "${key}=${expected}"
+		changed="1"
+		return 0
+	}
+	dns_env_apply_profile() {
+		local changed
+		changed="0"
+		dns_env_set_nvram "dnspriv_enable" "0" && changed="1"
+		dns_env_set_nvram "dhcpd_dns_router" "1" && changed="1"
+		dns_env_set_nvram "dhcp_dns1_x" "" && changed="1"
+		dns_env_set_nvram "dhcp_dns2_x" "" && changed="1"
+		[ "${changed}" = "1" ]
+	}
+	dns_env_restore_profile() {
+		local changed key cur old
+		changed="0"
+		for key in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+			cur="$(nvram get "${key}" 2>/dev/null)"
+			case "${key}" in
+				dnspriv_enable) old="${_OLD_dnspriv_enable}" ;;
+				dhcpd_dns_router) old="${_OLD_dhcpd_dns_router}" ;;
+				dhcp_dns1_x) old="${_OLD_dhcp_dns1_x}" ;;
+				dhcp_dns2_x) old="${_OLD_dhcp_dns2_x}" ;;
+			esac
+			if [ "${cur}" != "${old}" ]; then
+				nvram set "${key}=${old}"
+				changed="1"
+			fi
+		done
+		[ "${changed}" = "1" ]
+	}
+	MODE="$1"
 	NVCHECK="0"
-	if [ "$(nvram get dnspriv_enable)" != "0" ]; then
-		{ nvram set dnspriv_enable="0"; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(pidof stubby)" ]; then
-		{ kill_processes stubby; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(nvram get dhcp_dns1_x)" ] && [ "${NVCHECK}" != "0" ]; then
-		{ nvram set dhcp_dns1_x=""; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(nvram get dhcp_dns2_x)" ] && [ "${NVCHECK}" != "0" ]; then
-		{ nvram set dhcp_dns2_x=""; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
-	if [ "$(nvram get dhcpd_dns_router)" != "1" ] && [ "${NVCHECK}" != "0" ]; then
-		{ nvram set dhcpd_dns_router="1"; }
-		NVCHECK="$((NVCHECK + 1))"
-	fi
+	case "${MODE}" in
+		running)
+			# Save original values only once.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				save_dns_nvram_environment
+			fi
+			if [ "$(pidof stubby)" ]; then
+				{ kill_processes stubby; }
+				NVCHECK="$((NVCHECK + 1))"
+			fi
+			dns_env_apply_profile && NVCHECK="$((NVCHECK + 1))"
+			;;
+		stop)
+			# Do not restore if we never saved anything.
+			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
+				return 0
+			fi
+			dns_env_restore_profile && NVCHECK="$((NVCHECK + 1))"
+			;;
+		*)
+			logger -st "${NAME:-dns-manager}" "Invalid DNS environment mode: ${MODE}"
+			return 1
+			;;
+	esac
 	if [ "$NVCHECK" != "0" ]; then
 		{ nvram commit; }
 		{ service restart_dnsmasq >/dev/null 2>&1; }
@@ -345,12 +389,10 @@ dnsmasq_params() {
 			cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
 			append_on_demand "${CONFIG}" "no-resolv"
 			append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
-			for DNS in $(nvram get wan_dns) $(nvram get wan0_dns) $(nvram get wan1_dns) $(nvram get wan_dns1_x) $(nvram get wan_dns2_x) $(nvram get wan0_dns1_x) $(nvram get wan0_dns2_x) $(nvram get wan1_dns1_x) $(nvram get wan1_dns2_x) $(nvram get wan0_xdns) $(nvram get wan1_xdns) $(nvram get ipv6_get_dns); do
-				remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"
-			done
-			for VAR in 1 2 3; do
-				DNS="$(nvram get "ipv6_dns${VAR}")"
-				remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"
+			for VAR in wan_dns wan0_dns wan1_dns wan_dns1_x wan_dns2_x wan0_dns1_x wan0_dns2_x wan1_dns1_x wan1_dns2_x wan0_xdns wan1_xdns ipv6_get_dns ipv6_dns1 ipv6_dns2 ipv6_dns3; do
+				for DNS in $(nvram get "${VAR}" 2>/dev/null); do
+					if [ "${DNS}" ]; then { remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"; }; else { continue; }; fi
+				done
 			done
 			sed -i "/^servers-file=.*$/d" "${CONFIG}"
 			append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
@@ -403,6 +445,22 @@ resolv_conf_is_tmp_mount() {
 
 resolv_conf_uses_rom() {
 	readlink -f /etc/resolv.conf | grep -qE '^/rom/etc/resolv.conf'
+}
+
+save_dns_nvram_environment() {
+	local VAR VALUE
+	for VAR in dnspriv_enable dhcpd_dns_router dhcp_dns1_x dhcp_dns2_x; do
+		VALUE="$(nvram get "${VAR}" 2>/dev/null)"
+		case "${VAR}" in
+			dnspriv_enable) _OLD_dnspriv_enable="${VALUE}" ;;
+			dhcpd_dns_router) _OLD_dhcpd_dns_router="${VALUE}" ;;
+			dhcp_dns1_x) _OLD_dhcp_dns1_x="${VALUE}" ;;
+			dhcp_dns2_x) _OLD_dhcp_dns2_x="${VALUE}" ;;
+		esac
+	done
+	export _OLD_dnspriv_enable _OLD_dhcpd_dns_router _OLD_dhcp_dns1_x _OLD_dhcp_dns2_x
+	_DNS_NVRAM_SAVED="1"
+	export _DNS_NVRAM_SAVED
 }
 
 sdn_bridge_for_index() {
@@ -572,9 +630,9 @@ system_time_ready() {
 # Service control helpers
 start_dnscrypt_proxy() {
 	local DNSCRYPT_START LOG_FACILITY
-	{ cd /jffs/dnscrypt; } || exit
-	if [ "$(grep -cE '^# use_syslog = true' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "1" ] && [ "$(grep -cE '^# log_file =' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "5" ]; then LOG_FACILITY="-syslog"; fi
-	if [ -n "${LOG_FACILITY}" ]; then DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy ${LOG_FACILITY} -config /jffs/dnscrypt/dnscrypt-proxy.toml"; else DNSCRYPT_START="/jffs/dnscrypt/dnscrypt-proxy -config /jffs/dnscrypt/dnscrypt-proxy.toml"; fi
+	{ cd /jffs/dnscrypt; } || return 1
+	if { [ "$(grep -cE '^# use_syslog = true' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "1" ] && [ "$(grep -cE '^# log_file =' /jffs/dnscrypt/dnscrypt-proxy.toml)" = "5" ]; }; then LOG_FACILITY="-syslog"; fi
+	DNSCRYPT_START="./dnscrypt-proxy ${LOG_FACILITY:+$LOG_FACILITY} -config ./dnscrypt-proxy.toml"
 	{ kill_processes dnscrypt-proxy; }
 	if ! dnscrypt_wait_stopped 30; then
 		logger -st "${NAME}" "Warning: unable to stop existing dnscrypt-proxy processes before start."
@@ -583,7 +641,7 @@ start_dnscrypt_proxy() {
 	logger -st "${NAME}" "Starting dnscrypt-proxy from ${NAME}."
 	{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
 	if ! grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
-	if dnscrypt_wait_started 30 && { service_wait netcheck 300; }; then return "0"; else return "1"; fi
+	if { dnscrypt_wait_started 30; } && { service_wait netcheck 300; }; then return 0; else return 1; fi
 }
 
 start_monitor() {
@@ -600,6 +658,14 @@ start_monitor() {
 	RANDOM_STATE="0"
 	logger -st "${NAME}" "Starting Monitor!"
 	while true; do
+		case "${MONITOR_STATE}" in
+			"running" | "stop")
+				check_dns_environment "${MONITOR_STATE}"
+				;;
+			"restart")
+				check_dns_environment "running"
+				;;
+		esac
 		if [ "${MONITOR_STATE}" = "stop" ]; then # A place to exit early if needed, or if binary becomes unavailable before service-stop.
 			logger -st "${NAME}" "Stopping Monitor!"
 			trap - HUP INT QUIT ABRT USR1 USR2 TERM
@@ -676,7 +742,7 @@ start_monitor() {
 }
 
 stop_dnscrypt_proxy() {
-	{ cd /jffs/dnscrypt; } || exit
+	{ cd /jffs/dnscrypt; } || return 1
 	logger -st "${NAME}" "Stopping dnscrypt-proxy from ${NAME}."
 	{ kill_processes dnscrypt-proxy; }
 	if grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
@@ -799,4 +865,3 @@ case "$1" in
 		esac
 		;;
 esac
-check_dns_environment
