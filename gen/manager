@@ -500,21 +500,32 @@ init_hwrng() {
 	while [ ! -c "${RNG_DEV}" ]; do
 		if [ "${COUNT}" -gt 120 ]; then
 			logger -st "${NAME}" "ERROR: Unable to find HWRNG device. Aborting..."
-			if [ -f "/jffs/dnscrypt/haveged" ]; then
-				{ /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; }
-				logger -st "${NAME}" "Haveged: Using available haveged instead..."
+			if [ -x "/jffs/dnscrypt/haveged" ]; then
+				if /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; then
+					logger -st "${NAME}" "Haveged: Using available haveged instead..."
+				else
+					logger -st "${NAME}" "Warning: haveged exists but failed to start."
+				fi
 			fi
 			return 1
 		fi
 		COUNT="$((COUNT + 1))"
 		sleep 1s
 	done
-	{ /jffs/dnscrypt/stty raw -echo -ixoff -F "${RNG_DEV}" speed 115200; }
-	{ /jffs/dnscrypt/rngd -r "${RNG_DEV}"; }
-	if [ "$?" -eq "0" ]; then
+	if [ ! -x "/jffs/dnscrypt/stty" ] || [ ! -x "/jffs/dnscrypt/rngd" ]; then
+		logger -st "${NAME}" "ERROR: /jffs/dnscrypt/stty or /jffs/dnscrypt/rngd is missing or not executable."
+		return 1
+	fi
+	if ! /jffs/dnscrypt/stty raw -echo -ixoff -F "${RNG_DEV}" speed 115200; then
+		logger -st "${NAME}" "ERROR: Failed to configure ${RNG_DEV} using stty."
+		return 1
+	fi
+	if /jffs/dnscrypt/rngd -r "${RNG_DEV}"; then
 		logger -st "${NAME}" "rngd: Started for ${RNG_DEV}"
 		return 0
 	fi
+	logger -st "${NAME}" "ERROR: Failed to start rngd for ${RNG_DEV}."
+	return 1
 }
 
 netcheck() {
@@ -851,7 +862,7 @@ case "$1" in
 				proc_optimizations
 				case "${RAN_PRV}" in
 					"haveged")
-						{ /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; }
+						if [ -x "/jffs/dnscrypt/haveged" ] && /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; then :; else logger -st "${NAME}" "Warning: haveged provider selected but /jffs/dnscrypt/haveged is unavailable or failed to start."; fi
 						;;
 					"rngd")
 						{ init_hwrng & }
