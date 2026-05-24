@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.1                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.2                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.8.1"
+DI_VERSION="v2.8.2"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -2476,10 +2476,6 @@ menu() {
 		"q" | "Q")
 			PTXT "${INFO} Operations have been applied if any has been made" \
 				"${INFO} In case of anomaly, please reboot your router!"
-			# Restore pre-check DNS settings only when exiting without a local dnscrypt installation.
-			if [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
-				check_dns_environment 1
-			fi
 			if [ -f "${HOME}/installer" ]; then rm -rf "${HOME}/installer"; fi
 			sleep 3s
 			clear
