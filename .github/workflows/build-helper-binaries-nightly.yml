@@ -21,7 +21,7 @@ concurrency:
 jobs:
   build:
     name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
