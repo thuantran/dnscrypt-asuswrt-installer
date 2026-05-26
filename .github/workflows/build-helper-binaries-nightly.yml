@@ -128,10 +128,12 @@ jobs:
             }
             ./configure --host="$HOST" --prefix=/usr
             make -j"$(nproc)" || {
-              echo "haveged build failed" >&2
+              echo "haveged parallel build failed; retrying single-threaded" >&2
               make clean
-              make  # Try single-threaded build for better error diagnostics
-              exit 1
+              make || {
+                echo "haveged build failed" >&2
+                exit 1
+              }
             }
 
             # Check multiple possible binary locations
