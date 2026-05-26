@@ -74,7 +74,7 @@ jobs:
           mkdir -p "$HOME/.toolchains"
           BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2025.08-1.tar.xz"
           BOOTLIN_URLS="
-            https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs
+            https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/
           "
 
           for base_url in $BOOTLIN_URLS; do
