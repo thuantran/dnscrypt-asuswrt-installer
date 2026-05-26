@@ -30,10 +30,12 @@ jobs:
             repo_dir: armv7
             host_triplet: arm-linux-gnueabihf
             cc_prefix: arm-linux-gnueabihf
+            deb_arch: armhf
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
             cc_prefix: aarch64-linux-gnu
+            deb_arch: arm64
 
     steps:
       - name: Resolve checkout ref
@@ -63,7 +65,13 @@ jobs:
       - name: Install cross toolchain
         run: |
           set -eu
+          sudo dpkg --add-architecture ${{ matrix.deb_arch }}
+          sudo apt-get update
           sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
+          sudo apt-get install -y \
+            pkg-config \
+            libcurl4-openssl-dev:${{ matrix.deb_arch }} \
+            libxml2-dev:${{ matrix.deb_arch }}
 
       - name: Build helper binaries from source
         env:
@@ -73,10 +81,11 @@ jobs:
           set -eu
 
           mkdir -p "$OUT_DIR" _src _build
-          export CC="gcc"
-          export AR="ar"
-          export RANLIB="ranlib"
-          export STRIP="strip"
+          export CC="$CC_PREFIX-gcc"
+          export AR="$CC_PREFIX-ar"
+          export RANLIB="$CC_PREFIX-ranlib"
+          export STRIP="$CC_PREFIX-strip"
+          export PKG_CONFIG_LIBDIR="/usr/lib/${HOST}/pkgconfig:/usr/share/pkgconfig"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
@@ -158,7 +167,13 @@ jobs:
             clone_repo_at_ref "$RNG_TOOLS_REPO" "$RNG_TOOLS_REF" _src/rng-tools
             cd _src/rng-tools
             ./autogen.sh
-            ./configure --host="$HOST" --prefix=/usr --disable-silent-rules
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix=/usr \
+              --disable-silent-rules \
+              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
+              PKG_CONFIG=pkg-config
             make -j"$(nproc)"
             cp rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/rngd"
             cd "${GITHUB_WORKSPACE}"
