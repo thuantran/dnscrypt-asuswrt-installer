@@ -72,16 +72,15 @@ jobs:
         run: |
           set -eu
           mkdir -p "$HOME/.toolchains"
-          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2017.05-1.tar.bz2"
+          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2025.08-1.tar.xz"
           BOOTLIN_URLS="
             https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs
-            https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf--uclibc--stable-2017.05-1/tarballs
           "
 
           for base_url in $BOOTLIN_URLS; do
-            if curl -fsSL "$base_url/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.bz2; then
-              curl -fsSL "$base_url/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.bz2.sha256
-              (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.bz2.sha256)
+            if curl -fsSL "$base_url/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
+              curl -fsSL "$base_url/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
+              (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.xz.sha256)
               found_url="$base_url"
               break
             fi
@@ -91,8 +90,8 @@ jobs:
             echo "Unable to download $BOOTLIN_TARBALL from known Bootlin URLs" >&2
             exit 1
           fi
-          tar -xjf /tmp/armv7-uclibc-toolchain.tar.bz2 -C "$HOME/.toolchains"
-          echo "$HOME/.toolchains/armv7-eabihf--uclibc--stable-2017.05-1/bin" >> "$GITHUB_PATH"
+          tar -xJf /tmp/armv7-uclibc-toolchain.tar.xz -C "$HOME/.toolchains"
+          echo "$HOME/.toolchains/armv7-eabihf--uclibc--stable-2025.08-1/bin" >> "$GITHUB_PATH"
 
       - name: Build helper binaries from source
         env:
@@ -151,7 +150,11 @@ jobs:
           build_haveged() {
             clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
             cd _src/haveged
-            ./autogen.sh
+            autoreconf -i || {
+              if [ ! -f configure ]; then
+                autoconf
+              fi
+            }
             ./configure --host="$HOST" --prefix=/usr
             make -j"$(nproc)"
             cp haveged/.libs/haveged "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
