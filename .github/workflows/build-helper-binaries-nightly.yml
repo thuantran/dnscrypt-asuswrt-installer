@@ -72,22 +72,13 @@ jobs:
         run: |
           set -eu
           mkdir -p "$HOME/.toolchains"
-          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2025.08-1.tar.xz"
-          BOOTLIN_URLS="
-            https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs
-          "
-
-          for base_url in $BOOTLIN_URLS; do
-            if curl -fsSL "$base_url/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
-              curl -fsSL "$base_url/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
+          BOOTLIN_TARBALL='armv7-eabihf--uclibc--stable-2025.08-1.tar.xz'
+          BOOTLIN_URL='https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/'
+          if curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}${BOOTLIN_TARBALL}" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
+              curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}${BOOTLIN_TARBALL}.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
               (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.xz.sha256)
-              found_url="$base_url"
-              break
-            fi
-          done
-
-          if [ -z "${found_url:-}" ]; then
-            echo "Unable to download $BOOTLIN_TARBALL from known Bootlin URLs" >&2
+          else
+            echo "Unable to download ${BOOTLIN_TARBALL} from known Bootlin URLs" >&2
             exit 1
           fi
           tar -xJf /tmp/armv7-uclibc-toolchain.tar.xz -C "$HOME/.toolchains"
@@ -108,11 +99,11 @@ jobs:
           export STRIP="$CC_PREFIX-strip"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
-          HAVEGED_REF="v1.9.18"
+          HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
           RNG_TOOLS_REPO="https://github.com/nhorman/rng-tools.git"
-          RNG_TOOLS_REF="6e5984f3b12fdd82b7fd2f932a0b5014fe0f4890"
+          RNG_TOOLS_REF="bd00c08b0c3c6a880b0988befe97fd35b315468c"
           JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
-          JITTERENTROPY_REF="6a56998e2e5d9f79e5bbf57d4c2f4fd2e9c8dc95"
+          JITTERENTROPY_REF="b94ef60f888ad442641a25c4599e24296bde4959"
           COREUTILS_VERSION="9.5"
           COREUTILS_SHA256="cd80eb5b247f87670353197a8fc3e3f7fb77f607f9f10925a60214790514d31a"
 
@@ -156,8 +147,28 @@ jobs:
               fi
             }
             ./configure --host="$HOST" --prefix=/usr
-            make -j"$(nproc)"
-            cp haveged/.libs/haveged "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
+            make -j"$(nproc)" || {
+              echo "haveged build failed" >&2
+              make clean
+              make  # Try single-threaded build for better error diagnostics
+              exit 1
+            }
+
+            # Check multiple possible binary locations
+            if [ -f haveged/.libs/haveged ]; then
+              binary_path="haveged/.libs/haveged"
+            elif [ -f haveged/haveged ]; then
+              binary_path="haveged/haveged"
+            elif [ -f src/.libs/haveged ]; then
+              binary_path="src/.libs/haveged"
+            else
+              echo "haveged binary not found. Searching for it..." >&2
+              find . -name "haveged" -type f -executable 2>/dev/null || true
+              echo "haveged build failed: binary not found in expected locations" >&2
+              exit 1
+            fi
+
+            cp "$binary_path" "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
             cd "${GITHUB_WORKSPACE}"
           }
 
