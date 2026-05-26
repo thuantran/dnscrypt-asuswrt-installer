@@ -1332,6 +1332,12 @@ inst_dnscrypt() {
 			return
 		fi
 	fi
+	if ! download_file "${TARG_DIR}" 755 "${URL_ARCH}/nonroot"; then
+		PTXT "${WARNING} Failed to download nonroot helper for your router architecture." \
+			"${INFO} dnscrypt-proxy will run without nonroot until helper download succeeds."
+	elif [ ! -x "${TARG_DIR}/nonroot" ]; then
+		chmod 755 "${TARG_DIR}/nonroot"
+	fi
 	download_file "${TARG_DIR}" 644 "${RESOLVERS_URL_PREFIX}/public-resolvers.md" \
 		"${RESOLVERS_URL_PREFIX}/public-resolvers.md.minisig" \
 		"${RESOLVERS_URL_PREFIX}/relays.md" \
@@ -1409,15 +1415,26 @@ inst_ran_dev() {
 }
 
 inst_random() {
-	local RNG_DEV RAN_PRV
+	local RNG_DEV RAN_PRV MAX_OPTION HAS_JITTERENTROPY
 	create_dir "${TARG_DIR}"
+	HAS_JITTERENTROPY="0"
+	if http_get_file "${URL_ARCH}/jitterentropy-rngd.md5sum" "/dev/null" "" insecure; then
+		HAS_JITTERENTROPY="1"
+	fi
 	PTXT "${INFO} Install a (P)RNG for better cryptographic operations" \
 		"${INFO} Available random number generator providers:" \
 		"  1) HAVEGED (Preferred if you do not have a HW RNG)" \
-		"  2) RNGD (Preferred if you have a HW RNG)" \
-		"${INFO} If you choose a HW RNG, please have it plugged in now before" \
+		"  2) RNGD (Preferred if you have a HW RNG)"
+	if [ "${HAS_JITTERENTROPY}" = "1" ]; then
+		PTXT "  3) JITTERENTROPY-RNGD (Alternative software PRNG)"
+	else
+		PTXT "${WARNING} 3) JITTERENTROPY-RNGD is temporarily unavailable for this architecture."
+	fi
+	PTXT "${INFO} If you choose a HW RNG, please have it plugged in now before" \
 		"${INFO} proceeding with your selection."
-	read_input_num "Please enter the number designates your selection" 1 2
+	MAX_OPTION="2"
+	[ "${HAS_JITTERENTROPY}" = "1" ] && MAX_OPTION="3"
+	read_input_num "Please enter the number designates your selection" 1 "${MAX_OPTION}"
 	case "${CHOSEN}" in
 		1)
 			rm -f "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
@@ -1441,6 +1458,26 @@ inst_random() {
 				return 1
 			fi
 			RAN_PRV="rngd"
+			;;
+		3)
+			if [ "${HAS_JITTERENTROPY}" != "1" ]; then
+				PTXT "${ERROR} JITTERENTROPY-RNGD is currently unavailable for your architecture."
+				end_op_message 1
+				return 1
+			fi
+			rm -f "${TARG_DIR}/haveged" "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
+			{ kill_processes haveged jitterentropy-rngd rngd stty; }
+			if ! download_file "${TARG_DIR}" 755 "${URL_ARCH}/jitterentropy-rngd" "${URL_GEN}/manager"; then
+				PTXT "${ERROR} Failed to download jitterentropy-rngd and/or updated manager script."
+				end_op_message 1
+				return 1
+			fi
+			if [ ! -x "${TARG_DIR}/jitterentropy-rngd" ] || ! "${TARG_DIR}/jitterentropy-rngd"; then
+				PTXT "${ERROR} Failed to start jitterentropy-rngd. Please try reinstalling (P)RNG or switch providers."
+				end_op_message 1
+				return 1
+			fi
+			RAN_PRV="jitterentropy-rngd"
 			;;
 	esac
 	write_conf RAN_PRV "${RAN_PRV}"
@@ -1685,12 +1722,13 @@ uninst_all() {
 	fi
 	dnscrypt_stop
 	mv "${TARG_DIR}/installer" "${HOME}/installer"
+	rm -f "${TARG_DIR}/nonroot"
 	rm -rf "${TARG_DIR}"
 	del_jffs_script /jffs/scripts/dnsmasq.postconf
 	if nvram get rc_support | grep -q 'mtlancfg'; then del_jffs_script /jffs/scripts/dnsmasq-sdn.postconf; fi
 	del_jffs_script /jffs/scripts/init-start
 	del_jffs_script /jffs/scripts/services-stop
-	{ kill_processes haveged rngd stty dnscrypt-proxy; }
+	{ kill_processes haveged jitterentropy-rngd rngd stty dnscrypt-proxy; }
 	del_between_magic /jffs/scripts/service-event-end '# Asuswrt-Merlin-Dnscrypt-Proxy-Installer'
 	local MAN_PID PID
 	MAN_PID="$(pidof manager)"
@@ -1720,8 +1758,8 @@ uninst_dnscrypt() {
 
 uninst_random() {
 	PTXT "${INFO} Uninstalling (P)RNG..."
-	rm -f "${TARG_DIR}/haveged" "${TARG_DIR}/rngd" "${TARG_DIR}/stty"
-	{ kill_processes haveged rngd stty; }
+	rm -f "${TARG_DIR}/haveged" "${TARG_DIR}/rngd" "${TARG_DIR}/stty" "${TARG_DIR}/jitterentropy-rngd"
+	{ kill_processes haveged jitterentropy-rngd rngd stty; }
 	del_conf RAN_PRV RNG_DEV
 	if [ ! -f "${TARG_DIR}/localtime" ] && [ ! -f "${TARG_DIR}/dnscrypt-proxy" ]; then
 		del_jffs_script /jffs/scripts/init-start
