@@ -45,12 +45,12 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
             checkout_ref="${{ inputs.target_branch }}"
           else
-            checkout_ref="${{ github.ref_name }}"
+            checkout_ref="${{ github.sha }}"
           fi
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.ref.outputs.checkout_ref }}
 
@@ -72,11 +72,25 @@ jobs:
         run: |
           set -eu
           mkdir -p "$HOME/.toolchains"
-          BOOTLIN_BASE_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs"
           BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2017.05-toolchains-1-1.tar.bz2"
-          curl -fsSL "$BOOTLIN_BASE_URL/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.bz2
-          curl -fsSL "$BOOTLIN_BASE_URL/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.bz2.sha256
-          (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.bz2.sha256)
+          BOOTLIN_URLS="
+            https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs
+            https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf--uclibc--stable-2017.05-1/tarballs
+          "
+
+          for base_url in $BOOTLIN_URLS; do
+            if curl -fsSL "$base_url/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.bz2; then
+              curl -fsSL "$base_url/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.bz2.sha256
+              (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.bz2.sha256)
+              found_url="$base_url"
+              break
+            fi
+          done
+
+          if [ -z "${found_url:-}" ]; then
+            echo "Unable to download $BOOTLIN_TARBALL from known Bootlin URLs" >&2
+            exit 1
+          fi
           tar -xjf /tmp/armv7-uclibc-toolchain.tar.bz2 -C "$HOME/.toolchains"
           echo "$HOME/.toolchains/armv7-eabihf--uclibc--stable-2017.05-1/bin" >> "$GITHUB_PATH"
 
@@ -95,7 +109,7 @@ jobs:
           export STRIP="$CC_PREFIX-strip"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
-          HAVEGED_REF="1.9.18"
+          HAVEGED_REF="v1.9.18"
           RNG_TOOLS_REPO="https://github.com/nhorman/rng-tools.git"
           RNG_TOOLS_REF="6e5984f3b12fdd82b7fd2f932a0b5014fe0f4890"
           JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
@@ -110,9 +124,19 @@ jobs:
 
             git clone --depth=1 "$repo_url" "$destination"
             cd "$destination"
-            if ! git fetch --depth=1 origin "$repo_ref"; then
-              echo "Failed to fetch pinned ref $repo_ref from $repo_url" >&2
-              exit 1
+            if ! git fetch --depth=1 origin "$repo_ref" \
+              && ! git fetch --depth=1 origin "refs/tags/$repo_ref" \
+              && ! git fetch --depth=1 origin "refs/heads/$repo_ref"; then
+              case "$repo_ref" in
+                v*) fallback_ref="${repo_ref#v}" ;;
+                *) fallback_ref="v$repo_ref" ;;
+              esac
+              if ! git fetch --depth=1 origin "$fallback_ref" \
+                && ! git fetch --depth=1 origin "refs/tags/$fallback_ref" \
+                && ! git fetch --depth=1 origin "refs/heads/$fallback_ref"; then
+                echo "Failed to fetch pinned ref $repo_ref (and fallback $fallback_ref) from $repo_url" >&2
+                exit 1
+              fi
             fi
             git checkout --detach FETCH_HEAD
             if printf '%s' "$repo_ref" | grep -Eq '^[0-9a-f]{40}$'; then
@@ -244,12 +268,12 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
             checkout_ref="${{ inputs.target_branch }}"
           else
-            checkout_ref="${{ github.ref_name }}"
+            checkout_ref="${{ github.sha }}"
           fi
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.ref.outputs.checkout_ref }}
 
