@@ -148,25 +148,36 @@ jobs:
           }
 
           build_haveged() {
-                clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
-                cd _src/haveged
-                autoreconf -i || {
-                  if [ ! -f configure ]; then
-                    autoconf
-                  fi
-                }
-              ./configure --host="$HOST" --prefix=/usr
-                make -j"$(nproc)" || {
-                echo "haveged build failed" >&2
-                make clean
-                make  # Try single-threaded build for better error diagnostics
-                exit 1
-              }
-              if [ ! -f haveged/.libs/haveged ]; then
-              echo "haveged binary not found after build" >&2
+            clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
+            cd _src/haveged
+            autoreconf -i || {
+              if [ ! -f configure ]; then
+                autoconf
+              fi
+            }
+            ./configure --host="$HOST" --prefix=/usr
+            make -j"$(nproc)" || {
+              echo "haveged build failed" >&2
+              make clean
+              make  # Try single-threaded build for better error diagnostics
+              exit 1
+            }
+
+            # Check multiple possible binary locations
+            if [ -f haveged/.libs/haveged ]; then
+              binary_path="haveged/.libs/haveged"
+            elif [ -f haveged/haveged ]; then
+              binary_path="haveged/haveged"
+            elif [ -f src/.libs/haveged ]; then
+              binary_path="src/.libs/haveged"
+            else
+              echo "haveged binary not found. Searching for it..." >&2
+              find . -name "haveged" -type f -executable 2>/dev/null || true
+              echo "haveged build failed: binary not found in expected locations" >&2
               exit 1
             fi
-            cp haveged/.libs/haveged "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
+
+            cp "$binary_path" "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
             cd "${GITHUB_WORKSPACE}"
           }
 
