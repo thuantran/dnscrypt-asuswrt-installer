@@ -72,10 +72,10 @@ jobs:
         run: |
           set -eu
           mkdir -p "$HOME/.toolchains"
-          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2025.08-1.tar.xz"
-          BOOTLIN_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs"
-          if curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}/${BOOTLIN_TARBALL}" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
-              curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}/${BOOTLIN_TARBALL}.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
+          BOOTLIN_TARBALL='armv7-eabihf--uclibc--stable-2025.08-1.tar.xz'
+          BOOTLIN_URL='https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/'
+          if curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}${BOOTLIN_TARBALL}" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
+              curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}${BOOTLIN_TARBALL}.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
               (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.xz.sha256)
           else
             echo "Unable to download ${BOOTLIN_TARBALL} from known Bootlin URLs" >&2
