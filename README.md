@@ -173,10 +173,10 @@ The workflow derives and publishes the matching public key as `gen/dnscrypt-prox
 
 The installer lets users choose either the repository-provided `dnscrypt-proxy-nightly` package or the developer latest release package during install/update. The nightly build uses Go cross-compilation with `CGO_ENABLED=0`; Asuswrt-Merlin.ng toolchains are still appropriate for C helper binaries, but they are not required for dnscrypt-proxy unless the intention is to enable cgo.
 
-The `Build helper-binaries-nightly` workflow also runs nightly (cron `37 7 * * *`) and supports manual `Run workflow` execution with the same `target_branch` input behavior. It compiles installer helper binaries from upstream source repositories on every run (rather than extracting prebuilt package blobs), then updates checksums in-place:
+The `Build helper-binaries-nightly` workflow also runs nightly (cron `37 7 * * *`) and supports manual `Run workflow` execution with the same `target_branch` input behavior. It compiles installer helper binaries from upstream source repositories on every run (rather than extracting prebuilt package blobs), then updates checksums in-place. The workflow now uses native self-hosted build environments for each target architecture instead of external cross-toolchains:
 
-- `armv7/{haveged,rngd,jitterentropy-rngd,stty,nonroot}` + matching `.md5sum` files, cross-compiled with Bootlin uClibc toolchain prefix `arm-buildroot-linux-uclibcgnueabihf`.
-- `armv8/{haveged,rngd,jitterentropy-rngd,stty,nonroot}` + matching `.md5sum` files, cross-compiled with `aarch64-linux-gnu`.
+- `armv7/{haveged,rngd,jitterentropy-rngd,stty,nonroot}` + matching `.md5sum` files, built on a native `self-hosted/linux/armv7` runner.
+- `armv8/{haveged,rngd,jitterentropy-rngd,stty,nonroot}` + matching `.md5sum` files, built on a native `self-hosted/linux/arm64` runner.
 
 The workflow only commits when one or more helper binaries or checksums changed.
 
