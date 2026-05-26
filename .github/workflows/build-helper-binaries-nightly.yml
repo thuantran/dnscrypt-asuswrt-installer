@@ -67,10 +67,7 @@ jobs:
         run: |
           set -eu
           sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
-          sudo apt-get install -y \
-            pkg-config \
-            libcurl4-openssl-dev:${{ matrix.deb_arch }} \
-            libxml2-dev:${{ matrix.deb_arch }}
+          sudo apt-get install -y pkg-config
 
       - name: Build helper binaries from source
         env:
@@ -171,6 +168,8 @@ jobs:
               --host="$HOST" \
               --prefix=/usr \
               --disable-silent-rules \
+              --without-nistbeacon \
+              --without-libxml2 \
               CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
               PKG_CONFIG=pkg-config
             make -j"$(nproc)"
