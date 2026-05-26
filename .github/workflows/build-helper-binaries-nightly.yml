@@ -57,6 +57,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eu
+          sudo dpkg --add-architecture ${{ matrix.deb_arch }}
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
