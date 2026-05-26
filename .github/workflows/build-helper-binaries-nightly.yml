@@ -74,9 +74,9 @@ jobs:
           mkdir -p "$HOME/.toolchains"
           BOOTLIN_BASE_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs"
           BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2017.05-toolchains-1-1.tar.bz2"
-          BOOTLIN_SHA256="4c43fb43c781548ec327eeb13f14d69fe86f6f53c1940f18f4f0d8d2797b8e79"
           curl -fsSL "$BOOTLIN_BASE_URL/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.bz2
-          echo "$BOOTLIN_SHA256  /tmp/armv7-uclibc-toolchain.tar.bz2" | sha256sum -c -
+          curl -fsSL "$BOOTLIN_BASE_URL/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.bz2.sha256
+          (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.bz2.sha256)
           tar -xjf /tmp/armv7-uclibc-toolchain.tar.bz2 -C "$HOME/.toolchains"
           echo "$HOME/.toolchains/armv7-eabihf--uclibc--stable-2017.05-1/bin" >> "$GITHUB_PATH"
 
@@ -95,7 +95,7 @@ jobs:
           export STRIP="$CC_PREFIX-strip"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
-          HAVEGED_REF="4ac12f79eb4e8f7233a8f5c57d5a0d84b18f88f6"
+          HAVEGED_REF="1.9.18"
           RNG_TOOLS_REPO="https://github.com/nhorman/rng-tools.git"
           RNG_TOOLS_REF="6e5984f3b12fdd82b7fd2f932a0b5014fe0f4890"
           JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
@@ -110,11 +110,16 @@ jobs:
 
             git clone --depth=1 "$repo_url" "$destination"
             cd "$destination"
-            git fetch --depth=1 origin "$repo_ref"
-            git checkout --detach "$repo_ref"
-            if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
-              echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
+            if ! git fetch --depth=1 origin "$repo_ref"; then
+              echo "Failed to fetch pinned ref $repo_ref from $repo_url" >&2
               exit 1
+            fi
+            git checkout --detach FETCH_HEAD
+            if printf '%s' "$repo_ref" | grep -Eq '^[0-9a-f]{40}$'; then
+              if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
+                echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
+                exit 1
+              fi
             fi
             cd "${GITHUB_WORKSPACE}"
           }
