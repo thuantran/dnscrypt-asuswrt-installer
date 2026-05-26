@@ -148,15 +148,24 @@ jobs:
           }
 
           build_haveged() {
-            clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
-            cd _src/haveged
-            autoreconf -i || {
-              if [ ! -f configure ]; then
-                autoconf
-              fi
-            }
-            ./configure --host="$HOST" --prefix=/usr
-            make -j"$(nproc)"
+                clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
+                cd _src/haveged
+                autoreconf -i || {
+                  if [ ! -f configure ]; then
+                    autoconf
+                  fi
+                }
+              ./configure --host="$HOST" --prefix=/usr
+                make -j"$(nproc)" || {
+                echo "haveged build failed" >&2
+                make clean
+                make  # Try single-threaded build for better error diagnostics
+                exit 1
+              }
+              if [ ! -f haveged/.libs/haveged ]; then
+              echo "haveged binary not found after build" >&2
+              exit 1
+            fi
             cp haveged/.libs/haveged "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
             cd "${GITHUB_WORKSPACE}"
           }
