@@ -78,8 +78,8 @@ jobs:
           "
 
           for base_url in $BOOTLIN_URLS; do
-            if curl -fsSL "$base_url/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
-              curl -fsSL "$base_url/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
+            if curl -fsSL -H "User-Agent: Mozilla/5.0" "$base_url/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
+              curl -fsSL -H "User-Agent: Mozilla/5.0" "$base_url/$BOOTLIN_TARBALL.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
               (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.xz.sha256)
               found_url="$base_url"
               break
