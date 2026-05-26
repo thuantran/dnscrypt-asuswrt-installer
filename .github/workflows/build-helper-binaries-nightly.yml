@@ -30,12 +30,10 @@ jobs:
             repo_dir: armv7
             host_triplet: arm-linux-gnueabihf
             cc_prefix: arm-linux-gnueabihf
-            deb_arch: armhf
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
             cc_prefix: aarch64-linux-gnu
-            deb_arch: arm64
 
     steps:
       - name: Resolve checkout ref
@@ -57,7 +55,6 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eu
-          sudo dpkg --add-architecture ${{ matrix.deb_arch }}
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
@@ -84,6 +81,9 @@ jobs:
           export RANLIB="$CC_PREFIX-ranlib"
           export STRIP="$CC_PREFIX-strip"
           export PKG_CONFIG_LIBDIR="/usr/lib/${HOST}/pkgconfig:/usr/share/pkgconfig"
+          export COMMON_CFLAGS="-Os -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -D_FORTIFY_SOURCE=2"
+          export COMMON_CPPFLAGS="-D_GNU_SOURCE"
+          export COMMON_LDFLAGS="-Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
@@ -133,7 +133,8 @@ jobs:
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
-              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP"
+              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
+              CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS"
             make -j"$(nproc)" || {
               echo "haveged parallel build failed; retrying single-threaded" >&2
               make clean
@@ -173,8 +174,16 @@ jobs:
               --without-nistbeacon \
               --without-libxml2 \
               CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
+              CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
               PKG_CONFIG=pkg-config
-            make -j"$(nproc)"
+            make -j"$(nproc)" || {
+              echo "rngd parallel build failed; retrying single-threaded" >&2
+              make clean
+              make || {
+                echo "rngd build failed" >&2
+                exit 1
+              }
+            }
             cp rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/rngd"
             cd "${GITHUB_WORKSPACE}"
           }
@@ -185,8 +194,14 @@ jobs:
             tar -xf _build/coreutils.tar.xz -C _src
             coreutils_dir="_src/coreutils-${COREUTILS_VERSION}"
             cd "$coreutils_dir"
-            ./configure --host="$HOST" --prefix=/usr
-            make -j"$(nproc)" src/stty
+            ./configure --host="$HOST" --prefix=/usr CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS"
+            make -j"$(nproc)" src/stty || {
+              echo "stty parallel build failed; retrying single-threaded" >&2
+              make src/stty || {
+                echo "stty build failed" >&2
+                exit 1
+              }
+            }
             cp src/stty "${GITHUB_WORKSPACE}/${OUT_DIR}/stty"
             cd "${GITHUB_WORKSPACE}"
           }
@@ -223,13 +238,20 @@ jobs:
               '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\\n", argv[2], strerror(errno));' \
               '  return 67;' \
               '}' > _build/nonroot.c
-            "$CC" -Os -s _build/nonroot.c -o "${OUT_DIR}/nonroot"
+            "$CC" $COMMON_CPPFLAGS $COMMON_CFLAGS $COMMON_LDFLAGS -s _build/nonroot.c -o "${OUT_DIR}/nonroot"
           }
  
           build_jitterentropy_rngd() {
             clone_repo_at_ref "$JITTERENTROPY_REPO" "$JITTERENTROPY_REF" _src/jitterentropy-rngd
             cd _src/jitterentropy-rngd
-            make -j"$(nproc)" CC="$CC"
+            make -j"$(nproc)" CC="$CC" CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" || {
+              echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
+              make clean || true
+              make CC="$CC" CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" || {
+                echo "jitterentropy-rngd build failed" >&2
+                exit 1
+              }
+            }
             cp jitterentropy-rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/jitterentropy-rngd"
             cd "${GITHUB_WORKSPACE}"
           }
