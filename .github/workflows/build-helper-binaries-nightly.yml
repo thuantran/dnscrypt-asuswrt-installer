@@ -121,12 +121,12 @@ jobs:
           build_haveged() {
             clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
             cd _src/haveged
-            autoreconf -i || {
-              if [ ! -f configure ]; then
-                autoconf
-              fi
-            }
-            ./configure --host="$HOST" --prefix=/usr
+            autoreconf -fiv
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix=/usr \
+              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP"
             make -j"$(nproc)" || {
               echo "haveged parallel build failed; retrying single-threaded" >&2
               make clean
