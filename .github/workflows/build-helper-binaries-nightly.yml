@@ -29,11 +29,11 @@ jobs:
           - target: linux-armv7
             repo_dir: armv7
             host_triplet: arm-linux-gnueabihf
-            runs_on: [self-hosted, linux, armv7]
+            cc_prefix: arm-linux-gnueabihf
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
-            runs_on: [self-hosted, linux, arm64]
+            cc_prefix: aarch64-linux-gnu
 
     steps:
       - name: Resolve checkout ref
@@ -58,6 +58,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
+
+
+      - name: Install cross toolchain
+        run: |
+          set -eu
+          sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
 
       - name: Build helper binaries from source
         env:
