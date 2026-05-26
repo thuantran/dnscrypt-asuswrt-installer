@@ -21,21 +21,19 @@ concurrency:
 jobs:
   build:
     name: Build ${{ matrix.target }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: linux-armv7
             repo_dir: armv7
-            host_triplet: arm-linux-uclibcgnueabihf
-            toolchain_kind: bootlin-uclibc
-            cc_prefix: arm-buildroot-linux-uclibcgnueabihf
+            host_triplet: arm-linux-gnueabihf
+            runs_on: [self-hosted, linux, armv7]
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
-            toolchain_kind: apt
-            cc_prefix: aarch64-linux-gnu
+            runs_on: [self-hosted, linux, arm64]
 
     steps:
       - name: Resolve checkout ref
@@ -61,42 +59,18 @@ jobs:
           sudo apt-get install -y \
             autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
 
-      - name: Install apt cross toolchain
-        if: matrix.toolchain_kind == 'apt'
-        run: |
-          set -eu
-          sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
-
-      - name: Install ASUS-compatible armv7 uClibc toolchain
-        if: matrix.toolchain_kind == 'bootlin-uclibc'
-        run: |
-          set -eu
-          mkdir -p "$HOME/.toolchains"
-          BOOTLIN_TARBALL='armv7-eabihf--uclibc--stable-2025.08-1.tar.xz'
-          BOOTLIN_URL='https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/'
-          if curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}${BOOTLIN_TARBALL}" -o /tmp/armv7-uclibc-toolchain.tar.xz; then
-              curl -fsSL -H "User-Agent: Mozilla/5.0" "${BOOTLIN_URL}${BOOTLIN_TARBALL}.sha256" -o /tmp/armv7-uclibc-toolchain.tar.xz.sha256
-              (cd /tmp && sha256sum -c armv7-uclibc-toolchain.tar.xz.sha256)
-          else
-            echo "Unable to download ${BOOTLIN_TARBALL} from known Bootlin URLs" >&2
-            exit 1
-          fi
-          tar -xJf /tmp/armv7-uclibc-toolchain.tar.xz -C "$HOME/.toolchains"
-          echo "$HOME/.toolchains/armv7-eabihf--uclibc--stable-2025.08-1/bin" >> "$GITHUB_PATH"
-
       - name: Build helper binaries from source
         env:
           HOST: ${{ matrix.host_triplet }}
-          CC_PREFIX: ${{ matrix.cc_prefix }}
           OUT_DIR: dist/${{ matrix.repo_dir }}
         run: |
           set -eu
 
           mkdir -p "$OUT_DIR" _src _build
-          export CC="$CC_PREFIX-gcc"
-          export AR="$CC_PREFIX-ar"
-          export RANLIB="$CC_PREFIX-ranlib"
-          export STRIP="$CC_PREFIX-strip"
+          export CC="gcc"
+          export AR="ar"
+          export RANLIB="ranlib"
+          export STRIP="strip"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
