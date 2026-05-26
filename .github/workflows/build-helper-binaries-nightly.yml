@@ -145,6 +145,13 @@ jobs:
                 exit 1
               fi
             fi
+            git checkout --detach FETCH_HEAD
+            if printf '%s' "$repo_ref" | grep -Eq '^[0-9a-f]{40}$'; then
+              if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
+                echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
+                exit 1
+              fi
+            fi
             cd "${GITHUB_WORKSPACE}"
           }
 
