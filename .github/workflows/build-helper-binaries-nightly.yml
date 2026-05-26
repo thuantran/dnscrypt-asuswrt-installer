@@ -72,7 +72,7 @@ jobs:
         run: |
           set -eu
           mkdir -p "$HOME/.toolchains"
-          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2017.05-toolchains-1-1.tar.bz2"
+          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2017.05-1.tar.bz2"
           BOOTLIN_URLS="
             https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs
             https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf--uclibc--stable-2017.05-1/tarballs
@@ -135,13 +135,6 @@ jobs:
                 && ! git fetch --depth=1 origin "refs/tags/$fallback_ref" \
                 && ! git fetch --depth=1 origin "refs/heads/$fallback_ref"; then
                 echo "Failed to fetch pinned ref $repo_ref (and fallback $fallback_ref) from $repo_url" >&2
-                exit 1
-              fi
-            fi
-            git checkout --detach FETCH_HEAD
-            if printf '%s' "$repo_ref" | grep -Eq '^[0-9a-f]{40}$'; then
-              if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
-                echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
                 exit 1
               fi
             fi
