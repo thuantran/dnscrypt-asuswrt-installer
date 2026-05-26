@@ -42,7 +42,7 @@ Install, update, reconfigure, and remove [dnscrypt-proxy v2](https://github.com/
 - Supports OpenDNS dynamic IP updates by storing your OpenDNS account information during setup.
 - Starts dnscrypt-proxy with `cert_ignore_timestamp` at boot to work around NTP timestamp availability during router startup.
 - Optionally redirects LAN DNS queries to dnscrypt-proxy through the ASUS DNS Filter option.
-- Optionally installs `haveged` or `rngd` to improve entropy availability for dnscrypt-proxy and other cryptographic applications.
+- Optionally installs `haveged`, `rngd`, or `jitterentropy-rngd` to improve entropy availability for dnscrypt-proxy and other cryptographic applications.
 - Supports hardware random number generators including TrueRNG, TrueRNGpro, OneRNG, and EntropyKey.
 - Can create a swap file.
 - Can configure `/etc/localtime` for dnscrypt-proxy and other router applications.
@@ -172,6 +172,13 @@ Generate a signing key with `minisign -G -s minisign.key -p minisign.pub`, keep 
 The workflow derives and publishes the matching public key as `gen/dnscrypt-proxy-nightly.pub` whenever it signs nightly packages.
 
 The installer lets users choose either the repository-provided `dnscrypt-proxy-nightly` package or the developer latest release package during install/update. The nightly build uses Go cross-compilation with `CGO_ENABLED=0`; Asuswrt-Merlin.ng toolchains are still appropriate for C helper binaries, but they are not required for dnscrypt-proxy unless the intention is to enable cgo.
+
+The `Build helper-binaries-nightly` workflow also runs nightly (cron `37 7 * * *`) and supports manual `Run workflow` execution with the same `target_branch` input behavior. It compiles installer helper binaries from upstream source repositories on every run (rather than extracting prebuilt package blobs), then updates checksums in-place:
+
+- `armv7/{haveged,rngd,jitterentropy-rngd,stty,nonroot}` + matching `.md5sum` files, cross-compiled with Bootlin uClibc toolchain prefix `arm-buildroot-linux-uclibcgnueabihf`.
+- `armv8/{haveged,rngd,jitterentropy-rngd,stty,nonroot}` + matching `.md5sum` files, cross-compiled with `aarch64-linux-gnu`.
+
+The workflow only commits when one or more helper binaries or checksums changed.
 
 ## Project notes
 

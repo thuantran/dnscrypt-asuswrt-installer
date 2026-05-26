@@ -1,0 +1,281 @@
+name: Build helper-binaries-nightly
+run-name: helper-binaries-nightly -> ${{ inputs.target_branch || github.ref_name }}
+
+on:
+  schedule:
+    - cron: '37 7 * * *'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to publish nightly helper binaries to
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: helper-binaries-nightly-${{ inputs.target_branch || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-armv7
+            repo_dir: armv7
+            host_triplet: arm-linux-uclibcgnueabihf
+            toolchain_kind: bootlin-uclibc
+            cc_prefix: arm-buildroot-linux-uclibcgnueabihf
+          - target: linux-armv8
+            repo_dir: armv8
+            host_triplet: aarch64-linux-gnu
+            toolchain_kind: apt
+            cc_prefix: aarch64-linux-gnu
+
+    steps:
+      - name: Resolve checkout ref
+        id: ref
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
+            checkout_ref="${{ inputs.target_branch }}"
+          else
+            checkout_ref="${{ github.ref_name }}"
+          fi
+          echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout installer repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.ref.outputs.checkout_ref }}
+
+      - name: Install build dependencies
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
+
+      - name: Install apt cross toolchain
+        if: matrix.toolchain_kind == 'apt'
+        run: |
+          set -eu
+          sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
+
+      - name: Install ASUS-compatible armv7 uClibc toolchain
+        if: matrix.toolchain_kind == 'bootlin-uclibc'
+        run: |
+          set -eu
+          mkdir -p "$HOME/.toolchains"
+          BOOTLIN_BASE_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs"
+          BOOTLIN_TARBALL="armv7-eabihf--uclibc--stable-2017.05-toolchains-1-1.tar.bz2"
+          BOOTLIN_SHA256="4c43fb43c781548ec327eeb13f14d69fe86f6f53c1940f18f4f0d8d2797b8e79"
+          curl -fsSL "$BOOTLIN_BASE_URL/$BOOTLIN_TARBALL" -o /tmp/armv7-uclibc-toolchain.tar.bz2
+          echo "$BOOTLIN_SHA256  /tmp/armv7-uclibc-toolchain.tar.bz2" | sha256sum -c -
+          tar -xjf /tmp/armv7-uclibc-toolchain.tar.bz2 -C "$HOME/.toolchains"
+          echo "$HOME/.toolchains/armv7-eabihf--uclibc--stable-2017.05-1/bin" >> "$GITHUB_PATH"
+
+      - name: Build helper binaries from source
+        env:
+          HOST: ${{ matrix.host_triplet }}
+          CC_PREFIX: ${{ matrix.cc_prefix }}
+          OUT_DIR: dist/${{ matrix.repo_dir }}
+        run: |
+          set -eu
+
+          mkdir -p "$OUT_DIR" _src _build
+          export CC="$CC_PREFIX-gcc"
+          export AR="$CC_PREFIX-ar"
+          export RANLIB="$CC_PREFIX-ranlib"
+          export STRIP="$CC_PREFIX-strip"
+
+          HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
+          HAVEGED_REF="4ac12f79eb4e8f7233a8f5c57d5a0d84b18f88f6"
+          RNG_TOOLS_REPO="https://github.com/nhorman/rng-tools.git"
+          RNG_TOOLS_REF="6e5984f3b12fdd82b7fd2f932a0b5014fe0f4890"
+          JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
+          JITTERENTROPY_REF="6a56998e2e5d9f79e5bbf57d4c2f4fd2e9c8dc95"
+          COREUTILS_VERSION="9.5"
+          COREUTILS_SHA256="cd80eb5b247f87670353197a8fc3e3f7fb77f607f9f10925a60214790514d31a"
+
+          clone_repo_at_ref() {
+            repo_url="$1"
+            repo_ref="$2"
+            destination="$3"
+
+            git clone --depth=1 "$repo_url" "$destination"
+            cd "$destination"
+            git fetch --depth=1 origin "$repo_ref"
+            git checkout --detach "$repo_ref"
+            if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
+              echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
+              exit 1
+            fi
+            cd "${GITHUB_WORKSPACE}"
+          }
+
+          build_haveged() {
+            clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
+            cd _src/haveged
+            ./autogen.sh
+            ./configure --host="$HOST" --prefix=/usr
+            make -j"$(nproc)"
+            cp haveged/.libs/haveged "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
+            cd "${GITHUB_WORKSPACE}"
+          }
+
+          build_rngd() {
+            clone_repo_at_ref "$RNG_TOOLS_REPO" "$RNG_TOOLS_REF" _src/rng-tools
+            cd _src/rng-tools
+            ./autogen.sh
+            ./configure --host="$HOST" --prefix=/usr --disable-silent-rules
+            make -j"$(nproc)"
+            cp rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/rngd"
+            cd "${GITHUB_WORKSPACE}"
+          }
+
+          build_stty() {
+            curl -fsSL "https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz" -o _build/coreutils.tar.xz
+            echo "${COREUTILS_SHA256}  _build/coreutils.tar.xz" | sha256sum -c -
+            tar -xf _build/coreutils.tar.xz -C _src
+            coreutils_dir="_src/coreutils-${COREUTILS_VERSION}"
+            cd "$coreutils_dir"
+            ./configure --host="$HOST" --prefix=/usr
+            make -j"$(nproc)" src/stty
+            cp src/stty "${GITHUB_WORKSPACE}/${OUT_DIR}/stty"
+            cd "${GITHUB_WORKSPACE}"
+          }
+
+          build_nonroot() {
+            printf '%s\n' \
+              '#include <errno.h>' \
+              '#include <grp.h>' \
+              '#include <pwd.h>' \
+              '#include <stdio.h>' \
+              '#include <stdlib.h>' \
+              '#include <string.h>' \
+              '#include <sys/types.h>' \
+              '#include <unistd.h>' \
+              '' \
+              'int main(int argc, char **argv) {' \
+              '  if (argc < 3) {' \
+              '    fprintf(stderr, "Usage: %s <username> <program> [args...]\\n", argv[0]);' \
+              '    return 64;' \
+              '  }' \
+              '' \
+              '  struct passwd *pw = getpwnam(argv[1]);' \
+              '  if (!pw) {' \
+              '    fprintf(stderr, "nonroot: user '\''%s'\'' not found\\n", argv[1]);' \
+              '    return 65;' \
+              '  }' \
+              '' \
+              '  if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {' \
+              '    fprintf(stderr, "nonroot: failed to switch to '\''%s'\'': %s\\n", argv[1], strerror(errno));' \
+              '    return 66;' \
+              '  }' \
+              '' \
+              '  execvp(argv[2], &argv[2]);' \
+              '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\\n", argv[2], strerror(errno));' \
+              '  return 67;' \
+              '}' > _build/nonroot.c
+            "$CC" -Os -s _build/nonroot.c -o "${OUT_DIR}/nonroot"
+          }
+ 
+          build_jitterentropy_rngd() {
+            clone_repo_at_ref "$JITTERENTROPY_REPO" "$JITTERENTROPY_REF" _src/jitterentropy-rngd
+            cd _src/jitterentropy-rngd
+            make -j"$(nproc)" CC="$CC"
+            cp jitterentropy-rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/jitterentropy-rngd"
+            cd "${GITHUB_WORKSPACE}"
+          }
+
+          build_haveged
+          build_rngd
+          build_stty
+          build_nonroot
+          build_jitterentropy_rngd
+
+          chmod 755 "${OUT_DIR}/haveged" "${OUT_DIR}/rngd" "${OUT_DIR}/stty" "${OUT_DIR}/nonroot" "${OUT_DIR}/jitterentropy-rngd"
+          "$STRIP" "${OUT_DIR}/haveged" "${OUT_DIR}/rngd" "${OUT_DIR}/stty" "${OUT_DIR}/nonroot" "${OUT_DIR}/jitterentropy-rngd" || true
+
+          md5sum "${OUT_DIR}/haveged" | awk '{print $1}' > "${OUT_DIR}/haveged.md5sum"
+          md5sum "${OUT_DIR}/rngd" | awk '{print $1}' > "${OUT_DIR}/rngd.md5sum"
+          md5sum "${OUT_DIR}/stty" | awk '{print $1}' > "${OUT_DIR}/stty.md5sum"
+          md5sum "${OUT_DIR}/nonroot" | awk '{print $1}' > "${OUT_DIR}/nonroot.md5sum"
+          md5sum "${OUT_DIR}/jitterentropy-rngd" | awk '{print $1}' > "${OUT_DIR}/jitterentropy-rngd.md5sum"
+
+      - name: Upload helper binaries
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.0
+        with:
+          name: helper-binaries-nightly-${{ matrix.target }}
+          path: |
+            dist/${{ matrix.repo_dir }}/haveged
+            dist/${{ matrix.repo_dir }}/haveged.md5sum
+            dist/${{ matrix.repo_dir }}/rngd
+            dist/${{ matrix.repo_dir }}/rngd.md5sum
+            dist/${{ matrix.repo_dir }}/stty
+            dist/${{ matrix.repo_dir }}/stty.md5sum
+            dist/${{ matrix.repo_dir }}/nonroot
+            dist/${{ matrix.repo_dir }}/nonroot.md5sum
+            dist/${{ matrix.repo_dir }}/jitterentropy-rngd
+            dist/${{ matrix.repo_dir }}/jitterentropy-rngd.md5sum
+
+  publish:
+    name: Publish helper-binaries-nightly
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Resolve checkout ref
+        id: ref
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
+            checkout_ref="${{ inputs.target_branch }}"
+          else
+            checkout_ref="${{ github.ref_name }}"
+          fi
+          echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout installer repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.ref.outputs.checkout_ref }}
+
+      - name: Download helper binary artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: helper-binaries-nightly-*
+          path: _helper-artifacts
+
+      - name: Stage nightly helper binaries
+        run: |
+          set -eu
+          find _helper-artifacts/helper-binaries-nightly-linux-armv7 -type f -exec cp -f {} armv7/ \;
+          find _helper-artifacts/helper-binaries-nightly-linux-armv8 -type f -exec cp -f {} armv8/ \;
+          chmod 755 armv7/haveged armv7/rngd armv7/stty armv7/nonroot armv7/jitterentropy-rngd
+          chmod 755 armv8/haveged armv8/rngd armv8/stty armv8/nonroot armv8/jitterentropy-rngd
+
+      - name: Commit nightly helper binaries
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            armv7/haveged armv7/haveged.md5sum armv7/rngd armv7/rngd.md5sum armv7/stty armv7/stty.md5sum armv7/nonroot armv7/nonroot.md5sum armv7/jitterentropy-rngd armv7/jitterentropy-rngd.md5sum \
+            armv8/haveged armv8/haveged.md5sum armv8/rngd armv8/rngd.md5sum armv8/stty armv8/stty.md5sum armv8/nonroot armv8/nonroot.md5sum armv8/jitterentropy-rngd armv8/jitterentropy-rngd.md5sum
+
+          if git diff --cached --quiet; then
+            echo "No helper-binaries-nightly changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: update helper binaries nightly builds"
+          git push
