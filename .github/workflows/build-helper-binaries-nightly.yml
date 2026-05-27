@@ -230,24 +230,37 @@ jobs:
           }
 
           build_openssl() {
-            curl -fsSL "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz" -o "_build/openssl-${OPENSSL_VERSION}.tar.gz"
-            tar -xf "_build/openssl-${OPENSSL_VERSION}.tar.gz" -C _src
+            url="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
+            out="_build/openssl-${OPENSSL_VERSION}.tar.gz"
+
+            echo "Downloading OpenSSL: $url"
+            curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
+
+            tar -xf "$out" -C _src
 
             cd "_src/openssl-${OPENSSL_VERSION}"
 
-            # Save the cross-tool environment because OpenSSL handles this differently.
             old_CC="${CC:-}"
             old_CXX="${CXX:-}"
             old_AR="${AR:-}"
             old_RANLIB="${RANLIB:-}"
             old_STRIP="${STRIP:-}"
             old_LD="${LD:-}"
+            old_CPPFLAGS="${CPPFLAGS:-}"
+            old_CFLAGS="${CFLAGS:-}"
+            old_CXXFLAGS="${CXXFLAGS:-}"
+            old_LDFLAGS="${LDFLAGS:-}"
+            old_LIBS="${LIBS:-}"
+            old_PKG_CONFIG="${PKG_CONFIG:-}"
+            old_PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}"
+            old_PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR:-}"
+            old_PKG_CONFIG_SYSROOT_DIR="${PKG_CONFIG_SYSROOT_DIR:-}"
 
-            # IMPORTANT:
-            # OpenSSL combines --cross-compile-prefix with its compiler names.
-            # If CC is already arm-linux-gnueabihf-gcc, OpenSSL may try:
-            # arm-linux-gnueabihf-arm-linux-gnueabihf-gcc
+            # OpenSSL handles cross tools through --cross-compile-prefix.
+            # Do not let global dependency flags leak into OpenSSL.
             unset CC CXX AR RANLIB STRIP LD
+            unset CPPFLAGS CFLAGS CXXFLAGS LDFLAGS LIBS
+            unset PKG_CONFIG PKG_CONFIG_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR
 
             ./Configure \
               "$OPENSSL_TARGET" \
@@ -264,13 +277,21 @@ jobs:
 
             cd "$GITHUB_WORKSPACE"
 
-            # Restore cross-tool environment for the rest of the workflow.
             export CC="$old_CC"
             export CXX="$old_CXX"
             export AR="$old_AR"
             export RANLIB="$old_RANLIB"
             export STRIP="$old_STRIP"
             export LD="$old_LD"
+            export CPPFLAGS="$old_CPPFLAGS"
+            export CFLAGS="$old_CFLAGS"
+            export CXXFLAGS="$old_CXXFLAGS"
+            export LDFLAGS="$old_LDFLAGS"
+            export LIBS="$old_LIBS"
+            export PKG_CONFIG="$old_PKG_CONFIG"
+            export PKG_CONFIG_PATH="$old_PKG_CONFIG_PATH"
+            export PKG_CONFIG_LIBDIR="$old_PKG_CONFIG_LIBDIR"
+            export PKG_CONFIG_SYSROOT_DIR="$old_PKG_CONFIG_SYSROOT_DIR"
 
             pkg-config --modversion openssl
             pkg-config --cflags --libs openssl
@@ -357,20 +378,44 @@ jobs:
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
+              PKG_CONFIG=pkg-config \
+              CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags libudev)" \
               CFLAGS="$COMMON_CFLAGS -fPIC" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L libudev)" \
+              LIBS="$(pkg-config --libs libudev) -pthread"
 
             make -j"$(nproc)"
             make install
 
-            cd "$GITHUB_WORKSPACE"
+            mkdir -p "$DEPS_DIR/lib/pkgconfig"
 
+            if [ ! -f "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc" ]; then
+              echo "libusb-1.0.pc was not installed" >&2
+              find "$DEPS_DIR" -name 'libusb-1.0.pc' -o -name 'libusb*'
+              exit 1
+            fi
+
+            # libusb was built with udev support, so static consumers must link libudev too.
+            # Keep Libs minimal and put transitive static deps in Libs.private.
+            if grep -q '^Libs.private:' "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc"; then
+              sed -i 's/^Libs.private:.*/Libs.private: -ludev -pthread/' "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc"
+            else
+              printf '%s\n' 'Libs.private: -ludev -pthread' >> "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc"
+            fi
+
+            echo "libusb pkg-config:"
             pkg-config --modversion libusb-1.0
+            pkg-config --cflags libusb-1.0
+            pkg-config --libs libusb-1.0
+            pkg-config --libs --static libusb-1.0
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_librtlsdr() {
             clone_repo_at_ref "$RTLSDR_REPO" "$RTLSDR_REF" _src/rtl-sdr
+
+            rm -rf _build/rtl-sdr
 
             cmake -S _src/rtl-sdr -B _build/rtl-sdr \
               -DCMAKE_SYSTEM_NAME=Linux \
@@ -385,7 +430,8 @@ jobs:
               -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
               -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
               -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
-              -DCMAKE_C_FLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
+              -DCMAKE_C_FLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS -fPIC" \
+              -DCMAKE_EXE_LINKER_FLAGS="$COMMON_LDFLAGS" \
               -DBUILD_SHARED_LIBS=OFF \
               -DBUILD_STATIC_LIBS=ON \
               -DINSTALL_UDEV_RULES=OFF \
@@ -395,38 +441,57 @@ jobs:
 
             mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig"
 
+            if [ ! -f _build/rtl-sdr/src/librtlsdr.a ]; then
+              echo "librtlsdr.a was not created" >&2
+              find _build/rtl-sdr -name 'librtlsdr*' -o -name '*rtl*'
+              exit 1
+            fi
+
             cp -v _build/rtl-sdr/src/librtlsdr.a "$DEPS_DIR/lib/"
+            "$RANLIB" "$DEPS_DIR/lib/librtlsdr.a" || true
+
             cp -v _src/rtl-sdr/include/rtl-sdr.h "$DEPS_DIR/include/"
-            cp -v _src/rtl-sdr/include/rtl-sdr_export.h "$DEPS_DIR/include/" 2>/dev/null || true
 
-            cat > "$DEPS_DIR/lib/pkgconfig/librtlsdr.pc" <<EOF
-          prefix=$DEPS_DIR
-          exec_prefix=\${prefix}
-          libdir=\${prefix}/lib
-          includedir=\${prefix}/include
+            if [ -f _build/rtl-sdr/include/rtl-sdr_export.h ]; then
+              cp -v _build/rtl-sdr/include/rtl-sdr_export.h "$DEPS_DIR/include/"
+            elif [ -f _src/rtl-sdr/include/rtl-sdr_export.h ]; then
+              cp -v _src/rtl-sdr/include/rtl-sdr_export.h "$DEPS_DIR/include/"
+            else
+              echo "rtl-sdr_export.h not found; continuing because some rtl-sdr versions generate it only for shared builds."
+            fi
 
-          Name: librtlsdr
-          Description: RTL-SDR library
-          Version: 2.0.2
-          Libs: -L\${libdir} -lrtlsdr -lusb-1.0 -pthread
-          Cflags: -I\${includedir}
-          EOF
+            # Manual pkg-config files for static-only librtlsdr.
+            # libusb carries -ludev in its Libs.private, but include it here too
+            # so rng-tools gets it even if it does not request --static deeply enough.
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: librtlsdr'
+              printf '%s\n' 'Description: RTL-SDR library'
+              printf '%s\n' 'Version: 2.0.2'
+              printf '%s\n' 'Requires.private: libusb-1.0 libudev'
+              printf '%s\n' 'Libs: -L${libdir} -lrtlsdr'
+              printf '%s\n' 'Libs.private: -lusb-1.0 -ludev -pthread'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/librtlsdr.pc"
 
-            cat > "$DEPS_DIR/lib/pkgconfig/rtlsdr.pc" <<EOF
-          prefix=$DEPS_DIR
-          exec_prefix=\${prefix}
-          libdir=\${prefix}/lib
-          includedir=\${prefix}/include
+            cp -v "$DEPS_DIR/lib/pkgconfig/librtlsdr.pc" "$DEPS_DIR/lib/pkgconfig/rtlsdr.pc"
 
-          Name: rtlsdr
-          Description: RTL-SDR library
-          Version: 2.0.2
-          Libs: -L\${libdir} -lrtlsdr -lusb-1.0 -pthread
-          Cflags: -I\${includedir}
-          EOF
+            echo "librtlsdr pkg-config:"
+            pkg-config --cflags librtlsdr || true
+            pkg-config --libs librtlsdr || true
+            pkg-config --libs --static librtlsdr || true
 
-            pkg-config --cflags --libs librtlsdr || true
-            find "$DEPS_DIR" -name '*rtlsdr*' -o -name '*rtl*pc'
+            echo "Installed librtlsdr files:"
+            find "$DEPS_DIR" \( \
+              -name '*rtlsdr*' -o \
+              -name '*rtl*pc' -o \
+              -name 'rtl-sdr.h' -o \
+              -name 'rtl-sdr_export.h' \
+            \) -print
           }
 
           build_libxml2() {
@@ -874,16 +939,16 @@ jobs:
           }
           
           build_all_rng_dependencies() {
-            build_libcap
-            build_eudev
             build_zlib
             build_openssl
-            build_libp11
             build_jansson
-            build_libusb
-            build_librtlsdr
             build_libxml2
             build_curl
+            build_libcap
+            build_eudev
+            build_libusb
+            build_librtlsdr
+            build_libp11
             build_jitterentropy_library
 
             echo "Dependency prefix contents:"
