@@ -167,7 +167,7 @@ jobs:
           LIBP11_REF="master"
 
           COREUTILS_VERSION="9.11"
-          COREUTILS_SHA256="OUAk7aCllVIXztqc0SAeZdyPo6opwpURNaSVIdV8PMM="
+          COREUTILS_SHA256_BASE64="OUAk7aCllVIXztqc0SAeZdyPo6opwpURNaSVIdV8PMM="
 
           clone_repo_at_ref() {
             repo_url="$1"
@@ -1107,23 +1107,52 @@ jobs:
           }
 
           build_stty() {
+            : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
+            : "${COREUTILS_SHA256_BASE64:?COREUTILS_SHA256_BASE64 is not set}"
+
             url="https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz"
-            out="_build/coreutils-${COREUTILS_VERSION}.tar.xz"
+            out="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.tar.xz"
+            srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
+            logdir="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}-logs"
+            cache_file="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.config.cache"
+
+            mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir"
 
             rm -f "$out"
-            rm -rf "_src/coreutils-${COREUTILS_VERSION}"
+            rm -rf "$srcdir"
 
             echo "Downloading coreutils: $url"
             curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
 
             echo "Verifying coreutils base64 SHA256:"
-            printf '%s  %s\n' "$COREUTILS_SHA256_BASE64" "$out" | cksum -a sha256 --check
+            python3 -c 'import base64, hashlib, sys; p=sys.argv[1]; exp=sys.argv[2]; data=open(p,"rb").read(); got=base64.b64encode(hashlib.sha256(data).digest()).decode(); print(f"{p}: {got}"); sys.exit(0 if got == exp else 1)' "$out" "$COREUTILS_SHA256_BASE64"
 
-            tar -xf "$out" -C _src
+            tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
 
-            cd "_src/coreutils-${COREUTILS_VERSION}"
+            cd "$srcdir"
+
+            {
+              printf '%s\n' 'ac_cv_func_malloc_0_nonnull=yes'
+              printf '%s\n' 'ac_cv_func_realloc_0_nonnull=yes'
+              printf '%s\n' 'gl_cv_func_malloc_0_nonnull=yes'
+              printf '%s\n' 'gl_cv_func_realloc_0_nonnull=yes'
+              printf '%s\n' 'gl_cv_func_working_mkstemp=yes'
+              printf '%s\n' 'gl_cv_func_getcwd_null=yes'
+              printf '%s\n' 'ac_cv_header_stdckdint_h=no'
+              printf '%s\n' 'gl_cv_header_working_stdckdint_h=no'
+              printf '%s\n' 'gl_cv_func_gettimeofday_clobber=no'
+              printf '%s\n' 'gl_cv_func_tzset_clobber=no'
+              printf '%s\n' 'gl_cv_func_working_utimes=yes'
+              printf '%s\n' 'gl_cv_func_working_mktime=yes'
+              printf '%s\n' 'gl_cv_func_working_strerror=yes'
+              printf '%s\n' 'gl_cv_func_working_strerror_r=yes'
+              printf '%s\n' 'gl_cv_func_strerror_0_works=yes'
+            } > "$cache_file"
+
+            echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
 
             ./configure \
+              --cache-file="$cache_file" \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
@@ -1134,82 +1163,89 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS" \
-              ac_cv_func_malloc_0_nonnull=yes \
-              ac_cv_func_realloc_0_nonnull=yes \
-              gl_cv_func_malloc_0_nonnull=yes \
-              gl_cv_func_realloc_0_nonnull=yes \
-              gl_cv_func_working_mkstemp=yes \
-              gl_cv_func_getcwd_null=yes
+              2>&1 | tee "$logdir/configure.log"
 
-            # Build generated headers first. Ignore failures here because
-            # some targets may not exist until Makefile dependencies are walked.
-            make V=1 src/version.h lib/configmake.h || true
+            ensure_coreutils_fallback_headers() {
+              mkdir -p lib src
 
-            make V=1 -j"$(nproc)" src/stty || {
-              echo "stty parallel build failed; retrying single-threaded" >&2
-              make V=1 src/stty
+              if [ ! -f lib/stdckdint.h ]; then
+                echo "Creating fallback lib/stdckdint.h"
+                {
+                  printf '%s\n' '#ifndef _GL_STDCKDINT_H'
+                  printf '%s\n' '#define _GL_STDCKDINT_H 1'
+                  printf '%s\n' '#if defined(__GNUC__) || defined(__clang__)'
+                  printf '%s\n' '# define ckd_add(r, a, b) __builtin_add_overflow((a), (b), (r))'
+                  printf '%s\n' '# define ckd_sub(r, a, b) __builtin_sub_overflow((a), (b), (r))'
+                  printf '%s\n' '# define ckd_mul(r, a, b) __builtin_mul_overflow((a), (b), (r))'
+                  printf '%s\n' '#else'
+                  printf '%s\n' '# define ckd_add(r, a, b) ((*(r) = (a) + (b)), 0)'
+                  printf '%s\n' '# define ckd_sub(r, a, b) ((*(r) = (a) - (b)), 0)'
+                  printf '%s\n' '# define ckd_mul(r, a, b) ((*(r) = (a) * (b)), 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#endif'
+                } > lib/stdckdint.h
+              fi
+
+              if [ ! -f src/version.h ]; then
+                echo "Creating fallback src/version.h"
+                {
+                  printf '%s\n' '#ifndef COREUTILS_VERSION_H'
+                  printf '%s\n' '#define COREUTILS_VERSION_H 1'
+                  printf '%s\n' "static char const Version[] = \"${COREUTILS_VERSION}\";"
+                  printf '%s\n' '#endif'
+                } > src/version.h
+              fi
+
+              if [ ! -f lib/configmake.h ]; then
+                echo "Creating fallback lib/configmake.h"
+                {
+                  printf '%s\n' '#ifndef CONFIGMAKE_H'
+                  printf '%s\n' '#define CONFIGMAKE_H 1'
+                  printf '%s\n' '#define PREFIX "/usr"'
+                  printf '%s\n' '#define EXEC_PREFIX "/usr"'
+                  printf '%s\n' '#define BINDIR "/usr/bin"'
+                  printf '%s\n' '#define SBINDIR "/usr/sbin"'
+                  printf '%s\n' '#define LIBEXECDIR "/usr/libexec"'
+                  printf '%s\n' '#define DATAROOTDIR "/usr/share"'
+                  printf '%s\n' '#define DATADIR "/usr/share"'
+                  printf '%s\n' '#define SYSCONFDIR "/etc"'
+                  printf '%s\n' '#define LOCALSTATEDIR "/var"'
+                  printf '%s\n' '#define RUNSTATEDIR "/run"'
+                  printf '%s\n' '#define LOCALEDIR "/usr/share/locale"'
+                  printf '%s\n' '#endif'
+                } > lib/configmake.h
+              fi
             }
+
+            make V=1 src/version.h lib/configmake.h lib/stdckdint.h 2>&1 | tee "$logdir/generated-headers.log" || true
+            ensure_coreutils_fallback_headers
+
+            echo "Building GNU coreutils stty"
+
+            if ! make V=1 -j"$(nproc)" src/stty 2>&1 | tee "$logdir/build-parallel.log"; then
+              echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
+
+              ensure_coreutils_fallback_headers
+
+              make V=1 -j1 src/stty 2>&1 | tee "$logdir/build-single.log"
+            fi
 
             if [ ! -f src/stty ]; then
               echo "stty binary was not created" >&2
+              echo "Coreutils logs are in: $logdir" >&2
               find . -name 'stty' -type f -print
               exit 1
             fi
 
+            mkdir -p "$GITHUB_WORKSPACE/$OUT_DIR"
+
             cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+
+            "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
 
             file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
 
             cd "$GITHUB_WORKSPACE"
-          }
-          
-          build_nonroot() {
-            mkdir -p _build "$OUT_DIR"
-
-            {
-              printf '%s\n' '#include <errno.h>'
-              printf '%s\n' '#include <grp.h>'
-              printf '%s\n' '#include <pwd.h>'
-              printf '%s\n' '#include <stdio.h>'
-              printf '%s\n' '#include <stdlib.h>'
-              printf '%s\n' '#include <string.h>'
-              printf '%s\n' '#include <sys/types.h>'
-              printf '%s\n' '#include <unistd.h>'
-              printf '%s\n' ''
-              printf '%s\n' 'int main(int argc, char **argv) {'
-              printf '%s\n' '  if (argc < 3) {'
-              printf '%s\n' '    fprintf(stderr, "Usage: %s <username> <program> [args...]\n", argv[0]);'
-              printf '%s\n' '    return 64;'
-              printf '%s\n' '  }'
-              printf '%s\n' ''
-              printf '%s\n' '  struct passwd *pw = getpwnam(argv[1]);'
-              printf '%s\n' '  if (!pw) {'
-              printf '%s\n' '    fprintf(stderr, "nonroot: user '\''%s'\'' not found\n", argv[1]);'
-              printf '%s\n' '    return 65;'
-              printf '%s\n' '  }'
-              printf '%s\n' ''
-              printf '%s\n' '  if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {'
-              printf '%s\n' '    fprintf(stderr, "nonroot: failed to switch to '\''%s'\'': %s\n", argv[1], strerror(errno));'
-              printf '%s\n' '    return 66;'
-              printf '%s\n' '  }'
-              printf '%s\n' ''
-              printf '%s\n' '  execvp(argv[2], &argv[2]);'
-              printf '%s\n' ''
-              printf '%s\n' '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\n", argv[2], strerror(errno));'
-              printf '%s\n' '  return 67;'
-              printf '%s\n' '}'
-            } > _build/nonroot.c
-
-            "$CC" \
-              $COMMON_CPPFLAGS \
-              $COMMON_CFLAGS \
-              _build/nonroot.c \
-              $COMMON_LDFLAGS \
-              -o "$OUT_DIR/nonroot"
-
-            "$STRIP" "$OUT_DIR/nonroot" || true
-
-            file "$OUT_DIR/nonroot" || true
           }
 
           build_jitterentropy_rngd() {
