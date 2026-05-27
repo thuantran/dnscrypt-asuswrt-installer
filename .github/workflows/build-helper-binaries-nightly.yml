@@ -274,7 +274,10 @@ jobs:
 
             cd _src/eudev
 
-            ./autogen.sh
+            # Do not use ./autogen.sh here.
+            # eudev's autogen.sh enters man/ and runs make.sh, which requires xsltproc.
+            mkdir -p m4
+            autoreconf -fiv
 
             ./configure \
               --build="$(gcc -dumpmachine)" \
