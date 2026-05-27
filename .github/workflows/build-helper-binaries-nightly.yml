@@ -64,8 +64,8 @@ jobs:
             autoconf automake build-essential ca-certificates curl file git make gcc \
             libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
-            libp11-dev libp11-kit-dev libjitterentropy-dev librtlsdr-dev libseccomp-dev \
-            libsysfs-dev sysfsutils
+            libp11-dev libp11-kit-dev libjitterentropy3 libjitterentropy3-dev librtlsdr-dev \
+            libseccomp-dev libsysfs-dev sysfsutils
 
       - name: Install cross toolchain
         run: |
