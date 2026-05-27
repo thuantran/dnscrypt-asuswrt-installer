@@ -501,25 +501,54 @@ jobs:
 
             ./bootstrap
 
-            ./configure \
-              --build="$(gcc -dumpmachine)" \
-              --host="$HOST" \
-              --prefix="$DEPS_DIR" \
-              --disable-shared \
-              --enable-static \
+            configure_flags="
+              --build=$(gcc -dumpmachine)
+              --host=$HOST
+              --prefix=$DEPS_DIR
+              --disable-shared
+              --enable-static
+              --disable-doc
+              --disable-api-doc
+              --disable-tests
+              --disable-engine
+              --disable-provider
+            "
+
+            ./configure $configure_flags \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$COMMON_LDFLAGS" || {
+                echo "libp11 configure failed with provider/engine disables; retrying with basic static flags" >&2
 
-            make -j"$(nproc)"
+                ./configure \
+                  --build="$(gcc -dumpmachine)" \
+                  --host="$HOST" \
+                  --prefix="$DEPS_DIR" \
+                  --disable-shared \
+                  --enable-static \
+                  CC="$CC" \
+                  AR="$AR" \
+                  RANLIB="$RANLIB" \
+                  CPPFLAGS="$COMMON_CPPFLAGS" \
+                  CFLAGS="$COMMON_CFLAGS" \
+                  LDFLAGS="$COMMON_LDFLAGS"
+              }
+
+            make -j"$(nproc)" || {
+              echo "libp11 parallel build failed; retrying single-threaded" >&2
+              make clean
+              make
+            }
+
             make install
 
             cd "$GITHUB_WORKSPACE"
 
             pkg-config --list-all | grep -i p11 || true
+            find "$DEPS_DIR" -name '*p11*' -o -name '*.pc'
           }
 
           build_jitterentropy_library() {
