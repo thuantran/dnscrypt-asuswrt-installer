@@ -116,6 +116,10 @@ jobs:
           export RANLIB="$CC_PREFIX-ranlib"
           export STRIP="$CC_PREFIX-strip"
           export LD="$CC_PREFIX-ld"
+          export CC="$CC_PREFIX-gcc"
+          export OBJCOPY="$CC_PREFIX-objcopy"
+          export OBJDUMP="$CC_PREFIX-objdump"
+          export READELF="$CC_PREFIX-readelf"
 
           export DEPS_DIR="$GITHUB_WORKSPACE/_deps/$HOST"
 
@@ -716,6 +720,11 @@ jobs:
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              LD="$LD" \
+              OBJCOPY="$OBJCOPY" \
+              OBJDUMP="$OBJDUMP" \
+              READELF="$READELF" \
               BUILD_CC="gcc" \
               prefix="$DEPS_DIR" \
               lib="lib" \
@@ -726,8 +735,24 @@ jobs:
 
             mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include/sys" "$DEPS_DIR/lib/pkgconfig"
 
-            cp -v libcap/libcap.a "$DEPS_DIR/lib/"
-            cp -v libcap/include/sys/capability.h "$DEPS_DIR/include/sys/"
+            if [ -f libcap/libcap.a ]; then
+              cp -v libcap/libcap.a "$DEPS_DIR/lib/"
+            else
+              echo "libcap.a not found" >&2
+              find . -name 'libcap.a' -o -name 'capability.h'
+              exit 1
+            fi
+
+            if [ -f libcap/include/sys/capability.h ]; then
+              cp -v libcap/include/sys/capability.h "$DEPS_DIR/include/sys/"
+            elif [ -f libcap/include/uapi/linux/capability.h ]; then
+              mkdir -p "$DEPS_DIR/include/linux"
+              cp -v libcap/include/uapi/linux/capability.h "$DEPS_DIR/include/linux/"
+            else
+              echo "capability headers not found" >&2
+              find . -name 'capability.h'
+              exit 1
+            fi
 
             {
               printf '%s\n' "prefix=$DEPS_DIR"
@@ -736,7 +761,7 @@ jobs:
               printf '%s\n' 'includedir=${prefix}/include'
               printf '%s\n' ''
               printf '%s\n' 'Name: libcap'
-              printf '%s\n' 'Description: POSIX 1003.1e capabilities'
+              printf '%s\n' 'Description: POSIX capabilities library'
               printf '%s\n' 'Version: 2.73'
               printf '%s\n' 'Libs: -L${libdir} -lcap'
               printf '%s\n' 'Cflags: -I${includedir}'
@@ -747,7 +772,8 @@ jobs:
             echo "Installed libcap files:"
             find "$DEPS_DIR" \( \
               -name 'libcap*' -o \
-              -path '*/sys/capability.h' \
+              -path '*/sys/capability.h' -o \
+              -path '*/linux/capability.h' \
             \) -print
 
             echo "libcap pkg-config:"
