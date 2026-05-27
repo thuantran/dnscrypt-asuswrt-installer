@@ -55,6 +55,8 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eu
+          # Keep host-arch-only apt metadata; do not enable foreign architectures here.
+          # Ubuntu Noble runners can return 404s for armhf indexes on security.ubuntu.com.
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
@@ -66,7 +68,6 @@ jobs:
           sudo dpkg --add-architecture ${{ matrix.deb_arch }}
           sudo apt-get update
           sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
-          sudo apt-get install -y pkg-config
 
       - name: Build helper binaries from source
         env:
