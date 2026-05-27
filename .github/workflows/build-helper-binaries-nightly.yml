@@ -180,6 +180,7 @@ jobs:
               --without-qrypt \
               --without-pkcs11 \
               --without-libxml2 \
+              --without-rtlsdr \
               CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
               CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
               PKG_CONFIG=pkg-config
