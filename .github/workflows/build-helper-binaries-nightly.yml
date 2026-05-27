@@ -527,8 +527,9 @@ jobs:
               LIBS="$(pkg-config --libs libcrypto) -ldl -pthread -latomic"
 
             echo "Building only the core libp11 target, not engine/provider modules."
+
             make -C src V=1 libp11.la || {
-              echo "libp11 core target failed; retrying single-threaded" >&2
+              echo "libp11 core target failed; retrying after clean" >&2
               make -C src clean || true
               make -C src V=1 libp11.la
             }
@@ -537,34 +538,97 @@ jobs:
 
             if [ ! -f src/.libs/libp11.a ]; then
               echo "src/.libs/libp11.a was not created" >&2
-              find src -name 'libp11*' -o -name '*.a' -o -name '*.la'
+              find src \( -name 'libp11*' -o -name '*.a' -o -name '*.la' \) -print
               exit 1
             fi
 
             cp -v src/.libs/libp11.a "$DEPS_DIR/lib/"
-            cp -v src/.libs/libp11.la "$DEPS_DIR/lib/" 2>/dev/null || true
+            "$RANLIB" "$DEPS_DIR/lib/libp11.a" || true
 
-            cp -v src/libp11.h "$DEPS_DIR/include/"
-            cp -v src/pkcs11.h "$DEPS_DIR/include/" 2>/dev/null || true
+            # Copy libtool metadata if present. This is optional, but some autotools
+            # projects still inspect .la files during static cross-builds.
+            cp -v src/libp11.la "$DEPS_DIR/lib/" 2>/dev/null || \
+              cp -v src/.libs/libp11.la "$DEPS_DIR/lib/" 2>/dev/null || true
 
-            if [ -f src/libp11.pc ]; then
-              cp -v src/libp11.pc "$DEPS_DIR/lib/pkgconfig/"
-            elif [ -f libp11.pc ]; then
-              cp -v libp11.pc "$DEPS_DIR/lib/pkgconfig/"
-            else
-              {
-                printf '%s\n' "prefix=$DEPS_DIR"
-                printf '%s\n' 'exec_prefix=${prefix}'
-                printf '%s\n' 'libdir=${prefix}/lib'
-                printf '%s\n' 'includedir=${prefix}/include'
-                printf '%s\n' ''
-                printf '%s\n' 'Name: libp11'
-                printf '%s\n' 'Description: libp11 PKCS#11 wrapper library'
-                printf '%s\n' 'Version: 0.4.19'
-                printf '%s\n' 'Libs: -L${libdir} -lp11 -lcrypto -ldl -pthread'
-                printf '%s\n' 'Cflags: -I${includedir}'
-              } > "$DEPS_DIR/lib/pkgconfig/libp11.pc"
+            echo "Installing libp11 public headers."
+
+            for hdr in \
+              libp11.h \
+              p11_ver.h \
+              pkcs11.h \
+              p11_err.h
+            do
+              found_hdr=""
+
+              for dir in src include .; do
+                if [ -f "$dir/$hdr" ]; then
+                  found_hdr="$dir/$hdr"
+                  break
+                fi
+              done
+
+              if [ -n "$found_hdr" ]; then
+                cp -v "$found_hdr" "$DEPS_DIR/include/"
+              fi
+            done
+
+            if [ ! -f "$DEPS_DIR/include/libp11.h" ]; then
+              echo "libp11.h was not installed" >&2
+              find . -name 'libp11.h' -o -name 'p11_ver.h' -o -name 'pkcs11.h'
+              exit 1
             fi
+
+            if [ ! -f "$DEPS_DIR/include/p11_ver.h" ]; then
+              echo "p11_ver.h was not installed" >&2
+              find . -name 'p11_ver.h' -o -name 'libp11.h' -o -name 'pkcs11.h'
+              exit 1
+            fi
+
+            # Try to detect version from p11_ver.h; fall back if unavailable.
+            LIBP11_VERSION="$(
+              grep -E '#define[[:space:]]+PACKAGE_VERSION' "$DEPS_DIR/include/p11_ver.h" 2>/dev/null \
+                | awk '{print $3}' \
+                | tr -d '"' \
+                | head -n1
+            )"
+            LIBP11_VERSION="${LIBP11_VERSION:-0.4.19}"
+
+            # Always write our own pkg-config file so it points only to the
+            # target dependency prefix and target-built libcrypto.
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: libp11'
+              printf '%s\n' 'Description: libp11 PKCS#11 wrapper library'
+              printf '%s\n' "Version: $LIBP11_VERSION"
+              printf '%s\n' 'Libs: -L${libdir} -lp11 -lcrypto -ldl -pthread'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/libp11.pc"
+
+            # Validate header visibility and static linking.
+            {
+              printf '%s\n' '#include <libp11.h>'
+              printf '%s\n' ''
+              printf '%s\n' 'int main(void) {'
+              printf '%s\n' '  PKCS11_CTX *ctx = PKCS11_CTX_new();'
+              printf '%s\n' '  if (ctx) PKCS11_CTX_free(ctx);'
+              printf '%s\n' '  return 0;'
+              printf '%s\n' '}'
+            } > "$GITHUB_WORKSPACE/_build/test-libp11.c"
+
+            "$CC" \
+              -I"$DEPS_DIR/include" \
+              "$GITHUB_WORKSPACE/_build/test-libp11.c" \
+              -L"$DEPS_DIR/lib" \
+              -lp11 \
+              $(pkg-config --libs libcrypto) \
+              -ldl -pthread -latomic \
+              -o "$GITHUB_WORKSPACE/_build/test-libp11"
+
+            file "$GITHUB_WORKSPACE/_build/test-libp11" || true
 
             cd "$GITHUB_WORKSPACE"
 
@@ -574,7 +638,8 @@ jobs:
               -name '*p11*.pc' -o \
               -name 'pkcs11*.la' -o \
               -name 'pkcs11*.so' -o \
-              -name 'libpkcs11*' \
+              -name 'libpkcs11*' -o \
+              -name 'p11_ver.h' \
             \) -print
 
             echo "libp11 pkg-config:"
