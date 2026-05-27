@@ -721,7 +721,7 @@ jobs:
               AR="$AR" \
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
-              LD="$LD" \
+              LD="$CC" \
               OBJCOPY="$OBJCOPY" \
               OBJDUMP="$OBJDUMP" \
               READELF="$READELF" \
@@ -762,7 +762,7 @@ jobs:
               printf '%s\n' ''
               printf '%s\n' 'Name: libcap'
               printf '%s\n' 'Description: POSIX capabilities library'
-              printf '%s\n' 'Version: 2.73'
+              printf '%s\n' 'Version: 2.78'
               printf '%s\n' 'Libs: -L${libdir} -lcap'
               printf '%s\n' 'Cflags: -I${includedir}'
             } > "$DEPS_DIR/lib/pkgconfig/libcap.pc"
