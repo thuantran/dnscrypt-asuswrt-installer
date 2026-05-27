@@ -146,6 +146,8 @@ jobs:
           JITTERENTROPY_LIBRARY_REPO="https://github.com/smuellerDD/jitterentropy-library.git"
           JITTERENTROPY_LIBRARY_REF="master"
 
+          EUDEV_REPO="https://github.com/eudev-project/eudev.git"
+          EUDEV_REF="v3.2.14"
           ZLIB_VERSION="1.3.2"
           OPENSSL_VERSION="3.5.6"
           JANSSON_VERSION="2.15.0"
@@ -265,6 +267,40 @@ jobs:
 
             pkg-config --modversion openssl
             pkg-config --cflags --libs openssl
+          }          
+
+          build_eudev() {
+            clone_repo_at_ref "$EUDEV_REPO" "$EUDEV_REF" _src/eudev
+
+            cd _src/eudev
+
+            ./autogen.sh
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --disable-manpages \
+              --disable-selinux \
+              --disable-introspection \
+              --disable-hwdb \
+              --disable-programs \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libudev
+            pkg-config --cflags --libs libudev
           }
 
           build_jansson() {
@@ -466,6 +502,7 @@ jobs:
           }
 
           build_all_rng_dependencies() {
+            build_eudev
             build_zlib
             build_openssl
             build_jansson
