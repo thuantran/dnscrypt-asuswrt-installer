@@ -510,56 +510,40 @@ jobs:
             # with this static ARM cross-build.
             if [ -f src/Makefile.am ]; then
               cp -v src/Makefile.am src/Makefile.am.orig
-
-              python3 - <<'PY'
-              from pathlib import Path
-
-              path = Path("src/Makefile.am")
-              lines = path.read_text().splitlines(keepends=True)
-
-              drop_prefixes = (
-                  "enginesdir",
-                  "providersdir",
-                  "engines_LTLIBRARIES",
-                  "providers_LTLIBRARIES",
-                  "pkcs11_la_",
-                  "pkcs11prov_la_",
-              )
-
-              out = []
-              i = 0
-
-              while i < len(lines):
-                  line = lines[i]
-                  stripped = line.lstrip()
-
-                  # Force only the core library to be installed.
-                  if stripped.startswith("lib_LTLIBRARIES"):
-                      out.append("lib_LTLIBRARIES = libp11.la\n")
-
-                      # Skip continuation lines from original lib_LTLIBRARIES block.
-                      while line.rstrip().endswith("\\") and i + 1 < len(lines):
-                          i += 1
-                          line = lines[i]
-
-                      i += 1
-                      continue
-
-                  # Drop full multi-line assignment blocks for engine/provider targets.
-                  if any(stripped.startswith(prefix) for prefix in drop_prefixes):
-                      while line.rstrip().endswith("\\") and i + 1 < len(lines):
-                          i += 1
-                          line = lines[i]
-
-                      i += 1
-                      continue
-
-                  out.append(line)
-                  i += 1
-
-              path.write_text("".join(out))
-              PY
-
+            { python3 - <<'PY'
+from pathlib import Path
+path = Path("src/Makefile.am")
+lines = path.read_text().splitlines(keepends=True)
+drop_prefixes = (
+    "enginesdir",
+    "providersdir",
+    "engines_LTLIBRARIES",
+    "providers_LTLIBRARIES",
+    "pkcs11_la_",
+    "pkcs11prov_la_",
+)
+out = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+    stripped = line.lstrip()
+    if stripped.startswith("lib_LTLIBRARIES"):
+        out.append("lib_LTLIBRARIES = libp11.la\n")
+        while line.rstrip().endswith("\\") and i + 1 < len(lines):
+            i += 1
+            line = lines[i]
+        i += 1
+        continue
+    if any(stripped.startswith(prefix) for prefix in drop_prefixes):
+        while line.rstrip().endswith("\\") and i + 1 < len(lines):
+            i += 1
+            line = lines[i]
+        i += 1
+        continue
+    out.append(line)
+    i += 1
+path.write_text("".join(out))
+PY; };
               echo "Patched src/Makefile.am target summary:"
               grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile.am || true
 
