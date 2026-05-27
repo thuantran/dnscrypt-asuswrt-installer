@@ -501,9 +501,6 @@ jobs:
 
             ./bootstrap
 
-            # Build/install only the core libp11 library.
-            # Skip OpenSSL engine/provider modules because they are shared plugins
-            # and do not work cleanly with this static ARM cross-build.
             [ -f src/Makefile.am ] || {
               echo "src/Makefile.am not found; cannot patch libp11 build targets" >&2
               exit 1
@@ -511,13 +508,18 @@ jobs:
 
             cp -v src/Makefile.am src/Makefile.am.orig
 
+            # Build/install only the core libp11 library.
+            # Skip OpenSSL engine/provider/plugin modules because they are shared
+            # plugins and do not work cleanly with this static ARM cross-build.
             perl -0pi -e 's/^[ \t]*lib_LTLIBRARIES[ \t]*=.*?(?:\\\n.*?)*\n/lib_LTLIBRARIES = libp11.la\n/msg' src/Makefile.am
+            perl -0pi -e 's/^[ \t]*lib_LTLIBRARIES[ \t]*\+?=.*(?:pkcs11|pkcs11prov|libpkcs11).*?(?:\\\n.*?)*\n//msg' src/Makefile.am
             perl -0pi -e 's/^[ \t]*(?:enginesdir|providersdir)[ \t]*=.*?\n//mg' src/Makefile.am
             perl -0pi -e 's/^[ \t]*(?:engines_LTLIBRARIES|providers_LTLIBRARIES)[ \t]*=.*?(?:\\\n.*?)*\n//msg' src/Makefile.am
-            perl -0pi -e 's/^[ \t]*(?:pkcs11_la|pkcs11prov_la)_[A-Za-z0-9_]+[ \t]*=.*?(?:\\\n.*?)*\n//msg' src/Makefile.am
+            perl -0pi -e 's/^[ \t]*(?:pkcs11_la|pkcs11prov_la|libpkcs11_la|libpkcs11prov_la)_[A-Za-z0-9_]+[ \t]*(?:\+?=).*?(?:\\\n.*?)*\n//msg' src/Makefile.am
+            perl -0pi -e 's/^.*(?:pkcs11\.la|pkcs11prov\.la|libpkcs11\.la|libpkcs11prov\.la).*?\n//mg' src/Makefile.am
 
             echo "Patched libp11 targets:"
-            grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES)' src/Makefile.am || true
+            grep -nE 'lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|pkcs11|pkcs11prov|libpkcs11' src/Makefile.am || true
 
             autoreconf -fiv
 
@@ -540,7 +542,7 @@ jobs:
               LIBS="$(pkg-config --libs libcrypto) -ldl -pthread -latomic"
 
             echo "Generated libp11 targets:"
-            grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES)' src/Makefile || true
+            grep -nE 'lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|pkcs11|pkcs11prov|libpkcs11' src/Makefile || true
 
             make V=1 -j"$(nproc)" || {
               echo "libp11 parallel build failed; retrying single-threaded" >&2
@@ -557,7 +559,8 @@ jobs:
               -name 'libp11*' -o \
               -name '*p11*.pc' -o \
               -name 'pkcs11*.la' -o \
-              -name 'pkcs11*.so' \
+              -name 'pkcs11*.so' -o \
+              -name 'libpkcs11*' \
             \) -print
 
             echo "libp11 pkg-config:"
