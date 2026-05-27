@@ -346,11 +346,12 @@ jobs:
               --prefix="$DEPS_DIR" \
               --disable-shared \
               --enable-static \
+              --enable-udev \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
+              CFLAGS="$COMMON_CFLAGS -fPIC" \
               LDFLAGS="$COMMON_LDFLAGS"
 
             make -j"$(nproc)"
@@ -379,14 +380,17 @@ jobs:
               -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
               -DCMAKE_C_FLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
               -DCMAKE_EXE_LINKER_FLAGS="$COMMON_LDFLAGS" \
+              -DCMAKE_SHARED_LINKER_FLAGS="$COMMON_LDFLAGS" \
               -DBUILD_SHARED_LIBS=OFF \
+              -DBUILD_STATIC_LIBS=ON \
               -DINSTALL_UDEV_RULES=OFF \
               -DDETACH_KERNEL_DRIVER=ON
 
-            cmake --build _build/rtl-sdr -j"$(nproc)"
+            cmake --build _build/rtl-sdr -j"$(nproc)" --target rtlsdr_static
             cmake --install _build/rtl-sdr
 
             pkg-config --list-all | grep -i rtl || true
+            find "$DEPS_DIR" -name '*rtlsdr*' -o -name 'rtl-sdr.pc'
           }
 
           build_libxml2() {
