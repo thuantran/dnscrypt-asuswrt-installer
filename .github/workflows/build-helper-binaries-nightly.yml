@@ -582,7 +582,7 @@ jobs:
             cd _src/jitterentropy-library
 
             make clean || true
-            
+
             JENT_CFLAGS="-O0 -D_GNU_SOURCE -I$DEPS_DIR/include -Iinclude -Isrc -I. -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
 
             make -j"$(nproc)" \
@@ -592,23 +592,62 @@ jobs:
               CFLAGS="$JENT_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS"
 
-            make install \
-              PREFIX="$DEPS_DIR" \
-              LIBDIR="$DEPS_DIR/lib" \
-              INCDIR="$DEPS_DIR/include" \
-              CC="$CC" \
-              AR="$AR" \
-              RANLIB="$RANLIB"
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig"
+
+            cp -v libjitterentropy.a "$DEPS_DIR/lib/"
+
+            if [ -f include/jitterentropy.h ]; then
+              cp -v include/jitterentropy.h "$DEPS_DIR/include/"
+            elif [ -f jitterentropy.h ]; then
+              cp -v jitterentropy.h "$DEPS_DIR/include/"
+            else
+              echo "jitterentropy.h not found" >&2
+              find . -name 'jitterentropy.h' -print
+              exit 1
+            fi
+
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: jitterentropy'
+              printf '%s\n' 'Description: CPU Jitter Random Number Generator library'
+              printf '%s\n' 'Version: 3.7.0'
+              printf '%s\n' 'Libs: -L${libdir} -ljitterentropy'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/jitterentropy.pc"
+
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: libjitterentropy'
+              printf '%s\n' 'Description: CPU Jitter Random Number Generator library'
+              printf '%s\n' 'Version: 3.7.0'
+              printf '%s\n' 'Libs: -L${libdir} -ljitterentropy'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/libjitterentropy.pc"
 
             cd "$GITHUB_WORKSPACE"
 
             echo "Installed jitterentropy files:"
-            find "$DEPS_DIR" -name '*jitter*' -o -name '*.pc'
+            find "$DEPS_DIR" \( \
+              -name '*jitter*' -o \
+              -name 'jitterentropy.pc' -o \
+              -name 'libjitterentropy.pc' \
+            \) -print
 
             echo "jitterentropy pkg-config:"
-            pkg-config --list-all | grep -i jitter || true
+            pkg-config --cflags jitterentropy || true
+            pkg-config --libs jitterentropy || true
+            pkg-config --cflags libjitterentropy || true
+            pkg-config --libs libjitterentropy || true
           }
-
+          
           build_all_rng_dependencies() {
             build_eudev
             build_zlib
