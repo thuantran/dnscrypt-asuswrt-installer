@@ -167,7 +167,7 @@ jobs:
           LIBP11_REF="master"
 
           COREUTILS_VERSION="9.4"
-          COREUTILS_SHA256="ea613a4cf39c4c9c8692d8a2c0d255b136b3e25c6c9b8f9e0e8e4e2c5e4e0b0e"
+          COREUTILS_SHA256="ea613a4cf44612326e917201bbbcdfbd301de21ffc3b59b6e5c07e040b275e52"
 
           clone_repo_at_ref() {
             repo_url="$1"
