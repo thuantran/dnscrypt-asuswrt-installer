@@ -545,18 +545,18 @@ jobs:
             elif [ -f libp11.pc ]; then
               cp -v libp11.pc "$DEPS_DIR/lib/pkgconfig/"
             else
-              cat > "$DEPS_DIR/lib/pkgconfig/libp11.pc" <<EOF
-              prefix=$DEPS_DIR
-              exec_prefix=\${prefix}
-              libdir=\${prefix}/lib
-              includedir=\${prefix}/include
-
-              Name: libp11
-              Description: libp11 PKCS#11 wrapper library
-              Version: 0.4.19
-              Libs: -L\${libdir} -lp11 -lcrypto -ldl -pthread
-              Cflags: -I\${includedir}
-              EOF
+              {
+                printf '%s\n' "prefix=$DEPS_DIR"
+                printf '%s\n' 'exec_prefix=${prefix}'
+                printf '%s\n' 'libdir=${prefix}/lib'
+                printf '%s\n' 'includedir=${prefix}/include'
+                printf '%s\n' ''
+                printf '%s\n' 'Name: libp11'
+                printf '%s\n' 'Description: libp11 PKCS#11 wrapper library'
+                printf '%s\n' 'Version: 0.4.19'
+                printf '%s\n' 'Libs: -L${libdir} -lp11 -lcrypto -ldl -pthread'
+                printf '%s\n' 'Cflags: -I${includedir}'
+              } > "$DEPS_DIR/lib/pkgconfig/libp11.pc"
             fi
 
             cd "$GITHUB_WORKSPACE"
