@@ -56,15 +56,28 @@ jobs:
         run: |
           set -eu
           export DEBIAN_FRONTEND=noninteractive
+
           # Keep host-arch-only apt metadata; do not enable foreign architectures here.
           # Ubuntu Noble runners can return 404s for armhf indexes on security.ubuntu.com.
           # IMPORTANT: never run `dpkg --add-architecture` in this workflow.
           sudo apt-get update
+
           sudo apt-get install -y \
             autoconf automake build-essential ca-certificates curl file git make gcc \
             libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
             libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils
+
+          # Make locally installed libraries/headers visible to later build steps.
+          {
+            echo "CPPFLAGS=-I/usr/local/include"
+            echo "CFLAGS=-I/usr/local/include"
+            echo "LDFLAGS=-L/usr/local/lib -L/usr/local/lib64"
+            echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig"
+            echo "LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64"
+          } >> "$GITHUB_ENV"
+
+          sudo ldconfig
 
       - name: Install cross toolchain
         run: |
