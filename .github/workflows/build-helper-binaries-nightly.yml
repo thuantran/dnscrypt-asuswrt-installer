@@ -166,8 +166,8 @@ jobs:
           LIBP11_REPO="https://github.com/OpenSC/libp11.git"
           LIBP11_REF="master"
 
-          COREUTILS_VERSION="9.4"
-          COREUTILS_SHA256="ea613a4cf44612326e917201bbbcdfbd301de21ffc3b59b6e5c07e040b275e52"
+          COREUTILS_VERSION="9.11"
+          COREUTILS_SHA256="OUAk7aCllVIXztqc0SAeZdyPo6opwpURNaSVIdV8PMM="
 
           clone_repo_at_ref() {
             repo_url="$1"
@@ -1116,7 +1116,8 @@ jobs:
             echo "Downloading coreutils: $url"
             curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
 
-            echo "${COREUTILS_SHA256}  $out" | sha256sum -c -
+            echo "Verifying coreutils base64 SHA256:"
+            printf '%s  %s\n' "$COREUTILS_SHA256_BASE64" "$out" | cksum -a sha256 --check
 
             tar -xf "$out" -C _src
 
@@ -1133,41 +1134,16 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS" \
-              ac_cv_header_stdckdint_h=no \
-              gl_cv_header_working_stdckdint_h=no \
-              gl_cv_func_working_mkstemp=yes \
-              gl_cv_func_getcwd_null=yes \
+              ac_cv_func_malloc_0_nonnull=yes \
+              ac_cv_func_realloc_0_nonnull=yes \
               gl_cv_func_malloc_0_nonnull=yes \
               gl_cv_func_realloc_0_nonnull=yes \
-              ac_cv_func_malloc_0_nonnull=yes \
-              ac_cv_func_realloc_0_nonnull=yes
+              gl_cv_func_working_mkstemp=yes \
+              gl_cv_func_getcwd_null=yes
 
-            # Some cross builds of coreutils/gnulib do not generate stdckdint.h
-            # correctly even after configure. Provide a small fallback header.
-            if [ ! -f lib/stdckdint.h ]; then
-              echo "Creating fallback lib/stdckdint.h"
-
-              {
-                printf '%s\n' '#ifndef _GL_STDCKDINT_H'
-                printf '%s\n' '#define _GL_STDCKDINT_H 1'
-                printf '%s\n' ''
-                printf '%s\n' '#if defined(__GNUC__) || defined(__clang__)'
-                printf '%s\n' '# define ckd_add(r, a, b) __builtin_add_overflow((a), (b), (r))'
-                printf '%s\n' '# define ckd_sub(r, a, b) __builtin_sub_overflow((a), (b), (r))'
-                printf '%s\n' '# define ckd_mul(r, a, b) __builtin_mul_overflow((a), (b), (r))'
-                printf '%s\n' '#else'
-                printf '%s\n' '# include <stdint.h>'
-                printf '%s\n' '# define ckd_add(r, a, b) ((*(r) = (a) + (b)), 0)'
-                printf '%s\n' '# define ckd_sub(r, a, b) ((*(r) = (a) - (b)), 0)'
-                printf '%s\n' '# define ckd_mul(r, a, b) ((*(r) = (a) * (b)), 0)'
-                printf '%s\n' '#endif'
-                printf '%s\n' ''
-                printf '%s\n' '#endif'
-              } > lib/stdckdint.h
-            fi
-
-            # Build generated headers first. This avoids the configmake.h follow-on failure.
-            make V=1 lib/configmake.h || true
+            # Build generated headers first. Ignore failures here because
+            # some targets may not exist until Makefile dependencies are walked.
+            make V=1 src/version.h lib/configmake.h || true
 
             make V=1 -j"$(nproc)" src/stty || {
               echo "stty parallel build failed; retrying single-threaded" >&2
@@ -1182,9 +1158,11 @@ jobs:
 
             cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
 
+            file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
+
             cd "$GITHUB_WORKSPACE"
           }
-
+          
           build_nonroot() {
             mkdir -p _build "$OUT_DIR"
 
