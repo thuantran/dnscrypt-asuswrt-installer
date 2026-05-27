@@ -511,44 +511,57 @@ jobs:
             if [ -f src/Makefile.am ]; then
               cp -v src/Makefile.am src/Makefile.am.orig
 
-              awk '
-                BEGIN {
-                  skip = 0
-                }
+              python3 - <<'PY'
+from pathlib import Path
 
-                /^[[:space:]]*enginesdir[[:space:]]*=/ {
-                  next
-                }
+path = Path("src/Makefile.am")
+lines = path.read_text().splitlines(keepends=True)
 
-                /^[[:space:]]*providersdir[[:space:]]*=/ {
-                  next
-                }
+drop_prefixes = (
+    "enginesdir",
+    "providersdir",
+    "engines_LTLIBRARIES",
+    "providers_LTLIBRARIES",
+    "pkcs11_la_",
+    "pkcs11prov_la_",
+)
 
-                /^[[:space:]]*engines_LTLIBRARIES[[:space:]]*=/ {
-                  next
-                }
+out = []
+i = 0
 
-                /^[[:space:]]*providers_LTLIBRARIES[[:space:]]*=/ {
-                  next
-                }
+while i < len(lines):
+    line = lines[i]
+    stripped = line.lstrip()
 
-                /^[[:space:]]*pkcs11_la_/ {
-                  next
-                }
+    # Force only the core library to be installed.
+    if stripped.startswith("lib_LTLIBRARIES"):
+        out.append("lib_LTLIBRARIES = libp11.la\n")
 
-                /^[[:space:]]*pkcs11prov_la_/ {
-                  next
-                }
+        # Skip continuation lines from original lib_LTLIBRARIES block.
+        while line.rstrip().endswith("\\") and i + 1 < len(lines):
+            i += 1
+            line = lines[i]
 
-                /^[[:space:]]*lib_LTLIBRARIES[[:space:]]*=/ {
-                  print "lib_LTLIBRARIES = libp11.la"
-                  next
-                }
+        i += 1
+        continue
 
-                {
-                  print
-                }
-              ' src/Makefile.am.orig > src/Makefile.am
+    # Drop full multi-line assignment blocks for engine/provider targets.
+    if any(stripped.startswith(prefix) for prefix in drop_prefixes):
+        while line.rstrip().endswith("\\") and i + 1 < len(lines):
+            i += 1
+            line = lines[i]
+
+        i += 1
+        continue
+
+    out.append(line)
+    i += 1
+
+path.write_text("".join(out))
+PY
+
+              echo "Patched src/Makefile.am target summary:"
+              grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile.am || true
 
               autoreconf -fiv
             else
@@ -574,8 +587,8 @@ jobs:
               LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L libcrypto)" \
               LIBS="$(pkg-config --libs libcrypto) -ldl -pthread -latomic"
 
-            echo "Confirm patched libp11 make targets:"
-            grep -E '^(lib_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile || true
+            echo "Confirm patched libp11 generated make targets:"
+            grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile || true
 
             make V=1 -j"$(nproc)" || {
               echo "libp11 parallel build failed; retrying single-threaded" >&2
@@ -588,7 +601,7 @@ jobs:
             cd "$GITHUB_WORKSPACE"
 
             echo "Installed libp11 files:"
-            find "$DEPS_DIR" -name 'libp11*' -o -name '*p11*.pc'
+            find "$DEPS_DIR" -name 'libp11*' -o -name '*p11*.pc' -o -name 'pkcs11*.la' -o -name 'pkcs11*.so'
 
             echo "libp11 pkg-config:"
             pkg-config --cflags libp11 || true
