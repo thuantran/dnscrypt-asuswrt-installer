@@ -1164,15 +1164,45 @@ jobs:
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS" \
               2>&1 | tee "$logdir/configure.log"
-              
-            # Coreutils 9.11 / gnulib cross-build workaround:
-            # lib/mbbuf.h uses memmove(), but some cross-config paths fail to expose
-            # the declaration. Add <string.h> directly if it is missing.
-            if [ -f lib/mbbuf.h ] && ! grep -q '#include <string.h>' lib/mbbuf.h; then
-              echo "Patching lib/mbbuf.h to include <string.h>"
-              sed -i '/#include "idx.h"/a #include <string.h>' lib/mbbuf.h
-            fi
-            
+
+            patch_coreutils_sources() {
+              # Coreutils 9.11 / gnulib cross-build workaround:
+              # lib/mcel.h uses wint_t, which may not be declared unless wchar/wctype
+              # headers are included explicitly in this cross-build path.
+              if [ -f lib/mcel.h ] && ! grep -q 'COREUTILS_CROSS_WINT_T_FIX' lib/mcel.h; then
+                echo "Patching lib/mcel.h for wint_t"
+                tmp_file="lib/mcel.h.tmp"
+
+                {
+                  printf '%s\n' '/* COREUTILS_CROSS_WINT_T_FIX */'
+                  printf '%s\n' '#include <wchar.h>'
+                  printf '%s\n' '#include <wctype.h>'
+                  cat lib/mcel.h
+                } > "$tmp_file"
+
+                mv "$tmp_file" lib/mcel.h
+              fi
+
+              # lib/mbbuf.h uses memmove(), and in this cross-build path the
+              # declaration may not be visible. It may also use unreachable().
+              if [ -f lib/mbbuf.h ] && ! grep -q 'COREUTILS_CROSS_MBBUF_FIX' lib/mbbuf.h; then
+                echo "Patching lib/mbbuf.h for memmove/unreachable"
+                tmp_file="lib/mbbuf.h.tmp"
+
+                {
+                  printf '%s\n' '/* COREUTILS_CROSS_MBBUF_FIX */'
+                  printf '%s\n' '#include <string.h>'
+                  printf '%s\n' '#include <stdlib.h>'
+                  printf '%s\n' '#ifndef unreachable'
+                  printf '%s\n' '# define unreachable() abort()'
+                  printf '%s\n' '#endif'
+                  cat lib/mbbuf.h
+                } > "$tmp_file"
+
+                mv "$tmp_file" lib/mbbuf.h
+              fi
+            }
+
             ensure_coreutils_fallback_headers() {
               mkdir -p lib src
 
@@ -1225,8 +1255,12 @@ jobs:
               fi
             }
 
+            patch_coreutils_sources
+
             make V=1 src/version.h lib/configmake.h lib/stdckdint.h 2>&1 | tee "$logdir/generated-headers.log" || true
+
             ensure_coreutils_fallback_headers
+            patch_coreutils_sources
 
             echo "Building GNU coreutils stty"
 
@@ -1234,6 +1268,7 @@ jobs:
               echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
 
               ensure_coreutils_fallback_headers
+              patch_coreutils_sources
 
               make V=1 -j1 src/stty 2>&1 | tee "$logdir/build-single.log"
             fi
