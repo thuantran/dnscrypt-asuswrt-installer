@@ -501,57 +501,25 @@ jobs:
 
             ./bootstrap
 
-            # Patch libp11 so it builds/installs only the core libp11 library.
-            # Skip OpenSSL engine/provider modules:
-            #   pkcs11.la
-            #   pkcs11prov.la
-            #
-            # Those are shared OpenSSL plugin modules and do not work cleanly
-            # with this static ARM cross-build.
-            if [ -f src/Makefile.am ]; then
-              cp -v src/Makefile.am src/Makefile.am.orig
-            { python3 - <<'PY'
-from pathlib import Path
-path = Path("src/Makefile.am")
-lines = path.read_text().splitlines(keepends=True)
-drop_prefixes = (
-    "enginesdir",
-    "providersdir",
-    "engines_LTLIBRARIES",
-    "providers_LTLIBRARIES",
-    "pkcs11_la_",
-    "pkcs11prov_la_",
-)
-out = []
-i = 0
-while i < len(lines):
-    line = lines[i]
-    stripped = line.lstrip()
-    if stripped.startswith("lib_LTLIBRARIES"):
-        out.append("lib_LTLIBRARIES = libp11.la\n")
-        while line.rstrip().endswith("\\") and i + 1 < len(lines):
-            i += 1
-            line = lines[i]
-        i += 1
-        continue
-    if any(stripped.startswith(prefix) for prefix in drop_prefixes):
-        while line.rstrip().endswith("\\") and i + 1 < len(lines):
-            i += 1
-            line = lines[i]
-        i += 1
-        continue
-    out.append(line)
-    i += 1
-path.write_text("".join(out))
-PY; };
-              echo "Patched src/Makefile.am target summary:"
-              grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile.am || true
-
-              autoreconf -fiv
-            else
+            # Build/install only the core libp11 library.
+            # Skip OpenSSL engine/provider modules because they are shared plugins
+            # and do not work cleanly with this static ARM cross-build.
+            [ -f src/Makefile.am ] || {
               echo "src/Makefile.am not found; cannot patch libp11 build targets" >&2
               exit 1
-            fi
+            }
+
+            cp -v src/Makefile.am src/Makefile.am.orig
+
+            perl -0pi -e 's/^[ \t]*lib_LTLIBRARIES[ \t]*=.*?(?:\\\n.*?)*\n/lib_LTLIBRARIES = libp11.la\n/msg' src/Makefile.am
+            perl -0pi -e 's/^[ \t]*(?:enginesdir|providersdir)[ \t]*=.*?\n//mg' src/Makefile.am
+            perl -0pi -e 's/^[ \t]*(?:engines_LTLIBRARIES|providers_LTLIBRARIES)[ \t]*=.*?(?:\\\n.*?)*\n//msg' src/Makefile.am
+            perl -0pi -e 's/^[ \t]*(?:pkcs11_la|pkcs11prov_la)_[A-Za-z0-9_]+[ \t]*=.*?(?:\\\n.*?)*\n//msg' src/Makefile.am
+
+            echo "Patched libp11 targets:"
+            grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES)' src/Makefile.am || true
+
+            autoreconf -fiv
 
             ./configure \
               --build="$(gcc -dumpmachine)" \
@@ -571,8 +539,8 @@ PY; };
               LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L libcrypto)" \
               LIBS="$(pkg-config --libs libcrypto) -ldl -pthread -latomic"
 
-            echo "Confirm patched libp11 generated make targets:"
-            grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile || true
+            echo "Generated libp11 targets:"
+            grep -E '^(lib_LTLIBRARIES|engines_LTLIBRARIES|providers_LTLIBRARIES)' src/Makefile || true
 
             make V=1 -j"$(nproc)" || {
               echo "libp11 parallel build failed; retrying single-threaded" >&2
@@ -585,7 +553,12 @@ PY; };
             cd "$GITHUB_WORKSPACE"
 
             echo "Installed libp11 files:"
-            find "$DEPS_DIR" -name 'libp11*' -o -name '*p11*.pc' -o -name 'pkcs11*.la' -o -name 'pkcs11*.so'
+            find "$DEPS_DIR" \( \
+              -name 'libp11*' -o \
+              -name '*p11*.pc' -o \
+              -name 'pkcs11*.la' -o \
+              -name 'pkcs11*.so' \
+            \) -print
 
             echo "libp11 pkg-config:"
             pkg-config --cflags libp11 || true
