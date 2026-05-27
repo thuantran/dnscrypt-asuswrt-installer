@@ -73,6 +73,7 @@ jobs:
       - name: Build helper binaries from source
         env:
           HOST: ${{ matrix.host_triplet }}
+          CC_PREFIX: ${{ matrix.cc_prefix }}
           OUT_DIR: dist/${{ matrix.repo_dir }}
         run: |
           set -eu
@@ -174,6 +175,7 @@ jobs:
               --prefix=/usr \
               --disable-silent-rules \
               --without-nistbeacon \
+              --without-qrypt \
               --without-libxml2 \
               CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
               CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
@@ -246,10 +248,18 @@ jobs:
           build_jitterentropy_rngd() {
             clone_repo_at_ref "$JITTERENTROPY_REPO" "$JITTERENTROPY_REF" _src/jitterentropy-rngd
             cd _src/jitterentropy-rngd
-            make -j"$(nproc)" CC="$CC" CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" || {
+            make -j"$(nproc)" \
+              CC="$CC" \
+              EXTRA_CFLAGS="$COMMON_CFLAGS" \
+              EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
+              EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
               echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
               make clean || true
-              make CC="$CC" CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" || {
+              make \
+                CC="$CC" \
+                EXTRA_CFLAGS="$COMMON_CFLAGS" \
+                EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
+                EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
                 echo "jitterentropy-rngd build failed" >&2
                 exit 1
               }
