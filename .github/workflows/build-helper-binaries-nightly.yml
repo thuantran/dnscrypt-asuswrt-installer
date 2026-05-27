@@ -32,12 +32,14 @@ jobs:
             host_triplet: arm-linux-gnueabihf
             cc_prefix: arm-linux-gnueabihf
             libc_dev: libc6-dev-armhf-cross
+            openssl_target: linux-armv4
 
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
             cc_prefix: aarch64-linux-gnu
             libc_dev: libc6-dev-arm64-cross
+            openssl_target: linux-aarch64
 
     steps:
       - name: Resolve checkout ref
@@ -72,12 +74,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             autoconf automake build-essential ca-certificates curl file git make gcc g++ \
             libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
+            cmake ninja-build meson python3 python3-pip perl \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
             libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils
 
           gcc --version
           make --version
           pkg-config --version
+          cmake --version
+          meson --version || true
 
       - name: Install cross toolchain
         run: |
@@ -87,6 +92,7 @@ jobs:
 
           sudo apt-get install -y --no-install-recommends \
             gcc-${{ matrix.host_triplet }} \
+            g++-${{ matrix.host_triplet }} \
             binutils-${{ matrix.host_triplet }} \
             ${{ matrix.libc_dev }}
 
@@ -98,25 +104,35 @@ jobs:
           HOST: ${{ matrix.host_triplet }}
           CC_PREFIX: ${{ matrix.cc_prefix }}
           OUT_DIR: dist/${{ matrix.repo_dir }}
+          OPENSSL_TARGET: ${{ matrix.openssl_target }}
         run: |
           set -eu
 
           mkdir -p "$OUT_DIR" _src _build
 
           export CC="$CC_PREFIX-gcc"
+          export CXX="$CC_PREFIX-g++"
           export AR="$CC_PREFIX-ar"
           export RANLIB="$CC_PREFIX-ranlib"
           export STRIP="$CC_PREFIX-strip"
+          export LD="$CC_PREFIX-ld"
+
+          export DEPS_DIR="$GITHUB_WORKSPACE/_deps/$HOST"
+
+          mkdir -p "$DEPS_DIR"
 
           # Cross-build isolation:
-          # Do not let pkg-config see host /usr/local or host /usr/lib pkgconfig files.
-          export PKG_CONFIG_PATH=""
-          export PKG_CONFIG_SYSROOT_DIR="/"
-          export PKG_CONFIG_LIBDIR="/usr/lib/${HOST}/pkgconfig:/usr/share/pkgconfig"
+          # Keep target-built dependencies in a per-architecture prefix.
+          export PATH="$DEPS_DIR/bin:$PATH"
 
-          export COMMON_CPPFLAGS="-D_GNU_SOURCE"
+          export PKG_CONFIG_PATH="$DEPS_DIR/lib/pkgconfig:$DEPS_DIR/lib64/pkgconfig:$DEPS_DIR/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$DEPS_DIR/lib/pkgconfig:$DEPS_DIR/lib64/pkgconfig:$DEPS_DIR/share/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR=""
+
+          export COMMON_CPPFLAGS="-D_GNU_SOURCE -I$DEPS_DIR/include"
           export COMMON_CFLAGS="-Os -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -D_FORTIFY_SOURCE=2"
-          export COMMON_LDFLAGS="-Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
+          export COMMON_CXXFLAGS="$COMMON_CFLAGS"
+          export COMMON_LDFLAGS="-L$DEPS_DIR/lib -L$DEPS_DIR/lib64 -Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
@@ -126,6 +142,20 @@ jobs:
 
           JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
           JITTERENTROPY_REF="b94ef60f888ad442641a25c4599e24296bde4959"
+
+          JITTERENTROPY_LIBRARY_REPO="https://github.com/smuellerDD/jitterentropy-library.git"
+          JITTERENTROPY_LIBRARY_REF="master"
+
+          ZLIB_VERSION="1.3.1"
+          OPENSSL_VERSION="3.3.2"
+          JANSSON_VERSION="2.14"
+          LIBUSB_VERSION="v1.0.27"
+          RTLSDR_REPO="https://github.com/osmocom/rtl-sdr.git"
+          RTLSDR_REF="master"
+          LIBXML2_VERSION="v2.12.7"
+          CURL_VERSION="curl-8_11_1"
+          LIBP11_REPO="https://github.com/OpenSC/libp11.git"
+          LIBP11_REF="master"
 
           COREUTILS_VERSION="9.5"
           COREUTILS_SHA256="cd80eb5b247f87670353197a8fc3e3f7fb77f607f9f10925a60214790514d31a"
@@ -167,6 +197,268 @@ jobs:
             fi
 
             cd "$GITHUB_WORKSPACE"
+          }
+
+          build_zlib() {
+            curl -fsSL "https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz" -o "_build/zlib-${ZLIB_VERSION}.tar.gz"
+            tar -xf "_build/zlib-${ZLIB_VERSION}.tar.gz" -C _src
+
+            cd "_src/zlib-${ZLIB_VERSION}"
+
+            CHOST="$HOST" \
+            CC="$CC" \
+            AR="$AR" \
+            RANLIB="$RANLIB" \
+            CFLAGS="$COMMON_CFLAGS" \
+            ./configure \
+              --prefix="$DEPS_DIR" \
+              --static
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+          }
+
+          build_openssl() {
+            curl -fsSL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" -o "_build/openssl-${OPENSSL_VERSION}.tar.gz"
+            tar -xf "_build/openssl-${OPENSSL_VERSION}.tar.gz" -C _src
+
+            cd "_src/openssl-${OPENSSL_VERSION}"
+
+            ./Configure \
+              "$OPENSSL_TARGET" \
+              --cross-compile-prefix="${CC_PREFIX}-" \
+              --prefix="$DEPS_DIR" \
+              --openssldir="$DEPS_DIR/ssl" \
+              no-shared \
+              no-tests \
+              no-module \
+              no-engine
+
+            make -j"$(nproc)"
+            make install_sw
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion openssl
+            pkg-config --cflags --libs openssl
+          }
+
+          build_jansson() {
+            curl -fsSL "https://github.com/akheron/jansson/releases/download/v${JANSSON_VERSION}/jansson-${JANSSON_VERSION}.tar.gz" -o "_build/jansson-${JANSSON_VERSION}.tar.gz"
+            tar -xf "_build/jansson-${JANSSON_VERSION}.tar.gz" -C _src
+
+            cd "_src/jansson-${JANSSON_VERSION}"
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion jansson
+          }
+
+          build_libusb() {
+            clone_repo_at_ref "https://github.com/libusb/libusb.git" "$LIBUSB_VERSION" _src/libusb
+
+            cd _src/libusb
+
+            ./bootstrap.sh
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libusb-1.0
+          }
+
+          build_librtlsdr() {
+            clone_repo_at_ref "$RTLSDR_REPO" "$RTLSDR_REF" _src/rtl-sdr
+
+            cmake -S _src/rtl-sdr -B _build/rtl-sdr \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR="$HOST" \
+              -DCMAKE_C_COMPILER="$CC" \
+              -DCMAKE_AR="$AR" \
+              -DCMAKE_RANLIB="$RANLIB" \
+              -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" \
+              -DCMAKE_PREFIX_PATH="$DEPS_DIR" \
+              -DCMAKE_FIND_ROOT_PATH="$DEPS_DIR" \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+              -DCMAKE_C_FLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
+              -DCMAKE_EXE_LINKER_FLAGS="$COMMON_LDFLAGS" \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DINSTALL_UDEV_RULES=OFF \
+              -DDETACH_KERNEL_DRIVER=ON
+
+            cmake --build _build/rtl-sdr -j"$(nproc)"
+            cmake --install _build/rtl-sdr
+
+            pkg-config --list-all | grep -i rtl || true
+          }
+
+          build_libxml2() {
+            clone_repo_at_ref "https://github.com/GNOME/libxml2.git" "$LIBXML2_VERSION" _src/libxml2
+
+            cd _src/libxml2
+
+            ./autogen.sh \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --without-python \
+              --with-zlib="$DEPS_DIR" \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libxml-2.0
+          }
+
+          build_curl() {
+            clone_repo_at_ref "https://github.com/curl/curl.git" "$CURL_VERSION" _src/curl
+
+            cd _src/curl
+
+            autoreconf -fi
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --with-openssl="$DEPS_DIR" \
+              --with-zlib="$DEPS_DIR" \
+              --disable-ldap \
+              --disable-ldaps \
+              --disable-manual \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libcurl
+          }
+
+          build_libp11() {
+            clone_repo_at_ref "$LIBP11_REPO" "$LIBP11_REF" _src/libp11
+
+            cd _src/libp11
+
+            ./bootstrap
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --list-all | grep -i p11 || true
+          }
+
+          build_jitterentropy_library() {
+            clone_repo_at_ref "$JITTERENTROPY_LIBRARY_REPO" "$JITTERENTROPY_LIBRARY_REF" _src/jitterentropy-library
+
+            cd _src/jitterentropy-library
+
+            make clean || true
+
+            make -j"$(nproc)" \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make install \
+              PREFIX="$DEPS_DIR" \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB"
+
+            cd "$GITHUB_WORKSPACE"
+
+            find "$DEPS_DIR" -name '*jitter*' -o -name '*.pc'
+            pkg-config --list-all | grep -i jitter || true
+          }
+
+          build_all_rng_dependencies() {
+            build_zlib
+            build_openssl
+            build_jansson
+            build_libusb
+            build_librtlsdr
+            build_libxml2
+            build_curl
+            build_libp11
+            build_jitterentropy_library
+
+            echo "Dependency prefix contents:"
+            find "$DEPS_DIR" -maxdepth 4 -type f | sort
+
+            echo "pkg-config modules:"
+            pkg-config --list-all | sort || true
           }
 
           build_haveged() {
@@ -220,16 +512,13 @@ jobs:
 
             ./autogen.sh
 
+            # No --without-* statements here.
+            # Let rng-tools detect the target-built libraries from $DEPS_DIR.
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
               --disable-silent-rules \
-              --without-nistbeacon \
-              --without-qrypt \
-              --without-pkcs11 \
-              --without-libxml2 \
-              --without-rtlsdr \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -368,6 +657,8 @@ jobs:
 
             cd "$GITHUB_WORKSPACE"
           }
+
+          build_all_rng_dependencies
 
           build_haveged
           build_rngd
