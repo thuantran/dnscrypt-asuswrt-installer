@@ -466,9 +466,18 @@ jobs:
               --with-openssl="$DEPS_DIR" \
               --with-zlib="$DEPS_DIR" \
               --without-libpsl \
+              --without-zstd \
+              --without-brotli \
+              --without-nghttp2 \
+              --without-ngtcp2 \
+              --without-nghttp3 \
+              --without-quiche \
+              --without-ca-bundle \
+              --without-ca-path \
               --disable-ldap \
               --disable-ldaps \
               --disable-manual \
+              --disable-ntlm-wb \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -482,6 +491,7 @@ jobs:
             cd "$GITHUB_WORKSPACE"
 
             pkg-config --modversion libcurl
+            pkg-config --cflags --libs libcurl
           }
 
           build_libp11() {
