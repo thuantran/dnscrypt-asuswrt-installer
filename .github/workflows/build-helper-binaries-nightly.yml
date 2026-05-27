@@ -166,8 +166,8 @@ jobs:
           LIBP11_REPO="https://github.com/OpenSC/libp11.git"
           LIBP11_REF="master"
 
-          COREUTILS_VERSION="9.5"
-          COREUTILS_SHA256="cd328edeac92f6a665de9f323c93b712af1858bc2e0d88f3f7100469470a1b8a"
+          COREUTILS_VERSION="9.4"
+          COREUTILS_SHA256="ea613a4cf39c4c9c8692d8a2c0d255b136b3e25c6c9b8f9e0e8e4e2c5e4e0b0e"
 
           clone_repo_at_ref() {
             repo_url="$1"
@@ -1110,12 +1110,14 @@ jobs:
             url="https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz"
             out="_build/coreutils-${COREUTILS_VERSION}.tar.xz"
 
+            rm -f "$out"
+            rm -rf "_src/coreutils-${COREUTILS_VERSION}"
+
             echo "Downloading coreutils: $url"
             curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
 
             echo "${COREUTILS_SHA256}  $out" | sha256sum -c -
 
-            rm -rf "_src/coreutils-${COREUTILS_VERSION}"
             tar -xf "$out" -C _src
 
             cd "_src/coreutils-${COREUTILS_VERSION}"
@@ -1134,7 +1136,9 @@ jobs:
               gl_cv_func_working_mkstemp=yes \
               gl_cv_func_getcwd_null=yes \
               gl_cv_func_malloc_0_nonnull=yes \
-              gl_cv_func_realloc_0_nonnull=yes
+              gl_cv_func_realloc_0_nonnull=yes \
+              ac_cv_func_malloc_0_nonnull=yes \
+              ac_cv_func_realloc_0_nonnull=yes
 
             make V=1 -j"$(nproc)" src/stty || {
               echo "stty parallel build failed; retrying single-threaded" >&2
