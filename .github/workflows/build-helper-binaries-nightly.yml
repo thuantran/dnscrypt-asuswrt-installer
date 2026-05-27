@@ -636,18 +636,45 @@ jobs:
             cp -v libjitterentropy.a "$DEPS_DIR/lib/"
             "$RANLIB" "$DEPS_DIR/lib/libjitterentropy.a" || true
 
-            if [ -f include/jitterentropy.h ]; then
-              cp -v include/jitterentropy.h "$DEPS_DIR/include/"
-            elif [ -f jitterentropy.h ]; then
-              cp -v jitterentropy.h "$DEPS_DIR/include/"
-            elif [ -f src/jitterentropy.h ]; then
-              cp -v src/jitterentropy.h "$DEPS_DIR/include/"
-            else
-              echo "jitterentropy.h not found" >&2
-              find . -name 'jitterentropy.h' -print
+            # Install all public jitterentropy headers needed by jitterentropy.h.
+            for hdr in \
+              jitterentropy.h \
+              jitterentropy-base-user.h \
+              jitterentropy-base.h \
+              jitterentropy-health.h \
+              jitterentropy-noise.h \
+              jitterentropy-timer.h \
+              jitterentropy-gcd.h \
+              jitterentropy-sha3.h \
+              jitterentropy-status.h \
+              jitterentropy-internal.h
+            do
+              found_hdr=""
+
+              for dir in include src .; do
+                if [ -f "$dir/$hdr" ]; then
+                  found_hdr="$dir/$hdr"
+                  break
+                fi
+              done
+
+              if [ -n "$found_hdr" ]; then
+                cp -v "$found_hdr" "$DEPS_DIR/include/"
+              fi
+            done
+
+            if [ ! -f "$DEPS_DIR/include/jitterentropy.h" ]; then
+              echo "jitterentropy.h not installed" >&2
+              find . -name 'jitterentropy*.h' -print
               exit 1
             fi
 
+            if [ ! -f "$DEPS_DIR/include/jitterentropy-base-user.h" ]; then
+              echo "jitterentropy-base-user.h not installed" >&2
+              find . -name 'jitterentropy*.h' -print
+              exit 1
+            fi
+            
             # Try to extract a version from the header; fall back safely.
             JENT_VERSION="$(
               grep -E '#define[[:space:]]+JENT_VERSION' "$DEPS_DIR/include/jitterentropy.h" 2>/dev/null \
