@@ -1009,8 +1009,71 @@ jobs:
 
             ./autogen.sh
 
-            # No --without-* statements here.
+            echo "Checking rng-tools dependency pkg-config modules:"
+            for pc in \
+              libcap \
+              openssl \
+              libcrypto \
+              libcurl \
+              jansson \
+              libxml-2.0 \
+              librtlsdr \
+              rtlsdr \
+              libusb-1.0 \
+              libudev \
+              libp11 \
+              jitterentropy \
+              libjitterentropy
+            do
+              if pkg-config --exists "$pc"; then
+                echo "  found: $pc"
+                pkg-config --cflags "$pc" || true
+                pkg-config --libs --static "$pc" || true
+              else
+                echo "  missing: $pc"
+              fi
+            done
+
+            RNGD_CPPFLAGS="$COMMON_CPPFLAGS"
+            RNGD_LDFLAGS="$COMMON_LDFLAGS"
+
+            RNGD_PKG_CFLAGS="$(
+              pkg-config --cflags \
+                libcap \
+                openssl \
+                libcurl \
+                jansson \
+                libxml-2.0 \
+                librtlsdr \
+                libusb-1.0 \
+                libudev \
+                libp11 \
+                jitterentropy 2>/dev/null || true
+            )"
+
+            RNGD_PKG_LIBS="$(
+              pkg-config --libs --static \
+                libcap \
+                openssl \
+                libcurl \
+                jansson \
+                libxml-2.0 \
+                librtlsdr \
+                libusb-1.0 \
+                libudev \
+                libp11 \
+                jitterentropy 2>/dev/null || true
+            )"
+
+            # Safety net for static transitive dependencies that some .pc files may omit.
+            RNGD_EXTRA_LIBS="-ludev -lcap -lrtlsdr -lusb-1.0 -lp11 -lxml2 -lcurl -ljansson -lssl -lcrypto -ljitterentropy -lz -ldl -pthread -latomic"
+
+            echo "RNGD_PKG_CFLAGS=$RNGD_PKG_CFLAGS"
+            echo "RNGD_PKG_LIBS=$RNGD_PKG_LIBS"
+            echo "RNGD_EXTRA_LIBS=$RNGD_EXTRA_LIBS"
+
             # Let rng-tools detect the target-built libraries from $DEPS_DIR.
+            # No --without-* feature disables here.
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
@@ -1021,18 +1084,19 @@ jobs:
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
               PKG_CONFIG=pkg-config \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CPPFLAGS="$RNGD_CPPFLAGS $RNGD_PKG_CFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$RNGD_LDFLAGS" \
+              LIBS="$RNGD_PKG_LIBS $RNGD_EXTRA_LIBS"
 
-            make -j"$(nproc)" || {
+            make V=1 -j"$(nproc)" || {
               echo "rngd parallel build failed; retrying single-threaded" >&2
               make clean
-              make
+              make V=1
             }
 
             if [ -f rngd ]; then
-              cp rngd "$GITHUB_WORKSPACE/$OUT_DIR/rngd"
+              cp -v rngd "$GITHUB_WORKSPACE/$OUT_DIR/rngd"
             else
               echo "rngd binary not found. Searching..." >&2
               find . -name "rngd" -type f -executable 2>/dev/null || true
@@ -1043,11 +1107,16 @@ jobs:
           }
 
           build_stty() {
-            curl -fsSL "https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz" -o _build/coreutils.tar.xz
+            url="https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz"
+            out="_build/coreutils-${COREUTILS_VERSION}.tar.xz"
 
-            echo "${COREUTILS_SHA256}  _build/coreutils.tar.xz" | sha256sum -c -
+            echo "Downloading coreutils: $url"
+            curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
 
-            tar -xf _build/coreutils.tar.xz -C _src
+            echo "${COREUTILS_SHA256}  $out" | sha256sum -c -
+
+            rm -rf "_src/coreutils-${COREUTILS_VERSION}"
+            tar -xf "$out" -C _src
 
             cd "_src/coreutils-${COREUTILS_VERSION}"
 
@@ -1061,60 +1130,75 @@ jobs:
               STRIP="$STRIP" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$COMMON_LDFLAGS" \
+              gl_cv_func_working_mkstemp=yes \
+              gl_cv_func_getcwd_null=yes \
+              gl_cv_func_malloc_0_nonnull=yes \
+              gl_cv_func_realloc_0_nonnull=yes
 
-            make -j"$(nproc)" src/stty || {
+            make V=1 -j"$(nproc)" src/stty || {
               echo "stty parallel build failed; retrying single-threaded" >&2
-              make src/stty
+              make V=1 src/stty
             }
 
-            cp src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+            if [ ! -f src/stty ]; then
+              echo "stty binary was not created" >&2
+              find . -name 'stty' -type f -print
+              exit 1
+            fi
+
+            cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
 
             cd "$GITHUB_WORKSPACE"
           }
 
           build_nonroot() {
-            cat > _build/nonroot.c <<'EOF'
-          #include <errno.h>
-          #include <grp.h>
-          #include <pwd.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <string.h>
-          #include <sys/types.h>
-          #include <unistd.h>
+            mkdir -p _build "$OUT_DIR"
 
-          int main(int argc, char **argv) {
-            if (argc < 3) {
-              fprintf(stderr, "Usage: %s <username> <program> [args...]\n", argv[0]);
-              return 64;
-            }
-
-            struct passwd *pw = getpwnam(argv[1]);
-            if (!pw) {
-              fprintf(stderr, "nonroot: user '%s' not found\n", argv[1]);
-              return 65;
-            }
-
-            if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {
-              fprintf(stderr, "nonroot: failed to switch to '%s': %s\n", argv[1], strerror(errno));
-              return 66;
-            }
-
-            execvp(argv[2], &argv[2]);
-
-            fprintf(stderr, "nonroot: failed to exec '%s': %s\n", argv[2], strerror(errno));
-            return 67;
-          }
-          EOF
+            {
+              printf '%s\n' '#include <errno.h>'
+              printf '%s\n' '#include <grp.h>'
+              printf '%s\n' '#include <pwd.h>'
+              printf '%s\n' '#include <stdio.h>'
+              printf '%s\n' '#include <stdlib.h>'
+              printf '%s\n' '#include <string.h>'
+              printf '%s\n' '#include <sys/types.h>'
+              printf '%s\n' '#include <unistd.h>'
+              printf '%s\n' ''
+              printf '%s\n' 'int main(int argc, char **argv) {'
+              printf '%s\n' '  if (argc < 3) {'
+              printf '%s\n' '    fprintf(stderr, "Usage: %s <username> <program> [args...]\n", argv[0]);'
+              printf '%s\n' '    return 64;'
+              printf '%s\n' '  }'
+              printf '%s\n' ''
+              printf '%s\n' '  struct passwd *pw = getpwnam(argv[1]);'
+              printf '%s\n' '  if (!pw) {'
+              printf '%s\n' '    fprintf(stderr, "nonroot: user '\''%s'\'' not found\n", argv[1]);'
+              printf '%s\n' '    return 65;'
+              printf '%s\n' '  }'
+              printf '%s\n' ''
+              printf '%s\n' '  if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {'
+              printf '%s\n' '    fprintf(stderr, "nonroot: failed to switch to '\''%s'\'': %s\n", argv[1], strerror(errno));'
+              printf '%s\n' '    return 66;'
+              printf '%s\n' '  }'
+              printf '%s\n' ''
+              printf '%s\n' '  execvp(argv[2], &argv[2]);'
+              printf '%s\n' ''
+              printf '%s\n' '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\n", argv[2], strerror(errno));'
+              printf '%s\n' '  return 67;'
+              printf '%s\n' '}'
+            } > _build/nonroot.c
 
             "$CC" \
               $COMMON_CPPFLAGS \
               $COMMON_CFLAGS \
               _build/nonroot.c \
               $COMMON_LDFLAGS \
-              -s \
               -o "$OUT_DIR/nonroot"
+
+            "$STRIP" "$OUT_DIR/nonroot" || true
+
+            file "$OUT_DIR/nonroot" || true
           }
 
           build_jitterentropy_rngd() {
@@ -1122,30 +1206,45 @@ jobs:
 
             cd _src/jitterentropy-rngd
 
-            make -j"$(nproc)" \
+            JENT_RNGD_CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags jitterentropy 2>/dev/null || true)"
+            JENT_RNGD_LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L jitterentropy 2>/dev/null || true)"
+            JENT_RNGD_LIBS="$(pkg-config --libs jitterentropy 2>/dev/null || printf '%s\n' '-ljitterentropy') -pthread"
+
+            echo "Building jitterentropy-rngd for $HOST"
+            echo "JENT_RNGD_CPPFLAGS=$JENT_RNGD_CPPFLAGS"
+            echo "JENT_RNGD_LDFLAGS=$JENT_RNGD_LDFLAGS"
+            echo "JENT_RNGD_LIBS=$JENT_RNGD_LIBS"
+
+            make V=1 -j"$(nproc)" \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
-              CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS" \
+              CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$JENT_RNGD_LDFLAGS" \
+              LDLIBS="$JENT_RNGD_LIBS" \
+              LIBS="$JENT_RNGD_LIBS" \
+              EXTRA_CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
               EXTRA_CFLAGS="$COMMON_CFLAGS" \
-              EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
-              EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
+              EXTRA_LDFLAGS="$JENT_RNGD_LDFLAGS $JENT_RNGD_LIBS" || {
                 echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
                 make clean || true
-                make \
+                make V=1 \
                   CC="$CC" \
                   AR="$AR" \
                   RANLIB="$RANLIB" \
-                  CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
-                  LDFLAGS="$COMMON_LDFLAGS" \
+                  CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
+                  CFLAGS="$COMMON_CFLAGS" \
+                  LDFLAGS="$JENT_RNGD_LDFLAGS" \
+                  LDLIBS="$JENT_RNGD_LIBS" \
+                  LIBS="$JENT_RNGD_LIBS" \
+                  EXTRA_CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
                   EXTRA_CFLAGS="$COMMON_CFLAGS" \
-                  EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
-                  EXTRA_LDFLAGS="$COMMON_LDFLAGS"
+                  EXTRA_LDFLAGS="$JENT_RNGD_LDFLAGS $JENT_RNGD_LIBS"
               }
 
             if [ -f jitterentropy-rngd ]; then
-              cp jitterentropy-rngd "$GITHUB_WORKSPACE/$OUT_DIR/jitterentropy-rngd"
+              cp -v jitterentropy-rngd "$GITHUB_WORKSPACE/$OUT_DIR/jitterentropy-rngd"
             else
               echo "jitterentropy-rngd binary not found. Searching..." >&2
               find . -name "jitterentropy-rngd" -type f -executable 2>/dev/null || true
