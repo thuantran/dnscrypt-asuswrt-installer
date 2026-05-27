@@ -144,7 +144,7 @@ jobs:
           JITTERENTROPY_REF="b94ef60f888ad442641a25c4599e24296bde4959"
 
           JITTERENTROPY_LIBRARY_REPO="https://github.com/smuellerDD/jitterentropy-library.git"
-          JITTERENTROPY_LIBRARY_REF="master"
+          JITTERENTROPY_LIBRARY_REF="v3.7.0"
 
           EUDEV_REPO="https://github.com/eudev-project/eudev.git"
           EUDEV_REF="v3.2.14"
@@ -587,18 +587,23 @@ jobs:
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
-              CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
+              CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS -Iinclude -Isrc -I." \
               LDFLAGS="$COMMON_LDFLAGS"
 
             make install \
               PREFIX="$DEPS_DIR" \
+              LIBDIR="$DEPS_DIR/lib" \
+              INCDIR="$DEPS_DIR/include" \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB"
 
             cd "$GITHUB_WORKSPACE"
 
+            echo "Installed jitterentropy files:"
             find "$DEPS_DIR" -name '*jitter*' -o -name '*.pc'
+
+            echo "jitterentropy pkg-config:"
             pkg-config --list-all | grep -i jitter || true
           }
 
