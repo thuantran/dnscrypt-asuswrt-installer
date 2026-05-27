@@ -22,6 +22,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
@@ -30,21 +31,26 @@ jobs:
             repo_dir: armv7
             host_triplet: arm-linux-gnueabihf
             cc_prefix: arm-linux-gnueabihf
+            libc_dev: libc6-dev-armhf-cross
+
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
             cc_prefix: aarch64-linux-gnu
+            libc_dev: libc6-dev-arm64-cross
 
     steps:
       - name: Resolve checkout ref
         id: ref
         run: |
           set -eu
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
             checkout_ref="${{ inputs.target_branch }}"
           else
             checkout_ref="${{ github.sha }}"
           fi
+
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
@@ -55,6 +61,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eu
+
           export DEBIAN_FRONTEND=noninteractive
 
           # Keep host-arch-only apt metadata; do not enable foreign architectures here.
@@ -68,38 +75,23 @@ jobs:
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
             libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils
 
-          # Make /usr/local libraries visible to the runtime linker.
-          {
-            echo "/usr/local/lib"
-            echo "/usr/local/lib64"
-          } | sudo tee /etc/ld.so.conf.d/usr-local-libs.conf >/dev/null
-
-          sudo ldconfig
-
-          # Make locally installed libraries/headers visible to later build steps.
-          {
-            echo "CPATH=/usr/local/include"
-            echo "C_INCLUDE_PATH=/usr/local/include"
-            echo "CPLUS_INCLUDE_PATH=/usr/local/include"
-            echo "LIBRARY_PATH=/usr/local/lib:/usr/local/lib64"
-            echo "LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64"
-            echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
-            echo "CPPFLAGS=-I/usr/local/include"
-            echo "CFLAGS=-I/usr/local/include"
-            echo "CXXFLAGS=-I/usr/local/include"
-            echo "LDFLAGS=-L/usr/local/lib -L/usr/local/lib64"
-          } >> "$GITHUB_ENV"
-
-          # Debug checks.
           gcc --version
+          make --version
           pkg-config --version
-          ldconfig -v 2>/dev/null | grep -E '/usr/local/lib|/usr/local/lib64' || true
 
       - name: Install cross toolchain
         run: |
           set -eu
+
           export DEBIAN_FRONTEND=noninteractive
-          sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
+
+          sudo apt-get install -y --no-install-recommends \
+            gcc-${{ matrix.host_triplet }} \
+            binutils-${{ matrix.host_triplet }} \
+            ${{ matrix.libc_dev }}
+
+          ${{ matrix.cc_prefix }}-gcc --version
+          ${{ matrix.cc_prefix }}-ld --version
 
       - name: Build helper binaries from source
         env:
@@ -110,21 +102,31 @@ jobs:
           set -eu
 
           mkdir -p "$OUT_DIR" _src _build
+
           export CC="$CC_PREFIX-gcc"
           export AR="$CC_PREFIX-ar"
           export RANLIB="$CC_PREFIX-ranlib"
           export STRIP="$CC_PREFIX-strip"
+
+          # Cross-build isolation:
+          # Do not let pkg-config see host /usr/local or host /usr/lib pkgconfig files.
+          export PKG_CONFIG_PATH=""
+          export PKG_CONFIG_SYSROOT_DIR="/"
           export PKG_CONFIG_LIBDIR="/usr/lib/${HOST}/pkgconfig:/usr/share/pkgconfig"
-          export COMMON_CFLAGS="-Os -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -D_FORTIFY_SOURCE=2"
+
           export COMMON_CPPFLAGS="-D_GNU_SOURCE"
+          export COMMON_CFLAGS="-Os -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -D_FORTIFY_SOURCE=2"
           export COMMON_LDFLAGS="-Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
+
           RNG_TOOLS_REPO="https://github.com/nhorman/rng-tools.git"
           RNG_TOOLS_REF="bd00c08b0c3c6a880b0988befe97fd35b315468c"
+
           JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
           JITTERENTROPY_REF="b94ef60f888ad442641a25c4599e24296bde4959"
+
           COREUTILS_VERSION="9.5"
           COREUTILS_SHA256="cd80eb5b247f87670353197a8fc3e3f7fb77f607f9f10925a60214790514d31a"
 
@@ -133,73 +135,91 @@ jobs:
             repo_ref="$2"
             destination="$3"
 
+            rm -rf "$destination"
             git clone --depth=1 "$repo_url" "$destination"
+
             cd "$destination"
+
             if ! git fetch --depth=1 origin "$repo_ref" \
               && ! git fetch --depth=1 origin "refs/tags/$repo_ref" \
               && ! git fetch --depth=1 origin "refs/heads/$repo_ref"; then
+
               case "$repo_ref" in
                 v*) fallback_ref="${repo_ref#v}" ;;
                 *) fallback_ref="v$repo_ref" ;;
               esac
+
               if ! git fetch --depth=1 origin "$fallback_ref" \
                 && ! git fetch --depth=1 origin "refs/tags/$fallback_ref" \
                 && ! git fetch --depth=1 origin "refs/heads/$fallback_ref"; then
-                echo "Failed to fetch pinned ref $repo_ref (and fallback $fallback_ref) from $repo_url" >&2
+                echo "Failed to fetch pinned ref $repo_ref from $repo_url" >&2
                 exit 1
               fi
             fi
+
             git checkout --detach FETCH_HEAD
+
             if printf '%s' "$repo_ref" | grep -Eq '^[0-9a-f]{40}$'; then
               if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
                 echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
                 exit 1
               fi
             fi
-            cd "${GITHUB_WORKSPACE}"
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_haveged() {
             clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
+
             cd _src/haveged
+
             autoreconf -fiv
+
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
-              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
-              CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS"
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
             make -j"$(nproc)" || {
               echo "haveged parallel build failed; retrying single-threaded" >&2
               make clean
-              make || {
-                echo "haveged build failed" >&2
-                exit 1
-              }
+              make
             }
 
-            # Check multiple possible binary locations
             if [ -f haveged/.libs/haveged ]; then
               binary_path="haveged/.libs/haveged"
             elif [ -f haveged/haveged ]; then
               binary_path="haveged/haveged"
             elif [ -f src/.libs/haveged ]; then
               binary_path="src/.libs/haveged"
+            elif [ -f src/haveged ]; then
+              binary_path="src/haveged"
             else
-              echo "haveged binary not found. Searching for it..." >&2
+              echo "haveged binary not found. Searching..." >&2
               find . -name "haveged" -type f -executable 2>/dev/null || true
-              echo "haveged build failed: binary not found in expected locations" >&2
               exit 1
             fi
 
-            cp "$binary_path" "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
-            cd "${GITHUB_WORKSPACE}"
+            cp "$binary_path" "$GITHUB_WORKSPACE/$OUT_DIR/haveged"
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_rngd() {
             clone_repo_at_ref "$RNG_TOOLS_REPO" "$RNG_TOOLS_REF" _src/rng-tools
+
             cd _src/rng-tools
+
             ./autogen.sh
+
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
@@ -210,95 +230,143 @@ jobs:
               --without-pkcs11 \
               --without-libxml2 \
               --without-rtlsdr \
-              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
-              CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
-              PKG_CONFIG=pkg-config
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              PKG_CONFIG=pkg-config \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
             make -j"$(nproc)" || {
               echo "rngd parallel build failed; retrying single-threaded" >&2
               make clean
-              make || {
-                echo "rngd build failed" >&2
-                exit 1
-              }
+              make
             }
-            cp rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/rngd"
-            cd "${GITHUB_WORKSPACE}"
+
+            if [ -f rngd ]; then
+              cp rngd "$GITHUB_WORKSPACE/$OUT_DIR/rngd"
+            else
+              echo "rngd binary not found. Searching..." >&2
+              find . -name "rngd" -type f -executable 2>/dev/null || true
+              exit 1
+            fi
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_stty() {
             curl -fsSL "https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz" -o _build/coreutils.tar.xz
+
             echo "${COREUTILS_SHA256}  _build/coreutils.tar.xz" | sha256sum -c -
+
             tar -xf _build/coreutils.tar.xz -C _src
-            coreutils_dir="_src/coreutils-${COREUTILS_VERSION}"
-            cd "$coreutils_dir"
-            ./configure --host="$HOST" --prefix=/usr CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS"
+
+            cd "_src/coreutils-${COREUTILS_VERSION}"
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix=/usr \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
             make -j"$(nproc)" src/stty || {
               echo "stty parallel build failed; retrying single-threaded" >&2
-              make src/stty || {
-                echo "stty build failed" >&2
-                exit 1
-              }
+              make src/stty
             }
-            cp src/stty "${GITHUB_WORKSPACE}/${OUT_DIR}/stty"
-            cd "${GITHUB_WORKSPACE}"
+
+            cp src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_nonroot() {
-            printf '%s\n' \
-              '#include <errno.h>' \
-              '#include <grp.h>' \
-              '#include <pwd.h>' \
-              '#include <stdio.h>' \
-              '#include <stdlib.h>' \
-              '#include <string.h>' \
-              '#include <sys/types.h>' \
-              '#include <unistd.h>' \
-              '' \
-              'int main(int argc, char **argv) {' \
-              '  if (argc < 3) {' \
-              '    fprintf(stderr, "Usage: %s <username> <program> [args...]\\n", argv[0]);' \
-              '    return 64;' \
-              '  }' \
-              '' \
-              '  struct passwd *pw = getpwnam(argv[1]);' \
-              '  if (!pw) {' \
-              '    fprintf(stderr, "nonroot: user '\''%s'\'' not found\\n", argv[1]);' \
-              '    return 65;' \
-              '  }' \
-              '' \
-              '  if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {' \
-              '    fprintf(stderr, "nonroot: failed to switch to '\''%s'\'': %s\\n", argv[1], strerror(errno));' \
-              '    return 66;' \
-              '  }' \
-              '' \
-              '  execvp(argv[2], &argv[2]);' \
-              '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\\n", argv[2], strerror(errno));' \
-              '  return 67;' \
-              '}' > _build/nonroot.c
-            "$CC" $COMMON_CPPFLAGS $COMMON_CFLAGS $COMMON_LDFLAGS -s _build/nonroot.c -o "${OUT_DIR}/nonroot"
+            cat > _build/nonroot.c <<'EOF'
+          #include <errno.h>
+          #include <grp.h>
+          #include <pwd.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <sys/types.h>
+          #include <unistd.h>
+
+          int main(int argc, char **argv) {
+            if (argc < 3) {
+              fprintf(stderr, "Usage: %s <username> <program> [args...]\n", argv[0]);
+              return 64;
+            }
+
+            struct passwd *pw = getpwnam(argv[1]);
+            if (!pw) {
+              fprintf(stderr, "nonroot: user '%s' not found\n", argv[1]);
+              return 65;
+            }
+
+            if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {
+              fprintf(stderr, "nonroot: failed to switch to '%s': %s\n", argv[1], strerror(errno));
+              return 66;
+            }
+
+            execvp(argv[2], &argv[2]);
+
+            fprintf(stderr, "nonroot: failed to exec '%s': %s\n", argv[2], strerror(errno));
+            return 67;
           }
- 
+          EOF
+
+            "$CC" \
+              $COMMON_CPPFLAGS \
+              $COMMON_CFLAGS \
+              _build/nonroot.c \
+              $COMMON_LDFLAGS \
+              -s \
+              -o "$OUT_DIR/nonroot"
+          }
+
           build_jitterentropy_rngd() {
             clone_repo_at_ref "$JITTERENTROPY_REPO" "$JITTERENTROPY_REF" _src/jitterentropy-rngd
+
             cd _src/jitterentropy-rngd
+
             make -j"$(nproc)" \
               CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS" \
               EXTRA_CFLAGS="$COMMON_CFLAGS" \
               EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
               EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
-              echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
-              make clean || true
-              make \
-                CC="$CC" \
-                EXTRA_CFLAGS="$COMMON_CFLAGS" \
-                EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
-                EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
-                echo "jitterentropy-rngd build failed" >&2
-                exit 1
+                echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
+                make clean || true
+                make \
+                  CC="$CC" \
+                  AR="$AR" \
+                  RANLIB="$RANLIB" \
+                  CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS" \
+                  LDFLAGS="$COMMON_LDFLAGS" \
+                  EXTRA_CFLAGS="$COMMON_CFLAGS" \
+                  EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
+                  EXTRA_LDFLAGS="$COMMON_LDFLAGS"
               }
-            }
-            cp jitterentropy-rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/jitterentropy-rngd"
-            cd "${GITHUB_WORKSPACE}"
+
+            if [ -f jitterentropy-rngd ]; then
+              cp jitterentropy-rngd "$GITHUB_WORKSPACE/$OUT_DIR/jitterentropy-rngd"
+            else
+              echo "jitterentropy-rngd binary not found. Searching..." >&2
+              find . -name "jitterentropy-rngd" -type f -executable 2>/dev/null || true
+              exit 1
+            fi
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_haveged
@@ -307,14 +375,32 @@ jobs:
           build_nonroot
           build_jitterentropy_rngd
 
-          chmod 755 "${OUT_DIR}/haveged" "${OUT_DIR}/rngd" "${OUT_DIR}/stty" "${OUT_DIR}/nonroot" "${OUT_DIR}/jitterentropy-rngd"
-          "$STRIP" "${OUT_DIR}/haveged" "${OUT_DIR}/rngd" "${OUT_DIR}/stty" "${OUT_DIR}/nonroot" "${OUT_DIR}/jitterentropy-rngd" || true
+          chmod 755 \
+            "$OUT_DIR/haveged" \
+            "$OUT_DIR/rngd" \
+            "$OUT_DIR/stty" \
+            "$OUT_DIR/nonroot" \
+            "$OUT_DIR/jitterentropy-rngd"
 
-          md5sum "${OUT_DIR}/haveged" | awk '{print $1}' > "${OUT_DIR}/haveged.md5sum"
-          md5sum "${OUT_DIR}/rngd" | awk '{print $1}' > "${OUT_DIR}/rngd.md5sum"
-          md5sum "${OUT_DIR}/stty" | awk '{print $1}' > "${OUT_DIR}/stty.md5sum"
-          md5sum "${OUT_DIR}/nonroot" | awk '{print $1}' > "${OUT_DIR}/nonroot.md5sum"
-          md5sum "${OUT_DIR}/jitterentropy-rngd" | awk '{print $1}' > "${OUT_DIR}/jitterentropy-rngd.md5sum"
+          "$STRIP" \
+            "$OUT_DIR/haveged" \
+            "$OUT_DIR/rngd" \
+            "$OUT_DIR/stty" \
+            "$OUT_DIR/nonroot" \
+            "$OUT_DIR/jitterentropy-rngd" || true
+
+          file \
+            "$OUT_DIR/haveged" \
+            "$OUT_DIR/rngd" \
+            "$OUT_DIR/stty" \
+            "$OUT_DIR/nonroot" \
+            "$OUT_DIR/jitterentropy-rngd"
+
+          md5sum "$OUT_DIR/haveged" | awk '{print $1}' > "$OUT_DIR/haveged.md5sum"
+          md5sum "$OUT_DIR/rngd" | awk '{print $1}' > "$OUT_DIR/rngd.md5sum"
+          md5sum "$OUT_DIR/stty" | awk '{print $1}' > "$OUT_DIR/stty.md5sum"
+          md5sum "$OUT_DIR/nonroot" | awk '{print $1}' > "$OUT_DIR/nonroot.md5sum"
+          md5sum "$OUT_DIR/jitterentropy-rngd" | awk '{print $1}' > "$OUT_DIR/jitterentropy-rngd.md5sum"
 
       - name: Upload helper binaries
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.0
@@ -343,11 +429,13 @@ jobs:
         id: ref
         run: |
           set -eu
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
             checkout_ref="${{ inputs.target_branch }}"
           else
             checkout_ref="${{ github.sha }}"
           fi
+
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
@@ -364,20 +452,40 @@ jobs:
       - name: Stage nightly helper binaries
         run: |
           set -eu
+
           find _helper-artifacts/helper-binaries-nightly-linux-armv7 -type f -exec cp -f {} armv7/ \;
           find _helper-artifacts/helper-binaries-nightly-linux-armv8 -type f -exec cp -f {} armv8/ \;
-          chmod 755 armv7/haveged armv7/rngd armv7/stty armv7/nonroot armv7/jitterentropy-rngd
-          chmod 755 armv8/haveged armv8/rngd armv8/stty armv8/nonroot armv8/jitterentropy-rngd
+
+          chmod 755 \
+            armv7/haveged \
+            armv7/rngd \
+            armv7/stty \
+            armv7/nonroot \
+            armv7/jitterentropy-rngd \
+            armv8/haveged \
+            armv8/rngd \
+            armv8/stty \
+            armv8/nonroot \
+            armv8/jitterentropy-rngd
 
       - name: Commit nightly helper binaries
         run: |
           set -eu
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
-            armv7/haveged armv7/haveged.md5sum armv7/rngd armv7/rngd.md5sum armv7/stty armv7/stty.md5sum armv7/nonroot armv7/nonroot.md5sum armv7/jitterentropy-rngd armv7/jitterentropy-rngd.md5sum \
-            armv8/haveged armv8/haveged.md5sum armv8/rngd armv8/rngd.md5sum armv8/stty armv8/stty.md5sum armv8/nonroot armv8/nonroot.md5sum armv8/jitterentropy-rngd armv8/jitterentropy-rngd.md5sum
+            armv7/haveged armv7/haveged.md5sum \
+            armv7/rngd armv7/rngd.md5sum \
+            armv7/stty armv7/stty.md5sum \
+            armv7/nonroot armv7/nonroot.md5sum \
+            armv7/jitterentropy-rngd armv7/jitterentropy-rngd.md5sum \
+            armv8/haveged armv8/haveged.md5sum \
+            armv8/rngd armv8/rngd.md5sum \
+            armv8/stty armv8/stty.md5sum \
+            armv8/nonroot armv8/nonroot.md5sum \
+            armv8/jitterentropy-rngd armv8/jitterentropy-rngd.md5sum
 
           if git diff --cached --quiet; then
             echo "No helper-binaries-nightly changes to commit."
