@@ -55,8 +55,10 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eu
+          export DEBIAN_FRONTEND=noninteractive
           # Keep host-arch-only apt metadata; do not enable foreign architectures here.
           # Ubuntu Noble runners can return 404s for armhf indexes on security.ubuntu.com.
+          # IMPORTANT: never run `dpkg --add-architecture` in this workflow.
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils
@@ -65,8 +67,7 @@ jobs:
       - name: Install cross toolchain
         run: |
           set -eu
-          sudo dpkg --add-architecture ${{ matrix.deb_arch }}
-          sudo apt-get update
+          export DEBIAN_FRONTEND=noninteractive
           sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
 
       - name: Build helper binaries from source
