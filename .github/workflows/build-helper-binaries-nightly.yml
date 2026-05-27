@@ -1133,12 +1133,41 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS" \
+              ac_cv_header_stdckdint_h=no \
+              gl_cv_header_working_stdckdint_h=no \
               gl_cv_func_working_mkstemp=yes \
               gl_cv_func_getcwd_null=yes \
               gl_cv_func_malloc_0_nonnull=yes \
               gl_cv_func_realloc_0_nonnull=yes \
               ac_cv_func_malloc_0_nonnull=yes \
               ac_cv_func_realloc_0_nonnull=yes
+
+            # Some cross builds of coreutils/gnulib do not generate stdckdint.h
+            # correctly even after configure. Provide a small fallback header.
+            if [ ! -f lib/stdckdint.h ]; then
+              echo "Creating fallback lib/stdckdint.h"
+
+              {
+                printf '%s\n' '#ifndef _GL_STDCKDINT_H'
+                printf '%s\n' '#define _GL_STDCKDINT_H 1'
+                printf '%s\n' ''
+                printf '%s\n' '#if defined(__GNUC__) || defined(__clang__)'
+                printf '%s\n' '# define ckd_add(r, a, b) __builtin_add_overflow((a), (b), (r))'
+                printf '%s\n' '# define ckd_sub(r, a, b) __builtin_sub_overflow((a), (b), (r))'
+                printf '%s\n' '# define ckd_mul(r, a, b) __builtin_mul_overflow((a), (b), (r))'
+                printf '%s\n' '#else'
+                printf '%s\n' '# include <stdint.h>'
+                printf '%s\n' '# define ckd_add(r, a, b) ((*(r) = (a) + (b)), 0)'
+                printf '%s\n' '# define ckd_sub(r, a, b) ((*(r) = (a) - (b)), 0)'
+                printf '%s\n' '# define ckd_mul(r, a, b) ((*(r) = (a) * (b)), 0)'
+                printf '%s\n' '#endif'
+                printf '%s\n' ''
+                printf '%s\n' '#endif'
+              } > lib/stdckdint.h
+            fi
+
+            # Build generated headers first. This avoids the configmake.h follow-on failure.
+            make V=1 lib/configmake.h || true
 
             make V=1 -j"$(nproc)" src/stty || {
               echo "stty parallel build failed; retrying single-threaded" >&2
