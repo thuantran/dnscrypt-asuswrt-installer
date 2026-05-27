@@ -583,28 +583,72 @@ jobs:
 
             make clean || true
 
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig" "$GITHUB_WORKSPACE/_build"
+
+            # jitterentropy intentionally refuses optimized builds.
+            # Do not use COMMON_CFLAGS here because it contains -Os.
             JENT_CFLAGS="-O0 -D_GNU_SOURCE -I$DEPS_DIR/include -Iinclude -Isrc -I. -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
+            JENT_LDFLAGS="-L$DEPS_DIR/lib -L$DEPS_DIR/lib64"
 
-            make -j"$(nproc)" \
-              CC="$CC" \
-              AR="$AR" \
-              RANLIB="$RANLIB" \
-              CFLAGS="$JENT_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS"
+            echo "Building jitterentropy-library for $HOST"
+            echo "CC=$CC"
+            echo "AR=$AR"
+            echo "RANLIB=$RANLIB"
+            echo "CFLAGS=$JENT_CFLAGS"
+            echo "LDFLAGS=$JENT_LDFLAGS"
 
-            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig"
+            # Build the static library if the Makefile exposes that target.
+            # Otherwise fall back to the default build, then manually install
+            # only libjitterentropy.a and the public header.
+            if make -n libjitterentropy.a >/dev/null 2>&1; then
+              make -j"$(nproc)" libjitterentropy.a \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                CFLAGS="$JENT_CFLAGS" \
+                LDFLAGS="$JENT_LDFLAGS"
+            else
+              make -j"$(nproc)" \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                CFLAGS="$JENT_CFLAGS" \
+                LDFLAGS="$JENT_LDFLAGS"
+            fi
+
+            if [ ! -f libjitterentropy.a ]; then
+              echo "libjitterentropy.a was not created. Searching build tree..." >&2
+              find . \( \
+                -name 'libjitterentropy.a' -o \
+                -name 'libjitterentropy.so*' -o \
+                -name 'jitterentropy*.o' \
+              \) -print
+              exit 1
+            fi
 
             cp -v libjitterentropy.a "$DEPS_DIR/lib/"
+            "$RANLIB" "$DEPS_DIR/lib/libjitterentropy.a" || true
 
             if [ -f include/jitterentropy.h ]; then
               cp -v include/jitterentropy.h "$DEPS_DIR/include/"
             elif [ -f jitterentropy.h ]; then
               cp -v jitterentropy.h "$DEPS_DIR/include/"
+            elif [ -f src/jitterentropy.h ]; then
+              cp -v src/jitterentropy.h "$DEPS_DIR/include/"
             else
               echo "jitterentropy.h not found" >&2
               find . -name 'jitterentropy.h' -print
               exit 1
             fi
+
+            # Try to extract a version from the header; fall back safely.
+            JENT_VERSION="$(
+              grep -E '#define[[:space:]]+JENT_VERSION' "$DEPS_DIR/include/jitterentropy.h" 2>/dev/null \
+                | awk '{print $3}' \
+                | tr -d '"' \
+                | head -n1
+            )"
+            JENT_VERSION="${JENT_VERSION:-3.7.0}"
 
             {
               printf '%s\n' "prefix=$DEPS_DIR"
@@ -614,23 +658,33 @@ jobs:
               printf '%s\n' ''
               printf '%s\n' 'Name: jitterentropy'
               printf '%s\n' 'Description: CPU Jitter Random Number Generator library'
-              printf '%s\n' 'Version: 3.7.0'
+              printf '%s\n' "Version: $JENT_VERSION"
               printf '%s\n' 'Libs: -L${libdir} -ljitterentropy'
               printf '%s\n' 'Cflags: -I${includedir}'
             } > "$DEPS_DIR/lib/pkgconfig/jitterentropy.pc"
 
+            cp -v "$DEPS_DIR/lib/pkgconfig/jitterentropy.pc" "$DEPS_DIR/lib/pkgconfig/libjitterentropy.pc"
+
+            echo "Validating jitterentropy-library output:"
+            file "$DEPS_DIR/lib/libjitterentropy.a" || true
+            "$AR" t "$DEPS_DIR/lib/libjitterentropy.a" | head || true
+
             {
-              printf '%s\n' "prefix=$DEPS_DIR"
-              printf '%s\n' 'exec_prefix=${prefix}'
-              printf '%s\n' 'libdir=${prefix}/lib'
-              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' '#include <jitterentropy.h>'
               printf '%s\n' ''
-              printf '%s\n' 'Name: libjitterentropy'
-              printf '%s\n' 'Description: CPU Jitter Random Number Generator library'
-              printf '%s\n' 'Version: 3.7.0'
-              printf '%s\n' 'Libs: -L${libdir} -ljitterentropy'
-              printf '%s\n' 'Cflags: -I${includedir}'
-            } > "$DEPS_DIR/lib/pkgconfig/libjitterentropy.pc"
+              printf '%s\n' 'int main(void) {'
+              printf '%s\n' '  return 0;'
+              printf '%s\n' '}'
+            } > "$GITHUB_WORKSPACE/_build/test-jitterentropy.c"
+
+            "$CC" \
+              -I"$DEPS_DIR/include" \
+              "$GITHUB_WORKSPACE/_build/test-jitterentropy.c" \
+              -L"$DEPS_DIR/lib" \
+              -ljitterentropy \
+              -o "$GITHUB_WORKSPACE/_build/test-jitterentropy"
+
+            file "$GITHUB_WORKSPACE/_build/test-jitterentropy" || true
 
             cd "$GITHUB_WORKSPACE"
 
@@ -647,8 +701,59 @@ jobs:
             pkg-config --cflags libjitterentropy || true
             pkg-config --libs libjitterentropy || true
           }
+
+          build_libcap() {
+            clone_repo_at_ref "$LIBCAP_REPO" "$LIBCAP_REF" _src/libcap
+
+            cd _src/libcap
+
+            make clean || true
+
+            make -j"$(nproc)" \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              BUILD_CC="gcc" \
+              prefix="$DEPS_DIR" \
+              lib="lib" \
+              PAM_CAP=no \
+              RAISE_SETFCAP=no \
+              DYNAMIC=no \
+              GOLANG=no
+
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include/sys" "$DEPS_DIR/lib/pkgconfig"
+
+            cp -v libcap/libcap.a "$DEPS_DIR/lib/"
+            cp -v libcap/include/sys/capability.h "$DEPS_DIR/include/sys/"
+
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: libcap'
+              printf '%s\n' 'Description: POSIX 1003.1e capabilities'
+              printf '%s\n' 'Version: 2.73'
+              printf '%s\n' 'Libs: -L${libdir} -lcap'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/libcap.pc"
+
+            cd "$GITHUB_WORKSPACE"
+
+            echo "Installed libcap files:"
+            find "$DEPS_DIR" \( \
+              -name 'libcap*' -o \
+              -path '*/sys/capability.h' \
+            \) -print
+
+            echo "libcap pkg-config:"
+            pkg-config --cflags libcap
+            pkg-config --libs libcap
+          }
           
           build_all_rng_dependencies() {
+            build_libcap
             build_eudev
             build_zlib
             build_openssl
