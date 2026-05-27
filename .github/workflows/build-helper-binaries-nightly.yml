@@ -501,54 +501,99 @@ jobs:
 
             ./bootstrap
 
-            configure_flags="
-              --build=$(gcc -dumpmachine)
-              --host=$HOST
-              --prefix=$DEPS_DIR
-              --disable-shared
-              --enable-static
-              --disable-doc
-              --disable-api-doc
-              --disable-tests
-              --disable-engine
-              --disable-provider
-            "
+            # Patch libp11 so it builds/installs only the core libp11 library.
+            # Skip OpenSSL engine/provider modules:
+            #   pkcs11.la
+            #   pkcs11prov.la
+            #
+            # Those are shared OpenSSL plugin modules and do not work cleanly
+            # with this static ARM cross-build.
+            if [ -f src/Makefile.am ]; then
+              cp -v src/Makefile.am src/Makefile.am.orig
 
-            ./configure $configure_flags \
+              awk '
+                BEGIN {
+                  skip = 0
+                }
+
+                /^[[:space:]]*enginesdir[[:space:]]*=/ {
+                  next
+                }
+
+                /^[[:space:]]*providersdir[[:space:]]*=/ {
+                  next
+                }
+
+                /^[[:space:]]*engines_LTLIBRARIES[[:space:]]*=/ {
+                  next
+                }
+
+                /^[[:space:]]*providers_LTLIBRARIES[[:space:]]*=/ {
+                  next
+                }
+
+                /^[[:space:]]*pkcs11_la_/ {
+                  next
+                }
+
+                /^[[:space:]]*pkcs11prov_la_/ {
+                  next
+                }
+
+                /^[[:space:]]*lib_LTLIBRARIES[[:space:]]*=/ {
+                  print "lib_LTLIBRARIES = libp11.la"
+                  next
+                }
+
+                {
+                  print
+                }
+              ' src/Makefile.am.orig > src/Makefile.am
+
+              autoreconf -fiv
+            else
+              echo "src/Makefile.am not found; cannot patch libp11 build targets" >&2
+              exit 1
+            fi
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --disable-doc \
+              --disable-api-doc \
+              --disable-tests \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
+              PKG_CONFIG=pkg-config \
+              CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags libcrypto)" \
               CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS" || {
-                echo "libp11 configure failed with provider/engine disables; retrying with basic static flags" >&2
+              LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L libcrypto)" \
+              LIBS="$(pkg-config --libs libcrypto) -ldl -pthread -latomic"
 
-                ./configure \
-                  --build="$(gcc -dumpmachine)" \
-                  --host="$HOST" \
-                  --prefix="$DEPS_DIR" \
-                  --disable-shared \
-                  --enable-static \
-                  CC="$CC" \
-                  AR="$AR" \
-                  RANLIB="$RANLIB" \
-                  CPPFLAGS="$COMMON_CPPFLAGS" \
-                  CFLAGS="$COMMON_CFLAGS" \
-                  LDFLAGS="$COMMON_LDFLAGS"
-              }
+            echo "Confirm patched libp11 make targets:"
+            grep -E '^(lib_LTLIBRARIES|.*pkcs11.*LTLIBRARIES|.*provider.*LTLIBRARIES)' src/Makefile || true
 
-            make -j"$(nproc)" || {
+            make V=1 -j"$(nproc)" || {
               echo "libp11 parallel build failed; retrying single-threaded" >&2
               make clean
-              make
+              make V=1
             }
 
             make install
 
             cd "$GITHUB_WORKSPACE"
 
-            pkg-config --list-all | grep -i p11 || true
-            find "$DEPS_DIR" -name '*p11*' -o -name '*.pc'
+            echo "Installed libp11 files:"
+            find "$DEPS_DIR" -name 'libp11*' -o -name '*p11*.pc'
+
+            echo "libp11 pkg-config:"
+            pkg-config --cflags libp11 || true
+            pkg-config --libs libp11 || true
+            pkg-config --libs --static libp11 || true
           }
 
           build_jitterentropy_library() {
