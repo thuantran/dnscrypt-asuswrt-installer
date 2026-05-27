@@ -176,6 +176,10 @@ jobs:
               --host="$HOST" \
               --prefix=/usr \
               --disable-silent-rules \
+              --without-nistbeacon \
+              --without-qrypt \
+              --without-pkcs11 \
+              --without-libxml2 \
               CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
               CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
               PKG_CONFIG=pkg-config
