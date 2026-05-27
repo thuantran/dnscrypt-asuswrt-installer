@@ -578,10 +578,10 @@ jobs:
           }
 
           build_all_rng_dependencies() {
-            build_libp11
             build_eudev
             build_zlib
             build_openssl
+            build_libp11
             build_jansson
             build_libusb
             build_librtlsdr
