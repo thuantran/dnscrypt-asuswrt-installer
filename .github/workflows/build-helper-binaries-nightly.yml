@@ -61,10 +61,11 @@ jobs:
           # IMPORTANT: never run `dpkg --add-architecture` in this workflow.
           sudo apt-get update
           sudo apt-get install -y \
-            autoconf automake build-essential libtool pkg-config gettext texinfo bison gawk curl xz-utils \
-            ca-certificates git make file \
-            libcurl4-openssl-dev libjansson-dev libxml2-dev libp11-kit-dev
-
+            autoconf automake build-essential ca-certificates curl file git make gcc \
+            libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
+            libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
+            libp11-dev libp11-kit-dev libjitterentropy-dev librtlsdr-dev libseccomp-dev \
+            libsysfs-dev sysfsutils
 
       - name: Install cross toolchain
         run: |
@@ -176,10 +177,6 @@ jobs:
               --host="$HOST" \
               --prefix=/usr \
               --disable-silent-rules \
-              --without-nistbeacon \
-              --without-qrypt \
-              --without-pkcs11 \
-              --without-libxml2 \
               CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
               CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
               PKG_CONFIG=pkg-config
