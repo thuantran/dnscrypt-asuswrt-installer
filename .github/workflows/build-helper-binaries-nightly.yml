@@ -62,22 +62,38 @@ jobs:
           # IMPORTANT: never run `dpkg --add-architecture` in this workflow.
           sudo apt-get update
 
-          sudo apt-get install -y \
-            autoconf automake build-essential ca-certificates curl file git make gcc \
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake build-essential ca-certificates curl file git make gcc g++ \
             libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
             libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils
 
-          # Make locally installed libraries/headers visible to later build steps.
+          # Make /usr/local libraries visible to the runtime linker.
           {
-            echo "CPPFLAGS=-I/usr/local/include"
-            echo "CFLAGS=-I/usr/local/include"
-            echo "LDFLAGS=-L/usr/local/lib -L/usr/local/lib64"
-            echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig"
-            echo "LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64"
-          } >> "$GITHUB_ENV"
+            echo "/usr/local/lib"
+            echo "/usr/local/lib64"
+          } | sudo tee /etc/ld.so.conf.d/usr-local-libs.conf >/dev/null
 
           sudo ldconfig
+
+          # Make locally installed libraries/headers visible to later build steps.
+          {
+            echo "CPATH=/usr/local/include"
+            echo "C_INCLUDE_PATH=/usr/local/include"
+            echo "CPLUS_INCLUDE_PATH=/usr/local/include"
+            echo "LIBRARY_PATH=/usr/local/lib:/usr/local/lib64"
+            echo "LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64"
+            echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+            echo "CPPFLAGS=-I/usr/local/include"
+            echo "CFLAGS=-I/usr/local/include"
+            echo "CXXFLAGS=-I/usr/local/include"
+            echo "LDFLAGS=-L/usr/local/lib -L/usr/local/lib64"
+          } >> "$GITHUB_ENV"
+
+          # Debug checks.
+          gcc --version
+          pkg-config --version
+          ldconfig -v 2>/dev/null | grep -E '/usr/local/lib|/usr/local/lib64' || true
 
       - name: Install cross toolchain
         run: |
