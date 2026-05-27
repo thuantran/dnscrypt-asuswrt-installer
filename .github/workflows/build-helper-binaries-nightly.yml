@@ -146,6 +146,9 @@ jobs:
           JITTERENTROPY_LIBRARY_REPO="https://github.com/smuellerDD/jitterentropy-library.git"
           JITTERENTROPY_LIBRARY_REF="v3.7.0"
 
+          LIBCAP_REPO="https://git.kernel.org/pub/scm/libs/libcap/libcap.git"
+          LIBCAP_REF="libcap-2.78"
+
           EUDEV_REPO="https://github.com/eudev-project/eudev.git"
           EUDEV_REF="v3.2.14"
           ZLIB_VERSION="1.3.2"
