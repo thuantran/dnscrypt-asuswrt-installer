@@ -716,27 +716,26 @@ jobs:
 
             make clean || true
 
-            make -j"$(nproc)" \
+            # Build only static libcap.a. Avoid top-level/shared libcap.so build.
+            make -C libcap -j"$(nproc)" libcap.a \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
-              LD="$CC" \
               OBJCOPY="$OBJCOPY" \
               OBJDUMP="$OBJDUMP" \
               READELF="$READELF" \
               BUILD_CC="gcc" \
-              prefix="$DEPS_DIR" \
-              lib="lib" \
               PAM_CAP=no \
               RAISE_SETFCAP=no \
               DYNAMIC=no \
               GOLANG=no
 
-            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include/sys" "$DEPS_DIR/lib/pkgconfig"
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include/sys" "$DEPS_DIR/include/linux" "$DEPS_DIR/lib/pkgconfig"
 
             if [ -f libcap/libcap.a ]; then
               cp -v libcap/libcap.a "$DEPS_DIR/lib/"
+              "$RANLIB" "$DEPS_DIR/lib/libcap.a" || true
             else
               echo "libcap.a not found" >&2
               find . -name 'libcap.a' -o -name 'capability.h'
@@ -745,13 +744,14 @@ jobs:
 
             if [ -f libcap/include/sys/capability.h ]; then
               cp -v libcap/include/sys/capability.h "$DEPS_DIR/include/sys/"
-            elif [ -f libcap/include/uapi/linux/capability.h ]; then
-              mkdir -p "$DEPS_DIR/include/linux"
-              cp -v libcap/include/uapi/linux/capability.h "$DEPS_DIR/include/linux/"
             else
-              echo "capability headers not found" >&2
-              find . -name 'capability.h'
+              echo "sys/capability.h not found" >&2
+              find . -path '*/sys/capability.h' -o -name 'capability.h'
               exit 1
+            fi
+
+            if [ -f libcap/include/uapi/linux/capability.h ]; then
+              cp -v libcap/include/uapi/linux/capability.h "$DEPS_DIR/include/linux/"
             fi
 
             {
