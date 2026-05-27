@@ -582,12 +582,14 @@ jobs:
             cd _src/jitterentropy-library
 
             make clean || true
+            
+            JENT_CFLAGS="-O0 -D_GNU_SOURCE -I$DEPS_DIR/include -Iinclude -Isrc -I. -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
 
             make -j"$(nproc)" \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
-              CFLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS -Iinclude -Isrc -I." \
+              CFLAGS="$JENT_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS"
 
             make install \
