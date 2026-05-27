@@ -465,6 +465,7 @@ jobs:
               --enable-static \
               --with-openssl="$DEPS_DIR" \
               --with-zlib="$DEPS_DIR" \
+              --without-libpsl \
               --disable-ldap \
               --disable-ldaps \
               --disable-manual \
