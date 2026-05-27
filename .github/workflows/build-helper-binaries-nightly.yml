@@ -500,7 +500,7 @@ jobs:
             cd _src/libp11
 
             ./bootstrap
-
+            export lt_cv_prog_gnu_ld=yes
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
