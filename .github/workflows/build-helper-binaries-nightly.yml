@@ -60,12 +60,13 @@ jobs:
           # Ubuntu Noble runners can return 404s for armhf indexes on security.ubuntu.com.
           # IMPORTANT: never run `dpkg --add-architecture` in this workflow.
           sudo apt-get update
-          sudo apt-get install -y \
+          for DEPENDS in \
             autoconf automake build-essential ca-certificates curl file git make gcc \
             libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
-            libp11-dev libp11-kit-dev libjitterentropy3 libjitterentropy3-dev librtlsdr-dev \
-            libseccomp-dev libsysfs-dev sysfsutils
+            libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils libjitterentropy*-dev*; do
+            sudo apt-get install -y ${DEPENDS} 2>/dev/null
+          done
 
       - name: Install cross toolchain
         run: |
