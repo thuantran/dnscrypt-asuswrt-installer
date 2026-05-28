@@ -1806,28 +1806,6 @@ jobs:
                 } > lib/malloc/dynarray-skeleton.gl.h
               fi
 
-              if [ -f lib/selinux-at.c ]; then
-                 echo "Patching lib/selinux-at.c to no-op SELinux helpers"
-                 cp -v lib/selinux-at.c lib/selinux-at.c.orig || true
-                  {
-                    printf '%s\n' '#include <errno.h>'
-                    printf '%s\n' '#include "selinux-at.h"'
-                  } > lib/selinux-at.c
-              fi
-
-              if [ -f lib/selinux-at.h ]; then
-                echo "Patching lib/selinux-at.h to disable SELinux for this target"
-                cp -v lib/selinux-at.h lib/selinux-at.h.orig || true
-                {
-                  printf '%s\n' '#ifndef SELINUX_AT_H'
-                  printf '%s\n' '#define SELINUX_AT_H 1'
-                  printf '%s\n' '#include <errno.h>'
-                  printf '%s\n' '#define lgetfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#define getfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#endif'
-                } > lib/selinux-at.h
-              fi
-
               # Force a complete fallback speedlist.h if the generated one is missing
               # or if an earlier bad fallback exists.
               if [ ! -f src/speedlist.h ] || ! grep -q 'baud_to_value (speed_t speed)' src/speedlist.h; then
@@ -1957,6 +1935,75 @@ jobs:
                 } > src/speedlist.h
               fi
             }
+
+            patch_coreutils_selinux_stubs() {
+              echo "Patching Coreutils SELinux helpers as disabled stubs"
+
+              if [ -f lib/selinux-at.h ]; then
+                cp -v lib/selinux-at.h lib/selinux-at.h.orig || true
+                {
+                  printf '%s\n' '#ifndef SELINUX_AT_H'
+                  printf '%s\n' '#define SELINUX_AT_H 1'
+                  printf '%s\n' '#include <errno.h>'
+                  printf '%s\n' '#define lgetfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#define getfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#define setfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#endif'
+                } > lib/selinux-at.h
+              fi
+
+              if [ -f lib/selinux-at.c ]; then
+                cp -v lib/selinux-at.c lib/selinux-at.c.orig || true
+                {
+                  printf '%s\n' '#include <errno.h>'
+                  printf '%s\n' '#include "selinux-at.h"'
+                } > lib/selinux-at.c
+              fi
+
+              if [ -f lib/se-context.h ]; then
+                cp -v lib/se-context.h lib/se-context.h.orig || true
+                {
+                  printf '%s\n' '#ifndef SE_CONTEXT_H'
+                  printf '%s\n' '#define SE_CONTEXT_H 1'
+                  printf '%s\n' '#include <errno.h>'
+                  printf '%s\n' 'typedef char *security_context_t;'
+                  printf '%s\n' 'typedef char *context_t;'
+                  printf '%s\n' '#define se_const_context_t char const *'
+                  printf '%s\n' '#define se_context_t char *'
+                  printf '%s\n' '#define se_context_new(s) ((void) (s), errno = ENOTSUP, (se_context_t) 0)'
+                  printf '%s\n' '#define se_context_free(c) ((void) (c))'
+                  printf '%s\n' '#define se_context_user_get(c) ((void) (c), (char const *) 0)'
+                  printf '%s\n' '#define se_context_role_get(c) ((void) (c), (char const *) 0)'
+                  printf '%s\n' '#define se_context_type_get(c) ((void) (c), (char const *) 0)'
+                  printf '%s\n' '#define se_context_range_get(c) ((void) (c), (char const *) 0)'
+                  printf '%s\n' '#define se_context_user_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#define se_context_role_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#define se_context_type_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#define se_context_range_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#endif'
+                } > lib/se-context.h
+              fi
+
+              if [ -f lib/se-context.c ]; then
+                cp -v lib/se-context.c lib/se-context.c.orig || true
+                {
+                  printf '%s\n' '#include <errno.h>'
+                  printf '%s\n' '#include "se-context.h"'
+                } > lib/se-context.c
+              fi
+
+              # Extra guard: remove any direct SELinux includes from helper files if they remain.
+              for f in lib/*selinux*.c lib/*selinux*.h lib/se-*.c lib/se-*.h; do
+                [ -f "$f" ] || continue
+                sed -i \
+                  -e '/#include[[:space:]]*<selinux\/selinux.h>/d' \
+                  -e '/#include[[:space:]]*<selinux\/context.h>/d' \
+                  -e '/#include[[:space:]]*<selinux\/label.h>/d' \
+                  "$f"
+              done
+            }
+            
+            patch_coreutils_selinux_stubs
             
             ensure_coreutils_fallback_headers
             
