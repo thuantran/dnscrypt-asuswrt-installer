@@ -1115,6 +1115,7 @@ jobs:
             srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
             logdir="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}-logs"
             cache_file="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.config.cache"
+            compat_header="$GITHUB_WORKSPACE/_build/coreutils-cross-compat.h"
 
             mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir"
 
@@ -1130,6 +1131,105 @@ jobs:
             tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
 
             cd "$srcdir"
+
+            echo "Creating Coreutils cross-build compatibility header: $compat_header"
+
+            {
+              printf '%s\n' '#ifndef COREUTILS_CROSS_COMPAT_H'
+              printf '%s\n' '#define COREUTILS_CROSS_COMPAT_H 1'
+              printf '%s\n' ''
+              printf '%s\n' '#include <sys/types.h>'
+              printf '%s\n' '#include <sys/stat.h>'
+              printf '%s\n' '#include <stddef.h>'
+              printf '%s\n' '#include <stdint.h>'
+              printf '%s\n' '#include <stdlib.h>'
+              printf '%s\n' '#include <string.h>'
+              printf '%s\n' '#include <strings.h>'
+              printf '%s\n' '#include <ctype.h>'
+              printf '%s\n' '#include <locale.h>'
+              printf '%s\n' '#include <wchar.h>'
+              printf '%s\n' '#include <wctype.h>'
+              printf '%s\n' '#include <uchar.h>'
+              printf '%s\n' ''
+              printf '%s\n' '#ifndef S_IRWXUGO'
+              printf '%s\n' '# define S_IRWXUGO (S_IRWXU | S_IRWXG | S_IRWXO)'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef S_IRUGO'
+              printf '%s\n' '# define S_IRUGO (S_IRUSR | S_IRGRP | S_IROTH)'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef S_IWUGO'
+              printf '%s\n' '# define S_IWUGO (S_IWUSR | S_IWGRP | S_IWOTH)'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef S_IXUGO'
+              printf '%s\n' '# define S_IXUGO (S_IXUSR | S_IXGRP | S_IXOTH)'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef S_TYPEISTMO'
+              printf '%s\n' '# define S_TYPEISTMO(statbuf) 0'
+              printf '%s\n' '#endif'
+              printf '%s\n' ''
+              printf '%s\n' '#ifndef streq'
+              printf '%s\n' '# define streq(a, b) (strcmp ((a), (b)) == 0)'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef memeq'
+              printf '%s\n' '# define memeq(a, b, n) (memcmp ((a), (b), (n)) == 0)'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef unreachable'
+              printf '%s\n' '# define unreachable() abort()'
+              printf '%s\n' '#endif'
+              printf '%s\n' ''
+              printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
+              printf '%s\n' '# define SETLOCALE_NULL_MAX 256'
+              printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef HAVE_SETLOCALE_NULL_R'
+              printf '%s\n' 'static inline int'
+              printf '%s\n' 'coreutils_cross_setlocale_null_r (int category, char *buf, size_t bufsize)'
+              printf '%s\n' '{'
+              printf '%s\n' '  char const *locale = setlocale (category, NULL);'
+              printf '%s\n' '  if (!locale)'
+              printf '%s\n' '    return 1;'
+              printf '%s\n' '  if (strlen (locale) + 1 > bufsize)'
+              printf '%s\n' '    return 1;'
+              printf '%s\n' '  strcpy (buf, locale);'
+              printf '%s\n' '  return 0;'
+              printf '%s\n' '}'
+              printf '%s\n' '# define setlocale_null_r(category, buf, bufsize) coreutils_cross_setlocale_null_r ((category), (buf), (bufsize))'
+              printf '%s\n' '#endif'
+              printf '%s\n' ''
+              printf '%s\n' '#ifndef c32tolower'
+              printf '%s\n' 'static inline wint_t'
+              printf '%s\n' 'coreutils_cross_c32tolower (wint_t wc)'
+              printf '%s\n' '{'
+              printf '%s\n' '  if (0 <= wc && wc <= 127)'
+              printf '%s\n' '    return (wint_t) tolower ((unsigned char) wc);'
+              printf '%s\n' '  return wc;'
+              printf '%s\n' '}'
+              printf '%s\n' '# define c32tolower coreutils_cross_c32tolower'
+              printf '%s\n' '#endif'
+              printf '%s\n' ''
+              printf '%s\n' '#ifndef c32width'
+              printf '%s\n' 'static inline int'
+              printf '%s\n' 'coreutils_cross_c32width (char32_t wc)'
+              printf '%s\n' '{'
+              printf '%s\n' '  if (wc < 32)'
+              printf '%s\n' '    return -1;'
+              printf '%s\n' '  if (wc < 127)'
+              printf '%s\n' '    return 1;'
+              printf '%s\n' '  return 1;'
+              printf '%s\n' '}'
+              printf '%s\n' '# define c32width coreutils_cross_c32width'
+              printf '%s\n' '#endif'
+              printf '%s\n' ''
+              printf '%s\n' '#ifndef c32iscntrl'
+              printf '%s\n' 'static inline int'
+              printf '%s\n' 'coreutils_cross_c32iscntrl (char32_t wc)'
+              printf '%s\n' '{'
+              printf '%s\n' '  return (wc < 32 || wc == 127);'
+              printf '%s\n' '}'
+              printf '%s\n' '# define c32iscntrl coreutils_cross_c32iscntrl'
+              printf '%s\n' '#endif'
+              printf '%s\n' ''
+              printf '%s\n' '#endif'
+            } > "$compat_header"
 
             {
               printf '%s\n' 'ac_cv_func_malloc_0_nonnull=yes'
@@ -1149,6 +1249,8 @@ jobs:
               printf '%s\n' 'gl_cv_func_strerror_0_works=yes'
             } > "$cache_file"
 
+            COREUTILS_CPPFLAGS="$COMMON_CPPFLAGS -include $compat_header"
+
             echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
 
             ./configure \
@@ -1160,208 +1262,10 @@ jobs:
               AR="$AR" \
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
+              CPPFLAGS="$COREUTILS_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS -Wno-error -Wno-implicit-function-declaration" \
               LDFLAGS="$COMMON_LDFLAGS" \
               2>&1 | tee "$logdir/configure.log"
-
-            patch_coreutils_sources() {
-              # Coreutils 9.11 / gnulib cross-build workaround:
-              # lib/mcel.h uses wint_t, which may not be declared unless wchar/wctype
-              # headers are included explicitly in this cross-build path.
-              if [ -f lib/mcel.h ] && ! grep -q 'COREUTILS_CROSS_WINT_T_FIX' lib/mcel.h; then
-                echo "Patching lib/mcel.h for wint_t"
-                tmp_file="lib/mcel.h.tmp"
-
-                {
-                  printf '%s\n' '/* COREUTILS_CROSS_WINT_T_FIX */'
-                  printf '%s\n' '#include <wchar.h>'
-                  printf '%s\n' '#include <wctype.h>'
-                  cat lib/mcel.h
-                } > "$tmp_file"
-
-                mv "$tmp_file" lib/mcel.h
-              fi
-
-              # lib/mbbuf.h uses memmove(), and in this cross-build path the
-              # declaration may not be visible. It may also use unreachable().
-              if [ -f lib/mbbuf.h ] && ! grep -q 'COREUTILS_CROSS_MBBUF_FIX' lib/mbbuf.h; then
-                echo "Patching lib/mbbuf.h for memmove/unreachable"
-                tmp_file="lib/mbbuf.h.tmp"
-
-                {
-                  printf '%s\n' '/* COREUTILS_CROSS_MBBUF_FIX */'
-                  printf '%s\n' '#include <string.h>'
-                  printf '%s\n' '#include <stdlib.h>'
-                  printf '%s\n' '#ifndef unreachable'
-                  printf '%s\n' '# define unreachable() abort()'
-                  printf '%s\n' '#endif'
-                  cat lib/mbbuf.h
-                } > "$tmp_file"
-
-                mv "$tmp_file" lib/mbbuf.h
-              fi
-
-              # lib/same-inode.h may reference S_TYPEISTMO even when the target
-              # libc headers do not provide it. Treat unsupported typed memory
-              # objects as false.
-              if [ -f lib/same-inode.h ] && ! grep -q 'COREUTILS_CROSS_STYPEISTMO_FIX' lib/same-inode.h; then
-                echo "Patching lib/same-inode.h for S_TYPEISTMO"
-                tmp_file="lib/same-inode.h.tmp"
-
-                {
-                  printf '%s\n' '/* COREUTILS_CROSS_STYPEISTMO_FIX */'
-                  printf '%s\n' '#ifndef S_TYPEISTMO'
-                  printf '%s\n' '# define S_TYPEISTMO(statbuf) 0'
-                  printf '%s\n' '#endif'
-                  cat lib/same-inode.h
-                } > "$tmp_file"
-
-                mv "$tmp_file" lib/same-inode.h
-              fi
-
-              # lib/hard-locale.c may fail when gnulib did not expose
-              # SETLOCALE_NULL_MAX, setlocale_null_r(), or streq() correctly
-              # during cross-compilation.
-              if [ -f lib/hard-locale.c ] && ! grep -q 'COREUTILS_CROSS_HARD_LOCALE_FIX' lib/hard-locale.c; then
-                echo "Patching lib/hard-locale.c for setlocale/streq fallbacks"
-                tmp_file="lib/hard-locale.c.tmp"
-
-                {
-                  printf '%s\n' '/* COREUTILS_CROSS_HARD_LOCALE_FIX */'
-                  printf '%s\n' '#include <locale.h>'
-                  printf '%s\n' '#include <string.h>'
-                  printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
-                  printf '%s\n' '# define SETLOCALE_NULL_MAX 256'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef streq'
-                  printf '%s\n' '# define streq(a, b) (strcmp ((a), (b)) == 0)'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef HAVE_SETLOCALE_NULL_R'
-                  printf '%s\n' 'static int'
-                  printf '%s\n' 'coreutils_cross_setlocale_null_r (int category, char *buf, size_t bufsize)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  char const *locale = setlocale (category, NULL);'
-                  printf '%s\n' '  if (!locale)'
-                  printf '%s\n' '    return 1;'
-                  printf '%s\n' '  if (strlen (locale) + 1 > bufsize)'
-                  printf '%s\n' '    return 1;'
-                  printf '%s\n' '  strcpy (buf, locale);'
-                  printf '%s\n' '  return 0;'
-                  printf '%s\n' '}'
-                  printf '%s\n' '# define setlocale_null_r(category, buf, bufsize) coreutils_cross_setlocale_null_r ((category), (buf), (bufsize))'
-                  printf '%s\n' '#endif'
-                  cat lib/hard-locale.c
-                } > "$tmp_file"
-
-                mv "$tmp_file" lib/hard-locale.c
-              fi
-              # Some gnulib files use streq() before the helper macro is visible.
-              for f in lib/streq-opt.h lib/mbs_endswith.c lib/hashcode-named-file.c; do
-                if [ -f "$f" ] && ! grep -q 'COREUTILS_CROSS_STREQ_FIX' "$f"; then
-                  echo "Patching $f for streq"
-
-                  tmp_file="$f.tmp"
-
-                  {
-                    printf '%s\n' '/* COREUTILS_CROSS_STREQ_FIX */'
-                    printf '%s\n' '#include <string.h>'
-                    printf '%s\n' '#ifndef streq'
-                    printf '%s\n' '# define streq(a, b) (strcmp ((a), (b)) == 0)'
-                    printf '%s\n' '#endif'
-                    cat "$f"
-                  } > "$tmp_file"
-
-                  mv "$tmp_file" "$f"
-                fi
-              done
-              # Coreutils 9.11 / gnulib cross-build workaround:
-              # lib/mbscasecmp.c uses c32tolower(), but some cross-config paths
-              # fail to expose the gnulib uchar/c32 helper declarations.
-              if [ -f lib/mbscasecmp.c ] && ! grep -q 'COREUTILS_CROSS_C32TOLOWER_FIX' lib/mbscasecmp.c; then
-                echo "Patching lib/mbscasecmp.c for c32tolower"
-
-                tmp_file="lib/mbscasecmp.c.tmp"
-
-                {
-                  printf '%s\n' '/* COREUTILS_CROSS_C32TOLOWER_FIX */'
-                  printf '%s\n' '#include <config.h>'
-                  printf '%s\n' '#include <ctype.h>'
-                  printf '%s\n' '#include <stddef.h>'
-                  printf '%s\n' '#include <stdint.h>'
-                  printf '%s\n' '#include <wchar.h>'
-                  printf '%s\n' '#include <wctype.h>'
-                  printf '%s\n' '#include <uchar.h>'
-                  printf '%s\n' '#ifndef wint_t'
-                  printf '%s\n' '/* wint_t should come from <wchar.h>; this is only a last-resort cross-build fallback. */'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' ''
-                  printf '%s\n' '#ifndef c32tolower'
-                  printf '%s\n' 'static wint_t'
-                  printf '%s\n' 'coreutils_cross_c32tolower (wint_t wc)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  if (0 <= wc && wc <= 127)'
-                  printf '%s\n' '    return (wint_t) tolower ((unsigned char) wc);'
-                  printf '%s\n' '  return wc;'
-                  printf '%s\n' '}'
-                  printf '%s\n' '# define c32tolower coreutils_cross_c32tolower'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' ''
-                  grep -v '^#include <config.h>' lib/mbscasecmp.c
-                } > "$tmp_file"
-
-                mv "$tmp_file" lib/mbscasecmp.c
-              fi
-              # Coreutils 9.11 / gnulib cross-build workaround:
-              # Some target libc headers do not expose GNU permission-combo macros.
-              # Define them from the standard POSIX mode bits.
-              for f in lib/dirchownmod.c lib/mkdir-p.c lib/same-inode.h; do
-                if [ -f "$f" ] && ! grep -q 'COREUTILS_CROSS_MODE_BITS_FIX' "$f"; then
-                  echo "Patching $f for S_IXUGO/S_IRWXUGO"
-
-                  tmp_file="$f.tmp"
-
-                  {
-                    printf '%s\n' '/* COREUTILS_CROSS_MODE_BITS_FIX */'
-                    printf '%s\n' '#include <sys/stat.h>'
-                    printf '%s\n' '#ifndef S_IRWXUGO'
-                    printf '%s\n' '# define S_IRWXUGO (S_IRWXU | S_IRWXG | S_IRWXO)'
-                    printf '%s\n' '#endif'
-                    printf '%s\n' '#ifndef S_IXUGO'
-                    printf '%s\n' '# define S_IXUGO (S_IXUSR | S_IXGRP | S_IXOTH)'
-                    printf '%s\n' '#endif'
-                    printf '%s\n' '#ifndef S_IRUGO'
-                    printf '%s\n' '# define S_IRUGO (S_IRUSR | S_IRGRP | S_IROTH)'
-                    printf '%s\n' '#endif'
-                    printf '%s\n' '#ifndef S_IWUGO'
-                    printf '%s\n' '# define S_IWUGO (S_IWUSR | S_IWGRP | S_IWOTH)'
-                    printf '%s\n' '#endif'
-                    cat "$f"
-                  } > "$tmp_file"
-
-                  mv "$tmp_file" "$f"
-                fi
-              done
-              # Some gnulib paths use memeq() before its helper macro/prototype is visible.
-              for f in lib/memcoll.c; do
-                if [ -f "$f" ] && ! grep -q 'COREUTILS_CROSS_MEMEQ_FIX' "$f"; then
-                  echo "Patching $f for memeq"
-
-                  tmp_file="$f.tmp"
-
-                  {
-                    printf '%s\n' '/* COREUTILS_CROSS_MEMEQ_FIX */'
-                    printf '%s\n' '#include <string.h>'
-                    printf '%s\n' '#ifndef memeq'
-                    printf '%s\n' '# define memeq(a, b, n) (memcmp ((a), (b), (n)) == 0)'
-                    printf '%s\n' '#endif'
-                    cat "$f"
-                  } > "$tmp_file"
-
-                  mv "$tmp_file" "$f"
-                fi
-              done
-            }
 
             ensure_coreutils_fallback_headers() {
               mkdir -p lib src
@@ -1415,20 +1319,15 @@ jobs:
               fi
             }
 
-            patch_coreutils_sources
-
             make V=1 src/version.h lib/configmake.h lib/stdckdint.h 2>&1 | tee "$logdir/generated-headers.log" || true
-
             ensure_coreutils_fallback_headers
-            patch_coreutils_sources
 
             echo "Building GNU coreutils stty"
 
             if ! make V=1 -j"$(nproc)" src/stty 2>&1 | tee "$logdir/build-parallel.log"; then
-              echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
+              echo "stty parallel build failed; retrying single-threaded with compatibility header" >&2
 
               ensure_coreutils_fallback_headers
-              patch_coreutils_sources
 
               make V=1 -j1 src/stty 2>&1 | tee "$logdir/build-single.log"
             fi
@@ -1437,11 +1336,11 @@ jobs:
               echo "stty binary was not created" >&2
               echo "Coreutils logs are in: $logdir" >&2
 
-              echo "Last 120 lines of parallel build log:" >&2
-              tail -n 120 "$logdir/build-parallel.log" 2>/dev/null || true
+              echo "Last 160 lines of parallel build log:" >&2
+              tail -n 160 "$logdir/build-parallel.log" 2>/dev/null || true
 
-              echo "Last 120 lines of single build log:" >&2
-              tail -n 120 "$logdir/build-single.log" 2>/dev/null || true
+              echo "Last 160 lines of single build log:" >&2
+              tail -n 160 "$logdir/build-single.log" 2>/dev/null || true
 
               find . -name 'stty' -type f -print
               exit 1
