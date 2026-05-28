@@ -1201,6 +1201,61 @@ jobs:
 
                 mv "$tmp_file" lib/mbbuf.h
               fi
+
+              # lib/same-inode.h may reference S_TYPEISTMO even when the target
+              # libc headers do not provide it. Treat unsupported typed memory
+              # objects as false.
+              if [ -f lib/same-inode.h ] && ! grep -q 'COREUTILS_CROSS_STYPEISTMO_FIX' lib/same-inode.h; then
+                echo "Patching lib/same-inode.h for S_TYPEISTMO"
+                tmp_file="lib/same-inode.h.tmp"
+
+                {
+                  printf '%s\n' '/* COREUTILS_CROSS_STYPEISTMO_FIX */'
+                  printf '%s\n' '#ifndef S_TYPEISTMO'
+                  printf '%s\n' '# define S_TYPEISTMO(statbuf) 0'
+                  printf '%s\n' '#endif'
+                  cat lib/same-inode.h
+                } > "$tmp_file"
+
+                mv "$tmp_file" lib/same-inode.h
+              fi
+
+              # lib/hard-locale.c may fail when gnulib did not expose
+              # SETLOCALE_NULL_MAX, setlocale_null_r(), or streq() correctly
+              # during cross-compilation.
+              if [ -f lib/hard-locale.c ] && ! grep -q 'COREUTILS_CROSS_HARD_LOCALE_FIX' lib/hard-locale.c; then
+                echo "Patching lib/hard-locale.c for setlocale/streq fallbacks"
+                tmp_file="lib/hard-locale.c.tmp"
+
+                {
+                  printf '%s\n' '/* COREUTILS_CROSS_HARD_LOCALE_FIX */'
+                  printf '%s\n' '#include <locale.h>'
+                  printf '%s\n' '#include <string.h>'
+                  printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
+                  printf '%s\n' '# define SETLOCALE_NULL_MAX 256'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef streq'
+                  printf '%s\n' '# define streq(a, b) (strcmp ((a), (b)) == 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef HAVE_SETLOCALE_NULL_R'
+                  printf '%s\n' 'static int'
+                  printf '%s\n' 'coreutils_cross_setlocale_null_r (int category, char *buf, size_t bufsize)'
+                  printf '%s\n' '{'
+                  printf '%s\n' '  char const *locale = setlocale (category, NULL);'
+                  printf '%s\n' '  if (!locale)'
+                  printf '%s\n' '    return 1;'
+                  printf '%s\n' '  if (strlen (locale) + 1 > bufsize)'
+                  printf '%s\n' '    return 1;'
+                  printf '%s\n' '  strcpy (buf, locale);'
+                  printf '%s\n' '  return 0;'
+                  printf '%s\n' '}'
+                  printf '%s\n' '# define setlocale_null_r(category, buf, bufsize) coreutils_cross_setlocale_null_r ((category), (buf), (bufsize))'
+                  printf '%s\n' '#endif'
+                  cat lib/hard-locale.c
+                } > "$tmp_file"
+
+                mv "$tmp_file" lib/hard-locale.c
+              fi
             }
 
             ensure_coreutils_fallback_headers() {
