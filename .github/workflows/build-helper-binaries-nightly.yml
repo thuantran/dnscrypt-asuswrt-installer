@@ -1939,8 +1939,9 @@ jobs:
             patch_coreutils_selinux_stubs() {
               echo "Patching Coreutils SELinux helpers as disabled stubs"
 
-              if [ -f lib/selinux-at.h ]; then
-                cp -v lib/selinux-at.h lib/selinux-at.h.orig || true
+              if [ -f lib/selinux-at.c ] || [ -f lib/selinux-at.h ]; then
+                cp -v lib/selinux-at.h lib/selinux-at.h.orig 2>/dev/null || true
+
                 {
                   printf '%s\n' '#ifndef SELINUX_AT_H'
                   printf '%s\n' '#define SELINUX_AT_H 1'
@@ -1953,23 +1954,27 @@ jobs:
               fi
 
               if [ -f lib/selinux-at.c ]; then
-                cp -v lib/selinux-at.c lib/selinux-at.c.orig || true
+                cp -v lib/selinux-at.c lib/selinux-at.c.orig 2>/dev/null || true
+
                 {
                   printf '%s\n' '#include <errno.h>'
                   printf '%s\n' '#include "selinux-at.h"'
                 } > lib/selinux-at.c
               fi
 
-              if [ -f lib/se-context.h ]; then
-                cp -v lib/se-context.h lib/se-context.h.orig || true
+              if [ -f lib/se-context.c ] || [ -f lib/se-context.h ]; then
+                cp -v lib/se-context.h lib/se-context.h.orig 2>/dev/null || true
+
                 {
                   printf '%s\n' '#ifndef SE_CONTEXT_H'
                   printf '%s\n' '#define SE_CONTEXT_H 1'
                   printf '%s\n' '#include <errno.h>'
+                  printf '%s\n' ''
                   printf '%s\n' 'typedef char *security_context_t;'
                   printf '%s\n' 'typedef char *context_t;'
-                  printf '%s\n' '#define se_const_context_t char const *'
-                  printf '%s\n' '#define se_context_t char *'
+                  printf '%s\n' 'typedef char *se_context_t;'
+                  printf '%s\n' 'typedef char const *se_const_context_t;'
+                  printf '%s\n' ''
                   printf '%s\n' '#define se_context_new(s) ((void) (s), errno = ENOTSUP, (se_context_t) 0)'
                   printf '%s\n' '#define se_context_free(c) ((void) (c))'
                   printf '%s\n' '#define se_context_user_get(c) ((void) (c), (char const *) 0)'
@@ -1985,14 +1990,14 @@ jobs:
               fi
 
               if [ -f lib/se-context.c ]; then
-                cp -v lib/se-context.c lib/se-context.c.orig || true
+                cp -v lib/se-context.c lib/se-context.c.orig 2>/dev/null || true
+
                 {
                   printf '%s\n' '#include <errno.h>'
                   printf '%s\n' '#include "se-context.h"'
                 } > lib/se-context.c
               fi
 
-              # Extra guard: remove any direct SELinux includes from helper files if they remain.
               for f in lib/*selinux*.c lib/*selinux*.h lib/se-*.c lib/se-*.h; do
                 [ -f "$f" ] || continue
                 sed -i \
@@ -2001,8 +2006,11 @@ jobs:
                   -e '/#include[[:space:]]*<selinux\/label.h>/d' \
                   "$f"
               done
+
+              echo "SELinux stub files present:"
+              ls -l lib/selinux-at.h lib/selinux-at.c lib/se-context.h lib/se-context.c 2>/dev/null || true
             }
-            
+
             patch_coreutils_selinux_stubs
             
             ensure_coreutils_fallback_headers
