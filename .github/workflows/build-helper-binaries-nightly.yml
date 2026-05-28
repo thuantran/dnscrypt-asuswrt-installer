@@ -1548,12 +1548,31 @@ jobs:
                   printf '%s\n' '#endif'
                 } > lib/unictype.h
               fi
+
+              if [ ! -f lib/unitypes.h ]; then
+                echo "Creating fallback lib/unitypes.h"
+                {
+                  printf '%s\n' '#ifndef UNITYPES_H'
+                  printf '%s\n' '#define UNITYPES_H 1'
+                  printf '%s\n' ''
+                  printf '%s\n' '#include <stdint.h>'
+                  printf '%s\n' '#include <uchar.h>'
+                  printf '%s\n' '#include <wchar.h>'
+                  printf '%s\n' ''
+                  printf '%s\n' '#ifndef _GL_UC_UCS4_T'
+                  printf '%s\n' '#define _GL_UC_UCS4_T 1'
+                  printf '%s\n' 'typedef uint32_t ucs4_t;'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' ''
+                  printf '%s\n' '#endif'
+                } > lib/unitypes.h
+              fi
             }
 
             if ! make V=1 \
               CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
               CFLAGS="$COREUTILS_MAKE_CFLAGS" \
-              src/version.h lib/configmake.h lib/stdckdint.h lib/stdcountof.h lib/obstack.h lib/unictype.h src/speedlist.h \
+              src/version.h lib/configmake.h lib/stdckdint.h lib/stdcountof.h lib/obstack.h lib/unitypes.h lib/unictype.h src/speedlist.h \
               > "$logdir/generated-headers.log" 2>&1
             then
               echo "Generated-header make step failed; continuing with fallback headers." >&2
