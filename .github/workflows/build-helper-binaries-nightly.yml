@@ -1249,12 +1249,10 @@ jobs:
               printf '%s\n' 'gl_cv_func_strerror_0_works=yes'
             } > "$cache_file"
 
-            COREUTILS_CPPFLAGS="$COMMON_CPPFLAGS -include $compat_header"
-
             echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
 
-            echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
-
+            # Configure must use clean compiler flags.
+            # Do not use -include "$compat_header" or -Wno-implicit-function-declaration here.
             if ! ./configure \
               --cache-file="$cache_file" \
               --build="$(gcc -dumpmachine)" \
@@ -1264,8 +1262,8 @@ jobs:
               AR="$AR" \
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
-              CPPFLAGS="$COREUTILS_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS -Wno-error -Wno-implicit-function-declaration" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS" \
               > "$logdir/configure.log" 2>&1
             then
@@ -1288,6 +1286,10 @@ jobs:
 
               exit 1
             fi
+
+            # Make-time compatibility flags only.
+            COREUTILS_MAKE_CPPFLAGS="$COMMON_CPPFLAGS -include $compat_header"
+            COREUTILS_MAKE_CFLAGS="$COMMON_CFLAGS -Wno-error -Wno-implicit-function-declaration"
 
             ensure_coreutils_fallback_headers() {
               mkdir -p lib src
@@ -1341,23 +1343,39 @@ jobs:
               fi
             }
 
-            if ! make V=1 src/version.h lib/configmake.h lib/stdckdint.h > "$logdir/generated-headers.log" 2>&1; then
-              echo "Generated-header make step failed; continuing with fallback headers."
+            if ! make V=1 \
+              CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
+              CFLAGS="$COREUTILS_MAKE_CFLAGS" \
+              src/version.h lib/configmake.h lib/stdckdint.h \
+              > "$logdir/generated-headers.log" 2>&1
+            then
+              echo "Generated-header make step failed; continuing with fallback headers." >&2
               tail -n 120 "$logdir/generated-headers.log" >&2 || true
             fi
+
             ensure_coreutils_fallback_headers
 
             echo "Building GNU coreutils stty"
 
-            if ! make V=1 -j"$(nproc)" src/stty > "$logdir/build-parallel.log" 2>&1; then
+            if ! make V=1 -j"$(nproc)" \
+              CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
+              CFLAGS="$COREUTILS_MAKE_CFLAGS" \
+              src/stty \
+              > "$logdir/build-parallel.log" 2>&1
+            then
               echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
               tail -n 160 "$logdir/build-parallel.log" >&2 || true
 
               ensure_coreutils_fallback_headers
 
-              if ! make V=1 -j1 src/stty > "$logdir/build-single.log" 2>&1; then
+              if ! make V=1 -j1 \
+                CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
+                CFLAGS="$COREUTILS_MAKE_CFLAGS" \
+                src/stty \
+                > "$logdir/build-single.log" 2>&1
+              then
                 echo "stty single-threaded build failed." >&2
-                tail -n 200 "$logdir/build-single.log" >&2 || true
+                tail -n 220 "$logdir/build-single.log" >&2 || true
                 exit 1
               fi
             fi
