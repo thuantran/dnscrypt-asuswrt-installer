@@ -1204,21 +1204,6 @@ jobs:
               printf '%s\n' 'typedef void *timezone_t;'
               printf '%s\n' '#endif'
               printf '%s\n' ''
-              printf '%s\n' '#ifndef __attribute_noreturn__'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define __attribute_noreturn__ __attribute__ ((__noreturn__))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define __attribute_noreturn__'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef _OBSTACK_SIZE_T'
-              printf '%s\n' '# define _OBSTACK_SIZE_T size_t'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef _OBSTACK_CHUNK_SIZE_T'
-              printf '%s\n' '# define _OBSTACK_CHUNK_SIZE_T size_t'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
               printf '%s\n' '#ifndef c32tolower'
               printf '%s\n' 'static inline wint_t'
               printf '%s\n' 'coreutils_cross_c32tolower (wint_t wc)'
@@ -1266,6 +1251,8 @@ jobs:
               printf '%s\n' 'gl_cv_header_working_stdckdint_h=no'
               printf '%s\n' 'ac_cv_header_stdcountof_h=no'
               printf '%s\n' 'gl_cv_header_working_stdcountof_h=no'
+              printf '%s\n' 'ac_cv_header_obstack_h=no'
+              printf '%s\n' 'gl_cv_header_working_obstack_h=no'
               printf '%s\n' 'gl_cv_func_gettimeofday_clobber=no'
               printf '%s\n' 'gl_cv_func_tzset_clobber=no'
               printf '%s\n' 'gl_cv_func_working_utimes=yes'
@@ -1379,16 +1366,88 @@ jobs:
                   printf '%s\n' '#endif'
                 } > lib/configmake.h
               fi
+
+              if [ ! -f src/speedlist.h ]; then
+                echo "Creating fallback src/speedlist.h"
+                {
+                  printf '%s\n' '#ifndef SPEEDLIST_H'
+                  printf '%s\n' '#define SPEEDLIST_H 1'
+                  printf '%s\n' ''
+                  printf '%s\n' 'static struct speed_map const speeds[] ='
+                  printf '%s\n' '{'
+                  printf '%s\n' '#ifdef B0'
+                  printf '%s\n' '  {"0", B0},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B50'
+                  printf '%s\n' '  {"50", B50},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B75'
+                  printf '%s\n' '  {"75", B75},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B110'
+                  printf '%s\n' '  {"110", B110},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B134'
+                  printf '%s\n' '  {"134", B134},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B150'
+                  printf '%s\n' '  {"150", B150},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B200'
+                  printf '%s\n' '  {"200", B200},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B300'
+                  printf '%s\n' '  {"300", B300},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B600'
+                  printf '%s\n' '  {"600", B600},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B1200'
+                  printf '%s\n' '  {"1200", B1200},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B1800'
+                  printf '%s\n' '  {"1800", B1800},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B2400'
+                  printf '%s\n' '  {"2400", B2400},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B4800'
+                  printf '%s\n' '  {"4800", B4800},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B9600'
+                  printf '%s\n' '  {"9600", B9600},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B19200'
+                  printf '%s\n' '  {"19200", B19200},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B38400'
+                  printf '%s\n' '  {"38400", B38400},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B57600'
+                  printf '%s\n' '  {"57600", B57600},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B115200'
+                  printf '%s\n' '  {"115200", B115200},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifdef B230400'
+                  printf '%s\n' '  {"230400", B230400},'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '  {NULL, 0}'
+                  printf '%s\n' '};'
+                  printf '%s\n' ''
+                  printf '%s\n' '#endif'
+                } > src/speedlist.h
+              fi
             }
 
             if ! make V=1 \
               CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
               CFLAGS="$COREUTILS_MAKE_CFLAGS" \
-              src/version.h lib/configmake.h lib/stdckdint.h lib/stdcountof.h \
+              src/version.h lib/configmake.h lib/stdckdint.h lib/stdcountof.h lib/obstack.h src/speedlist.h \
               > "$logdir/generated-headers.log" 2>&1
             then
               echo "Generated-header make step failed; continuing with fallback headers." >&2
-              tail -n 120 "$logdir/generated-headers.log" >&2 || true
+              tail -n 160 "$logdir/generated-headers.log" >&2 || true
             fi
 
             ensure_coreutils_fallback_headers
@@ -1402,7 +1461,7 @@ jobs:
               > "$logdir/build-parallel.log" 2>&1
             then
               echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
-              tail -n 160 "$logdir/build-parallel.log" >&2 || true
+              tail -n 180 "$logdir/build-parallel.log" >&2 || true
 
               ensure_coreutils_fallback_headers
 
@@ -1413,7 +1472,7 @@ jobs:
                 > "$logdir/build-single.log" 2>&1
               then
                 echo "stty single-threaded build failed." >&2
-                tail -n 220 "$logdir/build-single.log" >&2 || true
+                tail -n 240 "$logdir/build-single.log" >&2 || true
                 exit 1
               fi
             fi
@@ -1422,11 +1481,11 @@ jobs:
               echo "stty binary was not created" >&2
               echo "Coreutils logs are in: $logdir" >&2
 
-              echo "Last 160 lines of parallel build log:" >&2
-              tail -n 160 "$logdir/build-parallel.log" 2>/dev/null || true
+              echo "Last 180 lines of parallel build log:" >&2
+              tail -n 180 "$logdir/build-parallel.log" 2>/dev/null || true
 
-              echo "Last 160 lines of single build log:" >&2
-              tail -n 160 "$logdir/build-single.log" 2>/dev/null || true
+              echo "Last 180 lines of single build log:" >&2
+              tail -n 180 "$logdir/build-single.log" 2>/dev/null || true
 
               find . -name 'stty' -type f -print
               exit 1
@@ -1442,7 +1501,7 @@ jobs:
 
             cd "$GITHUB_WORKSPACE"
           }
-
+          
           build_jitterentropy_rngd() {
             clone_repo_at_ref "$JITTERENTROPY_REPO" "$JITTERENTROPY_REF" _src/jitterentropy-rngd
 
