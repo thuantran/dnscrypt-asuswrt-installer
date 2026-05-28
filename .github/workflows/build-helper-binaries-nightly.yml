@@ -1253,7 +1253,9 @@ jobs:
 
             echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
 
-            ./configure \
+            echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
+
+            if ! ./configure \
               --cache-file="$cache_file" \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
@@ -1265,7 +1267,27 @@ jobs:
               CPPFLAGS="$COREUTILS_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS -Wno-error -Wno-implicit-function-declaration" \
               LDFLAGS="$COMMON_LDFLAGS" \
-              2>&1 | tee "$logdir/configure.log"
+              > "$logdir/configure.log" 2>&1
+            then
+              echo "coreutils configure failed. Last 200 lines of configure.log:" >&2
+              tail -n 200 "$logdir/configure.log" >&2 || true
+
+              echo "Last 200 lines of config.log:" >&2
+              tail -n 200 config.log >&2 || true
+
+              exit 1
+            fi
+
+            if [ ! -f Makefile ]; then
+              echo "coreutils configure completed but Makefile was not created." >&2
+              echo "Last 200 lines of configure.log:" >&2
+              tail -n 200 "$logdir/configure.log" >&2 || true
+
+              echo "Last 200 lines of config.log:" >&2
+              tail -n 200 config.log >&2 || true
+
+              exit 1
+            fi
 
             ensure_coreutils_fallback_headers() {
               mkdir -p lib src
@@ -1319,17 +1341,25 @@ jobs:
               fi
             }
 
-            make V=1 src/version.h lib/configmake.h lib/stdckdint.h 2>&1 | tee "$logdir/generated-headers.log" || true
+            if ! make V=1 src/version.h lib/configmake.h lib/stdckdint.h > "$logdir/generated-headers.log" 2>&1; then
+              echo "Generated-header make step failed; continuing with fallback headers."
+              tail -n 120 "$logdir/generated-headers.log" >&2 || true
+            fi
             ensure_coreutils_fallback_headers
 
             echo "Building GNU coreutils stty"
 
-            if ! make V=1 -j"$(nproc)" src/stty 2>&1 | tee "$logdir/build-parallel.log"; then
-              echo "stty parallel build failed; retrying single-threaded with compatibility header" >&2
+            if ! make V=1 -j"$(nproc)" src/stty > "$logdir/build-parallel.log" 2>&1; then
+              echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
+              tail -n 160 "$logdir/build-parallel.log" >&2 || true
 
               ensure_coreutils_fallback_headers
 
-              make V=1 -j1 src/stty 2>&1 | tee "$logdir/build-single.log"
+              if ! make V=1 -j1 src/stty > "$logdir/build-single.log" 2>&1; then
+                echo "stty single-threaded build failed." >&2
+                tail -n 200 "$logdir/build-single.log" >&2 || true
+                exit 1
+              fi
             fi
 
             if [ ! -f src/stty ]; then
