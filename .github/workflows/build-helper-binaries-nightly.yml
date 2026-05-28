@@ -1256,6 +1256,53 @@ jobs:
 
                 mv "$tmp_file" lib/hard-locale.c
               fi
+              # Some gnulib files use streq() before the helper macro is visible.
+              for f in lib/streq-opt.h lib/mbs_endswith.c lib/hashcode-named-file.c; do
+                if [ -f "$f" ] && ! grep -q 'COREUTILS_CROSS_STREQ_FIX' "$f"; then
+                  echo "Patching $f for streq"
+
+                  tmp_file="$f.tmp"
+
+                  {
+                    printf '%s\n' '/* COREUTILS_CROSS_STREQ_FIX */'
+                    printf '%s\n' '#include <string.h>'
+                    printf '%s\n' '#ifndef streq'
+                    printf '%s\n' '# define streq(a, b) (strcmp ((a), (b)) == 0)'
+                    printf '%s\n' '#endif'
+                    cat "$f"
+                  } > "$tmp_file"
+
+                  mv "$tmp_file" "$f"
+                fi
+              done
+              # Coreutils 9.11 / gnulib cross-build workaround:
+              # lib/mbscasecmp.c uses c32tolower(), but some cross-config paths
+              # fail to expose the gnulib uchar/c32 helper declarations.
+              # Provide a conservative ASCII-compatible fallback.
+              if [ -f lib/mbscasecmp.c ] && ! grep -q 'COREUTILS_CROSS_C32TOLOWER_FIX' lib/mbscasecmp.c; then
+                echo "Patching lib/mbscasecmp.c for c32tolower"
+
+                tmp_file="lib/mbscasecmp.c.tmp"
+
+                {
+                  printf '%s\n' '/* COREUTILS_CROSS_C32TOLOWER_FIX */'
+                  printf '%s\n' '#include <ctype.h>'
+                  printf '%s\n' '#include <uchar.h>'
+                  printf '%s\n' '#ifndef c32tolower'
+                  printf '%s\n' 'static wint_t'
+                  printf '%s\n' 'coreutils_cross_c32tolower (wint_t wc)'
+                  printf '%s\n' '{'
+                  printf '%s\n' '  if (0 <= wc && wc <= 127)'
+                  printf '%s\n' '    return (wint_t) tolower ((unsigned char) wc);'
+                  printf '%s\n' '  return wc;'
+                  printf '%s\n' '}'
+                  printf '%s\n' '# define c32tolower coreutils_cross_c32tolower'
+                  printf '%s\n' '#endif'
+                  cat lib/mbscasecmp.c
+                } > "$tmp_file"
+
+                mv "$tmp_file" lib/mbscasecmp.c
+              fi
             }
 
             ensure_coreutils_fallback_headers() {
