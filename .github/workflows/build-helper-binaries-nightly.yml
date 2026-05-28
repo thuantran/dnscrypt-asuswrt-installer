@@ -1196,6 +1196,9 @@ jobs:
               printf '%s\n' '#ifndef stdcountof'
               printf '%s\n' '# define stdcountof(a) (sizeof (a) / sizeof ((a)[0]))'
               printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef countof'
+              printf '%s\n' '# define countof(a) (sizeof (a) / sizeof ((a)[0]))'
+              printf '%s\n' '#endif'
               printf '%s\n' ''
               printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
               printf '%s\n' '# define SETLOCALE_NULL_MAX 256'
@@ -1397,6 +1400,9 @@ jobs:
                   printf '%s\n' '#define _GL_STDCOUNTOF_H 1'
                   printf '%s\n' '#ifndef stdcountof'
                   printf '%s\n' '# define stdcountof(a) (sizeof (a) / sizeof ((a)[0]))'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef countof'
+                  printf '%s\n' '# define countof(a) (sizeof (a) / sizeof ((a)[0]))'
                   printf '%s\n' '#endif'
                   printf '%s\n' '#endif'
                 } > lib/stdcountof.h
@@ -1667,8 +1673,16 @@ jobs:
               tail -n 160 "$logdir/generated-headers.log" >&2 || true
             fi
 
+            # Replace any broken/partial/generated headers with our controlled fallbacks.
             rm -f src/speedlist.h
             rm -f src/version.h
+            rm -f lib/stdcountof.h
+            rm -f lib/stdckdint.h
+            rm -f lib/unitypes.h
+            rm -f lib/unictype.h
+            rm -f lib/uniwidth.h
+            rm -f lib/uniname.h
+
             ensure_coreutils_fallback_headers
 
             echo "Building GNU coreutils stty"
