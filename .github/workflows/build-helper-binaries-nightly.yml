@@ -1503,12 +1503,57 @@ jobs:
                   printf '%s\n' '#endif'
                 } > src/speedlist.h
               fi
+
+              if [ ! -f lib/unictype.h ]; then
+                echo "Creating fallback lib/unictype.h"
+                {
+                  printf '%s\n' '#ifndef UNICTYPE_H'
+                  printf '%s\n' '#define UNICTYPE_H 1'
+                  printf '%s\n' '#include <ctype.h>'
+                  printf '%s\n' '#include <wchar.h>'
+                  printf '%s\n' '#include <uchar.h>'
+                  printf '%s\n' '#ifndef uc_is_alnum'
+                  printf '%s\n' '# define uc_is_alnum(wc) ((0 <= (wc) && (wc) <= 127) ? isalnum ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_alpha'
+                  printf '%s\n' '# define uc_is_alpha(wc) ((0 <= (wc) && (wc) <= 127) ? isalpha ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_blank'
+                  printf '%s\n' '# define uc_is_blank(wc) ((0 <= (wc) && (wc) <= 127) ? isblank ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_digit'
+                  printf '%s\n' '# define uc_is_digit(wc) ((0 <= (wc) && (wc) <= 127) ? isdigit ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_graph'
+                  printf '%s\n' '# define uc_is_graph(wc) ((0 <= (wc) && (wc) <= 127) ? isgraph ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_lower'
+                  printf '%s\n' '# define uc_is_lower(wc) ((0 <= (wc) && (wc) <= 127) ? islower ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_print'
+                  printf '%s\n' '# define uc_is_print(wc) ((0 <= (wc) && (wc) <= 127) ? isprint ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_punct'
+                  printf '%s\n' '# define uc_is_punct(wc) ((0 <= (wc) && (wc) <= 127) ? ispunct ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_space'
+                  printf '%s\n' '# define uc_is_space(wc) ((0 <= (wc) && (wc) <= 127) ? isspace ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_upper'
+                  printf '%s\n' '# define uc_is_upper(wc) ((0 <= (wc) && (wc) <= 127) ? isupper ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#ifndef uc_is_xdigit'
+                  printf '%s\n' '# define uc_is_xdigit(wc) ((0 <= (wc) && (wc) <= 127) ? isxdigit ((unsigned char) (wc)) : 0)'
+                  printf '%s\n' '#endif'
+                  printf '%s\n' '#endif'
+                } > lib/unictype.h
+              fi
             }
 
             if ! make V=1 \
               CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
               CFLAGS="$COREUTILS_MAKE_CFLAGS" \
-              src/version.h lib/configmake.h lib/stdckdint.h lib/stdcountof.h lib/obstack.h src/speedlist.h \
+              src/version.h lib/configmake.h lib/stdckdint.h lib/stdcountof.h lib/obstack.h lib/unictype.h src/speedlist.h \
               > "$logdir/generated-headers.log" 2>&1
             then
               echo "Generated-header make step failed; continuing with fallback headers." >&2
