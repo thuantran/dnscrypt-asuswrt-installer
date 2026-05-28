@@ -1468,6 +1468,19 @@ jobs:
                 } > lib/uniname.h
               fi
 
+              for h in unistr uniconv uninorm unilbrk uniwbrk; do
+                if [ ! -f "lib/${h}.h" ]; then
+                  echo "Creating fallback lib/${h}.h"
+                  {
+                    upper="$(printf '%s' "$h" | tr '[:lower:]' '[:upper:]')"
+                    printf '%s\n' "#ifndef ${upper}_H"
+                    printf '%s\n' "#define ${upper}_H 1"
+                    printf '%s\n' '#include "unitypes.h"'
+                    printf '%s\n' '#endif'
+                  } > "lib/${h}.h"
+                fi
+              done
+
               for h in \
                 c32isalnum c32isalpha c32isblank c32iscntrl c32isdigit c32isgraph \
                 c32islower c32isprint c32ispunct c32isspace c32isupper c32isxdigit \
@@ -1489,6 +1502,19 @@ jobs:
                   } > "lib/${h}.h"
                 fi
               done
+
+              if [ ! -f lib/malloc/scratch_buffer.gl.h ]; then
+                echo "Creating fallback lib/malloc/scratch_buffer.gl.h"
+                mkdir -p lib/malloc
+                {
+                  printf '%s\n' '#ifndef MALLOC_SCRATCH_BUFFER_GL_H'
+                  printf '%s\n' '#define MALLOC_SCRATCH_BUFFER_GL_H 1'
+                  printf '%s\n' '#include <stddef.h>'
+                  printf '%s\n' '#include <stdlib.h>'
+                  printf '%s\n' '#include <string.h>'
+                  printf '%s\n' '#endif'
+                } > lib/malloc/scratch_buffer.gl.h
+              fi
 
               # Force a complete fallback speedlist.h if the generated one is missing
               # or if an earlier bad fallback exists.
@@ -1631,10 +1657,16 @@ jobs:
               lib/stdcountof.h \
               lib/obstack.h \
               lib/unitypes.h \
-              lib/unicase.h \
               lib/unictype.h \
+              lib/unicase.h \
               lib/uniwidth.h \
               lib/uniname.h \
+              lib/unistr.h \
+              lib/uniconv.h \
+              lib/uninorm.h \
+              lib/unilbrk.h \
+              lib/uniwbrk.h \
+              lib/malloc/scratch_buffer.gl.h \
               src/speedlist.h \
               > "$logdir/generated-headers.log" 2>&1
             then
@@ -1652,6 +1684,12 @@ jobs:
             rm -f lib/unicase.h
             rm -f lib/uniwidth.h
             rm -f lib/uniname.h
+            rm -f lib/unistr.h
+            rm -f lib/uniconv.h
+            rm -f lib/uninorm.h
+            rm -f lib/unilbrk.h
+            rm -f lib/uniwbrk.h
+            rm -f lib/malloc/scratch_buffer.gl.h
             rm -f lib/c32isalnum.h
             rm -f lib/c32isalpha.h
             rm -f lib/c32isblank.h
