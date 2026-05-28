@@ -1282,24 +1282,6 @@ jobs:
               printf '%s\n' '# define countof(a) (sizeof (a) / sizeof ((a)[0]))'
               printf '%s\n' '#endif'
               printf '%s\n' ''
-              printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
-              printf '%s\n' '# define SETLOCALE_NULL_MAX 256'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef HAVE_SETLOCALE_NULL_R'
-              printf '%s\n' 'static inline int'
-              printf '%s\n' 'coreutils_cross_setlocale_null_r (int category, char *buf, size_t bufsize)'
-              printf '%s\n' '{'
-              printf '%s\n' '  char const *locale = setlocale (category, NULL);'
-              printf '%s\n' '  if (!locale)'
-              printf '%s\n' '    return 1;'
-              printf '%s\n' '  if (strlen (locale) + 1 > bufsize)'
-              printf '%s\n' '    return 1;'
-              printf '%s\n' '  strcpy (buf, locale);'
-              printf '%s\n' '  return 0;'
-              printf '%s\n' '}'
-              printf '%s\n' '# define setlocale_null_r(category, buf, bufsize) coreutils_cross_setlocale_null_r ((category), (buf), (bufsize))'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
               printf '%s\n' '#ifndef timezone_t'
               printf '%s\n' 'typedef void *timezone_t;'
               printf '%s\n' '#endif'
@@ -2022,6 +2004,7 @@ jobs:
               lib/obstack.h \
               lib/fts_.h \
               lib/idx.h \
+              lib/setlocale_null.h \
               lib/unitypes.h \
               lib/unictype.h \
               lib/unicase.h \
