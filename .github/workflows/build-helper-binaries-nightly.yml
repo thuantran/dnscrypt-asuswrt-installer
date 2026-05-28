@@ -1312,6 +1312,55 @@ jobs:
 
                 mv "$tmp_file" lib/mbscasecmp.c
               fi
+              # Coreutils 9.11 / gnulib cross-build workaround:
+              # Some target libc headers do not expose GNU permission-combo macros.
+              # Define them from the standard POSIX mode bits.
+              for f in lib/dirchownmod.c lib/mkdir-p.c lib/same-inode.h; do
+                if [ -f "$f" ] && ! grep -q 'COREUTILS_CROSS_MODE_BITS_FIX' "$f"; then
+                  echo "Patching $f for S_IXUGO/S_IRWXUGO"
+
+                  tmp_file="$f.tmp"
+
+                  {
+                    printf '%s\n' '/* COREUTILS_CROSS_MODE_BITS_FIX */'
+                    printf '%s\n' '#include <sys/stat.h>'
+                    printf '%s\n' '#ifndef S_IRWXUGO'
+                    printf '%s\n' '# define S_IRWXUGO (S_IRWXU | S_IRWXG | S_IRWXO)'
+                    printf '%s\n' '#endif'
+                    printf '%s\n' '#ifndef S_IXUGO'
+                    printf '%s\n' '# define S_IXUGO (S_IXUSR | S_IXGRP | S_IXOTH)'
+                    printf '%s\n' '#endif'
+                    printf '%s\n' '#ifndef S_IRUGO'
+                    printf '%s\n' '# define S_IRUGO (S_IRUSR | S_IRGRP | S_IROTH)'
+                    printf '%s\n' '#endif'
+                    printf '%s\n' '#ifndef S_IWUGO'
+                    printf '%s\n' '# define S_IWUGO (S_IWUSR | S_IWGRP | S_IWOTH)'
+                    printf '%s\n' '#endif'
+                    cat "$f"
+                  } > "$tmp_file"
+
+                  mv "$tmp_file" "$f"
+                fi
+              done
+              # Some gnulib paths use memeq() before its helper macro/prototype is visible.
+              for f in lib/memcoll.c; do
+                if [ -f "$f" ] && ! grep -q 'COREUTILS_CROSS_MEMEQ_FIX' "$f"; then
+                  echo "Patching $f for memeq"
+
+                  tmp_file="$f.tmp"
+
+                  {
+                    printf '%s\n' '/* COREUTILS_CROSS_MEMEQ_FIX */'
+                    printf '%s\n' '#include <string.h>'
+                    printf '%s\n' '#ifndef memeq'
+                    printf '%s\n' '# define memeq(a, b, n) (memcmp ((a), (b), (n)) == 0)'
+                    printf '%s\n' '#endif'
+                    cat "$f"
+                  } > "$tmp_file"
+
+                  mv "$tmp_file" "$f"
+                fi
+              done
             }
 
             ensure_coreutils_fallback_headers() {
