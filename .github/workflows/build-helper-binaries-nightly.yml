@@ -1281,6 +1281,9 @@ jobs:
               printf '%s\n' '#ifndef countof'
               printf '%s\n' '# define countof(a) (sizeof (a) / sizeof ((a)[0]))'
               printf '%s\n' '#endif'
+              printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
+              printf '%s\n' '# define SETLOCALE_NULL_MAX 257'
+              printf '%s\n' '#endif'
               printf '%s\n' ''
               printf '%s\n' '#ifndef timezone_t'
               printf '%s\n' 'typedef void *timezone_t;'
@@ -1934,10 +1937,10 @@ jobs:
               lib/configmake.h \
               lib/stdckdint.h \
               lib/stdcountof.h \
+              lib/setlocale_null.h \
               lib/obstack.h \
               lib/fts_.h \
               lib/idx.h \
-              lib/setlocale_null.h \
               lib/unitypes.h \
               lib/unictype.h \
               lib/unicase.h \
