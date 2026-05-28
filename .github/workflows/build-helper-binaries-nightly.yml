@@ -1414,6 +1414,38 @@ jobs:
                 } > lib/unictype.h
               fi
 
+               if [ ! -f lib/unicase.h ]; then
+                echo "Creating fallback lib/unicase.h"
+                {
+                  printf '%s\n' '#ifndef UNICASE_H'
+                  printf '%s\n' '#define UNICASE_H 1'
+                  printf '%s\n' '#include <ctype.h>'
+                  printf '%s\n' '#include <wchar.h>'
+                  printf '%s\n' '#include <uchar.h>'
+                  printf '%s\n' '#include "unitypes.h"'
+                  printf '%s\n' ''
+                  printf '%s\n' 'static inline ucs4_t'
+                  printf '%s\n' 'uc_tolower (ucs4_t uc)'
+                  printf '%s\n' '{'
+                  printf '%s\n' '  return (uc <= 127) ? (ucs4_t) tolower ((unsigned char) uc) : uc;'
+                  printf '%s\n' '}'
+                  printf '%s\n' ''
+                  printf '%s\n' 'static inline ucs4_t'
+                  printf '%s\n' 'uc_toupper (ucs4_t uc)'
+                  printf '%s\n' '{'
+                  printf '%s\n' '  return (uc <= 127) ? (ucs4_t) toupper ((unsigned char) uc) : uc;'
+                  printf '%s\n' '}'
+                  printf '%s\n' ''
+                  printf '%s\n' 'static inline ucs4_t'
+                  printf '%s\n' 'uc_totitle (ucs4_t uc)'
+                  printf '%s\n' '{'
+                  printf '%s\n' '  return uc_toupper (uc);'
+                  printf '%s\n' '}'
+                  printf '%s\n' ''
+                  printf '%s\n' '#endif'
+                } > lib/unicase.h
+              fi   
+
               if [ ! -f lib/uniwidth.h ]; then
                 echo "Creating fallback lib/uniwidth.h"
                 {
@@ -1599,6 +1631,7 @@ jobs:
               lib/stdcountof.h \
               lib/obstack.h \
               lib/unitypes.h \
+              lib/unicase.h \
               lib/unictype.h \
               lib/uniwidth.h \
               lib/uniname.h \
@@ -1616,6 +1649,7 @@ jobs:
             rm -f lib/stdckdint.h
             rm -f lib/unitypes.h
             rm -f lib/unictype.h
+            rm -f lib/unicase.h
             rm -f lib/uniwidth.h
             rm -f lib/uniname.h
             rm -f lib/c32isalnum.h
