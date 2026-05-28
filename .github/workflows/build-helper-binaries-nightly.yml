@@ -1407,7 +1407,7 @@ jobs:
                 {
                   printf '%s\n' '#ifndef COREUTILS_VERSION_H'
                   printf '%s\n' '#define COREUTILS_VERSION_H 1'
-                  printf '%s\n' "static char const Version[] = \"${COREUTILS_VERSION}\";"
+                  printf '%s\n' 'extern char const *Version;'
                   printf '%s\n' '#endif'
                 } > src/version.h
               fi
@@ -1518,7 +1518,7 @@ jobs:
 
               # Force a complete fallback speedlist.h if the generated one is missing
               # or if an earlier bad fallback exists.
-              if [ ! -f src/speedlist.h ] || ! grep -q 'coreutils_cross_baud_to_value' src/speedlist.h; then
+              if [ ! -f src/speedlist.h ] || ! grep -q 'baud_to_value (speed_t speed)' src/speedlist.h; then
                 echo "Creating fallback src/speedlist.h"
                 {
                   printf '%s\n' '#ifndef SPEEDLIST_H'
@@ -1633,17 +1633,13 @@ jobs:
                   printf '%s\n' '};'
                   printf '%s\n' ''
                   printf '%s\n' 'static unsigned long int'
-                  printf '%s\n' 'coreutils_cross_baud_to_value (speed_t speed)'
+                  printf '%s\n' 'baud_to_value (speed_t speed)'
                   printf '%s\n' '{'
                   printf '%s\n' '  for (size_t i = 0; speeds[i].string != NULL; i++)'
                   printf '%s\n' '    if (speeds[i].speed == speed)'
                   printf '%s\n' '      return speeds[i].value;'
                   printf '%s\n' '  return (unsigned long int) speed;'
                   printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' '#ifndef baud_to_value'
-                  printf '%s\n' '# define baud_to_value coreutils_cross_baud_to_value'
-                  printf '%s\n' '#endif'
                   printf '%s\n' ''
                   printf '%s\n' '#endif'
                 } > src/speedlist.h
@@ -1671,6 +1667,8 @@ jobs:
               tail -n 160 "$logdir/generated-headers.log" >&2 || true
             fi
 
+            rm -f src/speedlist.h
+            rm -f src/version.h
             ensure_coreutils_fallback_headers
 
             echo "Building GNU coreutils stty"
