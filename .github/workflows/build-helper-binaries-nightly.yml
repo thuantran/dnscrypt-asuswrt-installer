@@ -1333,8 +1333,16 @@ jobs:
               printf '%s\n' 'gl_cv_func_strerror_0_works=yes'
               printf '%s\n' 'ac_cv_header_selinux_selinux_h=no'
               printf '%s\n' 'ac_cv_header_selinux_context_h=no'
+              printf '%s\n' 'ac_cv_header_selinux_label_h=no'
               printf '%s\n' 'ac_cv_lib_selinux_getfilecon=no'
+              printf '%s\n' 'ac_cv_lib_selinux_lgetfilecon=no'
+              printf '%s\n' 'ac_cv_lib_selinux_fgetfilecon=no'
               printf '%s\n' 'ac_cv_search_getfilecon=no'
+              printf '%s\n' 'ac_cv_search_lgetfilecon=no'
+              printf '%s\n' 'ac_cv_search_fgetfilecon=no'
+              printf '%s\n' 'gl_cv_header_selinux_selinux_h=no'
+              printf '%s\n' 'gl_cv_lib_selinux=no'
+              printf '%s\n' 'with_selinux=no'
             } > "$cache_file"
 
             echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
@@ -1796,6 +1804,28 @@ jobs:
                   printf '%s\n' '#define MALLOC_DYNARRAY_SKELETON_GL_H 1'
                   printf '%s\n' '#endif'
                 } > lib/malloc/dynarray-skeleton.gl.h
+              fi
+
+              if [ -f lib/selinux-at.c ]; then
+                 echo "Patching lib/selinux-at.c to no-op SELinux helpers"
+                 cp -v lib/selinux-at.c lib/selinux-at.c.orig || true
+                  {
+                    printf '%s\n' '#include <errno.h>'
+                    printf '%s\n' '#include "selinux-at.h"'
+                  } > lib/selinux-at.c
+              fi
+
+              if [ -f lib/selinux-at.h ]; then
+                echo "Patching lib/selinux-at.h to disable SELinux for this target"
+                cp -v lib/selinux-at.h lib/selinux-at.h.orig || true
+                {
+                  printf '%s\n' '#ifndef SELINUX_AT_H'
+                  printf '%s\n' '#define SELINUX_AT_H 1'
+                  printf '%s\n' '#include <errno.h>'
+                  printf '%s\n' '#define lgetfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#define getfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
+                  printf '%s\n' '#endif'
+                } > lib/selinux-at.h
               fi
 
               # Force a complete fallback speedlist.h if the generated one is missing
