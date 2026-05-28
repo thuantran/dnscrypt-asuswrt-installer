@@ -1255,51 +1255,6 @@ jobs:
               printf '%s\n' '# define c32iscntrl coreutils_cross_c32iscntrl'
               printf '%s\n' '#endif'
               printf '%s\n' ''
-              printf '%s\n' '#ifndef c32isalnum'
-              printf '%s\n' 'static inline int coreutils_cross_c32isalnum (wint_t wc) { return (0 <= wc && wc <= 127) ? isalnum ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isalnum coreutils_cross_c32isalnum'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isalpha'
-              printf '%s\n' 'static inline int coreutils_cross_c32isalpha (wint_t wc) { return (0 <= wc && wc <= 127) ? isalpha ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isalpha coreutils_cross_c32isalpha'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isblank'
-              printf '%s\n' 'static inline int coreutils_cross_c32isblank (wint_t wc) { return (0 <= wc && wc <= 127) ? isblank ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isblank coreutils_cross_c32isblank'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isdigit'
-              printf '%s\n' 'static inline int coreutils_cross_c32isdigit (wint_t wc) { return (0 <= wc && wc <= 127) ? isdigit ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isdigit coreutils_cross_c32isdigit'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isgraph'
-              printf '%s\n' 'static inline int coreutils_cross_c32isgraph (wint_t wc) { return (0 <= wc && wc <= 127) ? isgraph ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isgraph coreutils_cross_c32isgraph'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32islower'
-              printf '%s\n' 'static inline int coreutils_cross_c32islower (wint_t wc) { return (0 <= wc && wc <= 127) ? islower ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32islower coreutils_cross_c32islower'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isprint'
-              printf '%s\n' 'static inline int coreutils_cross_c32isprint (wint_t wc) { return (0 <= wc && wc <= 127) ? isprint ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isprint coreutils_cross_c32isprint'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32ispunct'
-              printf '%s\n' 'static inline int coreutils_cross_c32ispunct (wint_t wc) { return (0 <= wc && wc <= 127) ? ispunct ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32ispunct coreutils_cross_c32ispunct'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isspace'
-              printf '%s\n' 'static inline int coreutils_cross_c32isspace (wint_t wc) { return (0 <= wc && wc <= 127) ? isspace ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isspace coreutils_cross_c32isspace'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isupper'
-              printf '%s\n' 'static inline int coreutils_cross_c32isupper (wint_t wc) { return (0 <= wc && wc <= 127) ? isupper ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isupper coreutils_cross_c32isupper'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef c32isxdigit'
-              printf '%s\n' 'static inline int coreutils_cross_c32isxdigit (wint_t wc) { return (0 <= wc && wc <= 127) ? isxdigit ((unsigned char) wc) : 0; }'
-              printf '%s\n' '# define c32isxdigit coreutils_cross_c32isxdigit'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
               printf '%s\n' '#ifndef COREUTILS_CROSS_C32_TYPE_TEST_T'
               printf '%s\n' '#define COREUTILS_CROSS_C32_TYPE_TEST_T 1'
               printf '%s\n' 'typedef int (*c32_type_test_t) (wint_t);'
@@ -1733,6 +1688,66 @@ jobs:
             file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
 
             cd "$GITHUB_WORKSPACE"
+          }
+
+          build_nonroot() {
+            mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/$OUT_DIR"
+
+            src="$GITHUB_WORKSPACE/_build/nonroot.c"
+            out="$GITHUB_WORKSPACE/$OUT_DIR/nonroot"
+
+            printf '%s\n' \
+              '#include <errno.h>' \
+              '#include <grp.h>' \
+              '#include <pwd.h>' \
+              '#include <stdio.h>' \
+              '#include <stdlib.h>' \
+              '#include <string.h>' \
+              '#include <sys/types.h>' \
+              '#include <unistd.h>' \
+              '' \
+              'int main(int argc, char **argv) {' \
+              '  if (argc < 3) {' \
+              '    fprintf(stderr, "Usage: %s <username> <program> [args...]\\n", argv[0]);' \
+              '    return 64;' \
+              '  }' \
+              '' \
+              '  struct passwd *pw = getpwnam(argv[1]);' \
+              '  if (!pw) {' \
+              '    fprintf(stderr, "nonroot: user '\''%s'\'' not found\\n", argv[1]);' \
+              '    return 65;' \
+              '  }' \
+              '' \
+              '  if (initgroups(argv[1], pw->pw_gid) != 0) {' \
+              '    fprintf(stderr, "nonroot: failed to initialize groups for '\''%s'\'': %s\\n", argv[1], strerror(errno));' \
+              '    return 66;' \
+              '  }' \
+              '' \
+              '  if (setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {' \
+              '    fprintf(stderr, "nonroot: failed to switch to '\''%s'\'': %s\\n", argv[1], strerror(errno));' \
+              '    return 66;' \
+              '  }' \
+              '' \
+              '  execvp(argv[2], &argv[2]);' \
+              '' \
+              '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\\n", argv[2], strerror(errno));' \
+              '  return 67;' \
+              '}' > "$src"
+
+            echo "Building nonroot for $HOST"
+
+            "$CC" \
+              ${COMMON_CPPFLAGS:-} \
+              ${COMMON_CFLAGS:-} \
+              "$src" \
+              ${COMMON_LDFLAGS:-} \
+              -o "$out"
+
+            "$STRIP" "$out" 2>/dev/null || true
+
+            chmod 0755 "$out"
+
+            file "$out" || true
           }
           
           build_jitterentropy_rngd() {
