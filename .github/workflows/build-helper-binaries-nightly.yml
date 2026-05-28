@@ -1222,42 +1222,23 @@ jobs:
               printf '%s\n' 'typedef void *timezone_t;'
               printf '%s\n' '#endif'
               printf '%s\n' ''
-              printf '%s\n' '#ifndef c32tolower'
-              printf '%s\n' 'static inline wint_t'
-              printf '%s\n' 'coreutils_cross_c32tolower (wint_t wc)'
-              printf '%s\n' '{'
-              printf '%s\n' '  if (0 <= wc && wc <= 127)'
-              printf '%s\n' '    return (wint_t) tolower ((unsigned char) wc);'
-              printf '%s\n' '  return wc;'
-              printf '%s\n' '}'
-              printf '%s\n' '# define c32tolower coreutils_cross_c32tolower'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef c32width'
-              printf '%s\n' 'static inline int'
-              printf '%s\n' 'coreutils_cross_c32width (char32_t wc)'
-              printf '%s\n' '{'
-              printf '%s\n' '  if (wc < 32)'
-              printf '%s\n' '    return -1;'
-              printf '%s\n' '  if (wc < 127)'
-              printf '%s\n' '    return 1;'
-              printf '%s\n' '  return 1;'
-              printf '%s\n' '}'
-              printf '%s\n' '# define c32width coreutils_cross_c32width'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef c32iscntrl'
-              printf '%s\n' 'static inline int'
-              printf '%s\n' 'coreutils_cross_c32iscntrl (wint_t wc)'
-              printf '%s\n' '{'
-              printf '%s\n' '  return (wc < 32 || wc == 127);'
-              printf '%s\n' '}'
-              printf '%s\n' '# define c32iscntrl coreutils_cross_c32iscntrl'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef COREUTILS_CROSS_C32_TYPE_TEST_T'
-              printf '%s\n' '#define COREUTILS_CROSS_C32_TYPE_TEST_T 1'
+              printf '%s\n' '#ifndef COREUTILS_CROSS_C32_PROTO_FIX'
+              printf '%s\n' '#define COREUTILS_CROSS_C32_PROTO_FIX 1'
               printf '%s\n' 'typedef int (*c32_type_test_t) (wint_t);'
+              printf '%s\n' 'extern int c32isalnum (wint_t);'
+              printf '%s\n' 'extern int c32isalpha (wint_t);'
+              printf '%s\n' 'extern int c32isblank (wint_t);'
+              printf '%s\n' 'extern int c32iscntrl (wint_t);'
+              printf '%s\n' 'extern int c32isdigit (wint_t);'
+              printf '%s\n' 'extern int c32isgraph (wint_t);'
+              printf '%s\n' 'extern int c32islower (wint_t);'
+              printf '%s\n' 'extern int c32isprint (wint_t);'
+              printf '%s\n' 'extern int c32ispunct (wint_t);'
+              printf '%s\n' 'extern int c32isspace (wint_t);'
+              printf '%s\n' 'extern int c32isupper (wint_t);'
+              printf '%s\n' 'extern int c32isxdigit (wint_t);'
+              printf '%s\n' 'extern wint_t c32tolower (wint_t);'
+              printf '%s\n' 'extern int c32width (char32_t);'
               printf '%s\n' '#endif'
               printf '%s\n' ''
               printf '%s\n' '#endif'
@@ -1637,6 +1618,22 @@ jobs:
             rm -f lib/unictype.h
             rm -f lib/uniwidth.h
             rm -f lib/uniname.h
+            rm -f lib/c32isalnum.h
+            rm -f lib/c32isalpha.h
+            rm -f lib/c32isblank.h
+            rm -f lib/c32iscntrl.h
+            rm -f lib/c32isdigit.h
+            rm -f lib/c32isgraph.h
+            rm -f lib/c32islower.h
+            rm -f lib/c32isprint.h
+            rm -f lib/c32ispunct.h
+            rm -f lib/c32isspace.h
+            rm -f lib/c32isupper.h
+            rm -f lib/c32isxdigit.h
+            rm -f lib/c32tolower.h
+            rm -f lib/c32width.h
+            rm -f lib/c32_apply_type_test.h
+            rm -f lib/c32_get_type_test.h
 
             ensure_coreutils_fallback_headers
 
