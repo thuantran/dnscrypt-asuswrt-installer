@@ -33,6 +33,7 @@ jobs:
             cc_prefix: arm-linux-gnueabihf
             libc_dev: libc6-dev-armhf-cross
             openssl_target: linux-armv4
+            stty_file_pattern: 'ELF 32-bit.*ARM'
 
           - target: linux-armv8
             repo_dir: armv8
@@ -40,6 +41,7 @@ jobs:
             cc_prefix: aarch64-linux-gnu
             libc_dev: libc6-dev-arm64-cross
             openssl_target: linux-aarch64
+            stty_file_pattern: 'ELF 64-bit.*ARM aarch64'
 
     steps:
       - name: Resolve checkout ref
@@ -105,6 +107,7 @@ jobs:
           CC_PREFIX: ${{ matrix.cc_prefix }}
           OUT_DIR: dist/${{ matrix.repo_dir }}
           OPENSSL_TARGET: ${{ matrix.openssl_target }}
+          STTY_FILE_PATTERN: ${{ matrix.stty_file_pattern }}
         run: |
           set -eu
 
@@ -1362,7 +1365,13 @@ jobs:
 
             chmod 0755 "$out"
 
-            file "$out" || true
+            stty_file_output="$(file "$out")"
+            echo "$stty_file_output"
+
+            if ! printf '%s\n' "$stty_file_output" | grep -Eq "$STTY_FILE_PATTERN"; then
+              echo "stty helper for $HOST did not match expected file pattern: $STTY_FILE_PATTERN" >&2
+              exit 1
+            fi
           }
 
           build_nonroot() {
@@ -1430,27 +1439,27 @@ jobs:
 
             cd _src/jitterentropy-rngd
 
-            JENT_RNGD_CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags jitterentropy 2>/dev/null || true)"
-            JENT_RNGD_LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L jitterentropy 2>/dev/null || true)"
-            JENT_RNGD_LIBS="$(pkg-config --libs jitterentropy 2>/dev/null || printf '%s\n' '-ljitterentropy') -pthread"
+            # jitterentropy-rngd vendors the jitterentropy core under lib/ and its
+            # Makefile links only with $(LDFLAGS). Build that bundled core without
+            # optimization and keep the required runtime libraries in LDFLAGS.
+            # Passing COMMON_CFLAGS here would inject -Os and trip jitterentropy's
+            # compile-time safety check on both ARM targets.
+            JENT_RNGD_CPPFLAGS="-D_GNU_SOURCE -I$DEPS_DIR/include -I. -Ilib"
+            JENT_RNGD_CFLAGS="-O0 -fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
+            JENT_RNGD_LDFLAGS="$COMMON_LDFLAGS -pie -lrt -pthread"
 
             echo "Building jitterentropy-rngd for $HOST"
             echo "JENT_RNGD_CPPFLAGS=$JENT_RNGD_CPPFLAGS"
+            echo "JENT_RNGD_CFLAGS=$JENT_RNGD_CFLAGS"
             echo "JENT_RNGD_LDFLAGS=$JENT_RNGD_LDFLAGS"
-            echo "JENT_RNGD_LIBS=$JENT_RNGD_LIBS"
 
             make V=1 -j"$(nproc)" \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
               CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$JENT_RNGD_LDFLAGS" \
-              LDLIBS="$JENT_RNGD_LIBS" \
-              LIBS="$JENT_RNGD_LIBS" \
-              EXTRA_CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
-              EXTRA_CFLAGS="$COMMON_CFLAGS" \
-              EXTRA_LDFLAGS="$JENT_RNGD_LDFLAGS $JENT_RNGD_LIBS" || {
+              CFLAGS="$JENT_RNGD_CFLAGS" \
+              LDFLAGS="$JENT_RNGD_LDFLAGS" || {
                 echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
                 make clean || true
                 make V=1 \
@@ -1458,13 +1467,8 @@ jobs:
                   AR="$AR" \
                   RANLIB="$RANLIB" \
                   CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
-                  CFLAGS="$COMMON_CFLAGS" \
-                  LDFLAGS="$JENT_RNGD_LDFLAGS" \
-                  LDLIBS="$JENT_RNGD_LIBS" \
-                  LIBS="$JENT_RNGD_LIBS" \
-                  EXTRA_CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
-                  EXTRA_CFLAGS="$COMMON_CFLAGS" \
-                  EXTRA_LDFLAGS="$JENT_RNGD_LDFLAGS $JENT_RNGD_LIBS"
+                  CFLAGS="$JENT_RNGD_CFLAGS" \
+                  LDFLAGS="$JENT_RNGD_LDFLAGS"
               }
 
             if [ -f jitterentropy-rngd ]; then
@@ -1478,11 +1482,15 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
+          # stty is a tiny standalone compatibility helper used only by rngd.
+          # Build and validate it first so both matrix targets produce their own
+          # architecture-specific stty before the heavier RNG dependency chain can fail.
+          build_stty
+
           build_all_rng_dependencies
 
           build_haveged
           build_rngd
-          build_stty
           build_nonroot
           build_jitterentropy_rngd
 
