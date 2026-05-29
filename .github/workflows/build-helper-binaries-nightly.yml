@@ -1146,13 +1146,15 @@ jobs:
 
             echo "Configuring Coreutils for $HOST"
 
-            if ! ./configure \
+            # Execute directly to prevent pipeline redirection status masking
+            ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
               --without-selinux \
               --disable-acl \
               --disable-xattr \
+              --disable-nls \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1161,19 +1163,23 @@ jobs:
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
               > "$logdir/configure.log" 2>&1
-            then
-              echo "Coreutils configure failed! Printing tail of config.log:" >&2
+            
+            CONF_EXIT=$?
+            if [ $CONF_EXIT -ne 0 ]; then
+              echo "CRITICAL ERROR: Coreutils configure failed with exit code $CONF_EXIT!" >&2
+              echo "=== DISPLAYING LAST 200 LINES OF config.log ===" >&2
               if [ -f config.log ]; then
                 tail -n 200 config.log >&2
               else
                 tail -n 200 "$logdir/configure.log" >&2
               fi
+              echo "===============================================" >&2
               exit 1
             fi
 
-            echo "Building Coreutils internal library dependencies"
+            echo "Building Coreutils internal library dependencies (Parallel)"
 
-            if ! make V=1 -j"$(nproc)" -C lib \
+            make V=1 -j"$(nproc)" -C lib \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1182,11 +1188,16 @@ jobs:
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
               > "$logdir/build-coreutils-lib.log" 2>&1
-            then
-              echo "Coreutils lib build failed; retrying single-threaded." >&2
+            
+            BUILD_LIB_EXIT=$?
+            if [ $BUILD_LIB_EXIT -ne 0 ]; then
+              echo "Coreutils lib parallel build failed (Exit: $BUILD_LIB_EXIT). Printing logs and retrying single-threaded..." >&2
+              echo "=== PARALLEL LIB BUILD LOG TAIL ===" >&2
               tail -n 240 "$logdir/build-coreutils-lib.log" >&2 || true
+              echo "===================================" >&2
 
-              if ! make V=1 -j1 -C lib \
+              echo "Building Coreutils internal library dependencies (Single-Threaded)"
+              make V=1 -j1 -C lib \
                 CC="$CC" \
                 AR="$AR" \
                 RANLIB="$RANLIB" \
@@ -1195,16 +1206,20 @@ jobs:
                 CFLAGS="$COMMON_CFLAGS" \
                 LDFLAGS="$COMMON_LDFLAGS -static" \
                 > "$logdir/build-coreutils-lib-single.log" 2>&1
-              then
-                echo "Coreutils lib single-threaded build failed. Last 300 lines:" >&2
+              
+              BUILD_LIB_SINGLE_EXIT=$?
+              if [ $BUILD_LIB_SINGLE_EXIT -ne 0 ]; then
+                echo "CRITICAL ERROR: Coreutils lib single-threaded build failed (Exit: $BUILD_LIB_SINGLE_EXIT)!" >&2
+                echo "=== SINGLE-THREADED LIB BUILD LOG TAIL ===" >&2
                 tail -n 300 "$logdir/build-coreutils-lib-single.log" >&2 || true
+                echo "==========================================" >&2
                 exit 1
               fi
             fi
 
-            echo "Building only Coreutils stty"
+            echo "Building only Coreutils stty (Parallel)"
 
-            if ! make V=1 -j"$(nproc)" -C src \
+            make V=1 -j"$(nproc)" -C src \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1214,11 +1229,16 @@ jobs:
               LDFLAGS="$COMMON_LDFLAGS -static" \
               stty \
               > "$logdir/build-stty.log" 2>&1
-            then
-              echo "Coreutils stty build failed; retrying single-threaded." >&2
+            
+            BUILD_STTY_EXIT=$?
+            if [ $BUILD_STTY_EXIT -ne 0 ]; then
+              echo "Coreutils stty parallel build failed (Exit: $BUILD_STTY_EXIT). Printing logs and retrying single-threaded..." >&2
+              echo "=== PARALLEL STTY BUILD LOG TAIL ===" >&2
               tail -n 240 "$logdir/build-stty.log" >&2 || true
+              echo "====================================" >&2
 
-              if ! make V=1 -j1 -C src \
+              echo "Building only Coreutils stty (Single-Threaded)"
+              make V=1 -j1 -C src \
                 CC="$CC" \
                 AR="$AR" \
                 RANLIB="$RANLIB" \
@@ -1228,15 +1248,19 @@ jobs:
                 LDFLAGS="$COMMON_LDFLAGS -static" \
                 stty \
                 > "$logdir/build-stty-single.log" 2>&1
-              then
-                echo "Coreutils stty single-threaded build failed. Last 300 lines:" >&2
+              
+              BUILD_STTY_SINGLE_EXIT=$?
+              if [ $BUILD_STTY_SINGLE_EXIT -ne 0 ]; then
+                echo "CRITICAL ERROR: Coreutils stty single-threaded build failed (Exit: $BUILD_STTY_SINGLE_EXIT)!" >&2
+                echo "=== SINGLE-THREADED STTY BUILD LOG TAIL ===" >&2
                 tail -n 300 "$logdir/build-stty-single.log" >&2 || true
+                echo "===========================================" >&2
                 exit 1
               fi
             fi
 
             if [ ! -f "src/stty" ]; then
-              echo "src/stty was not created" >&2
+              echo "CRITICAL ERROR: src/stty was not created despite build completing!" >&2
               echo "Coreutils logs are in: $logdir" >&2
               find . -name 'stty' -type f -print
               exit 1
@@ -1247,6 +1271,7 @@ jobs:
             chmod 0755 "$final_stty"
             file "$final_stty" || true
 
+            echo "Successfully built and packaged stty target."
             cd "$GITHUB_WORKSPACE"
           }
           
