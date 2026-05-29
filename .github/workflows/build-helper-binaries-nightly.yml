@@ -1177,7 +1177,6 @@ jobs:
               lib/stdcountof.h \
               lib/idx.h \
               lib/setlocale_null.h \
-              lib/time_rz.h \
               lib/verify.h \
               lib/attribute.h \
               lib/cdefs.h \
@@ -1205,7 +1204,6 @@ jobs:
               lib/stdcountof.h \
               lib/idx.h \
               lib/setlocale_null.h \
-              lib/time_rz.h \
               lib/verify.h \
               lib/attribute.h \
               lib/cdefs.h \
