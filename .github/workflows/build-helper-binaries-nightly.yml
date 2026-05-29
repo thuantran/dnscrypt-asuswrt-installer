@@ -1146,23 +1146,27 @@ jobs:
 
             echo "Configuring Coreutils for $HOST"
 
-            # Pass variables as environment arguments BEFORE ./configure to avoid strict toolchain sanity checks failing on static links
-            if ! CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
-               CPPFLAGS="$COMMON_CPPFLAGS" CFLAGS="$COMMON_CFLAGS" \
-               ./configure \
+            if ! ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
               --without-selinux \
               --disable-acl \
               --disable-xattr \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
               > "$logdir/configure.log" 2>&1
             then
-              echo "Coreutils configure failed. Last 200 lines:" >&2
-              tail -n 200 "$logdir/configure.log" >&2 || true
+              echo "Coreutils configure failed! Printing tail of config.log:" >&2
               if [ -f config.log ]; then
-                echo "=== config.log Snippet ===" >&2
-                tail -n 200 config.log >&2 || true
+                tail -n 200 config.log >&2
+              else
+                tail -n 200 "$logdir/configure.log" >&2
               fi
               exit 1
             fi
