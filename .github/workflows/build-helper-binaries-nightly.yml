@@ -1164,15 +1164,15 @@ jobs:
 
             echo "Building only Coreutils stty"
 
-            if ! make V=1 -C src \
-              CC="$CC" \
-              AR="$AR" \
-              RANLIB="$RANLIB" \
-              STRIP="$STRIP" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS -static" \
-              stty \
+            if ! make V=1 \
+                  CC="$CC" \
+                  AR="$AR" \
+                  RANLIB="$RANLIB" \
+                  STRIP="$STRIP" \
+                  CPPFLAGS="$COMMON_CPPFLAGS" \
+                  CFLAGS="$COMMON_CFLAGS" \
+                  LDFLAGS="$COMMON_LDFLAGS -static" \
+                  src/stty \
               > "$logdir/build-stty-simple.log" 2>&1
             then
               echo "Coreutils stty build failed. Last 240 lines:" >&2
