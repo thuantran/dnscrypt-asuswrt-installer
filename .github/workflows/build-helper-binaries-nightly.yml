@@ -1160,17 +1160,17 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
-              > "$logdir/configure-simple.log" 2>&1
+              > "$logdir/configure.log" 2>&1
             then
               echo "Coreutils configure failed. Last 200 lines:" >&2
-              tail -n 200 "$logdir/configure-simple.log" >&2 || true
+              tail -n 200 "$logdir/configure.log" >&2 || true
               tail -n 200 config.log >&2 || true
               exit 1
             fi
 
-            echo "Building Coreutils stty through the top-level dependency graph"
+            echo "Building Coreutils internal library dependencies"
 
-            if ! make V=1 -j"$(nproc)" \
+            if ! make V=1 -j"$(nproc)" -C lib \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1178,13 +1178,12 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
-              src/stty \
-              > "$logdir/build-stty-simple.log" 2>&1
+              > "$logdir/build-coreutils-lib.log" 2>&1
             then
-              echo "Coreutils stty build failed; retrying single-threaded." >&2
-              tail -n 240 "$logdir/build-stty-simple.log" >&2 || true
+              echo "Coreutils lib build failed; retrying single-threaded." >&2
+              tail -n 240 "$logdir/build-coreutils-lib.log" >&2 || true
 
-              if ! make V=1 -j1 \
+              if ! make V=1 -j1 -C lib \
                 CC="$CC" \
                 AR="$AR" \
                 RANLIB="$RANLIB" \
@@ -1192,17 +1191,50 @@ jobs:
                 CPPFLAGS="$COMMON_CPPFLAGS" \
                 CFLAGS="$COMMON_CFLAGS" \
                 LDFLAGS="$COMMON_LDFLAGS -static" \
-                src/stty \
-                > "$logdir/build-stty-simple-single.log" 2>&1
+                > "$logdir/build-coreutils-lib-single.log" 2>&1
               then
-                echo "Coreutils stty single-threaded build failed. Last 300 lines:" >&2
-                tail -n 300 "$logdir/build-stty-simple-single.log" >&2 || true
+                echo "Coreutils lib single-threaded build failed. Last 300 lines:" >&2
+                tail -n 300 "$logdir/build-coreutils-lib-single.log" >&2 || true
                 exit 1
               fi
             fi
 
-            if [ ! -x src/stty ]; then
+            echo "Building only Coreutils stty"
+
+            if ! make V=1 -j"$(nproc)" -C src \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS -I.. -I../lib -I."
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
+              stty \
+              > "$logdir/build-stty.log" 2>&1
+            then
+              echo "Coreutils stty build failed; retrying single-threaded." >&2
+              tail -n 240 "$logdir/build-stty.log" >&2 || true
+
+              if ! make V=1 -j1 -C src \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                STRIP="$STRIP" \
+                CPPFLAGS="$COMMON_CPPFLAGS -I.. -I../lib -I." \
+                CFLAGS="$COMMON_CFLAGS" \
+                LDFLAGS="$COMMON_LDFLAGS -static" \
+                stty \
+                > "$logdir/build-stty-single.log" 2>&1
+              then
+                echo "Coreutils stty single-threaded build failed. Last 300 lines:" >&2
+                tail -n 300 "$logdir/build-stty-single.log" >&2 || true
+                exit 1
+              fi
+            fi
+
+            if [ ! -f "src/stty" ]; then
               echo "src/stty was not created" >&2
+              echo "Coreutils logs are in: $logdir" >&2
               find . -name 'stty' -type f -print
               exit 1
             fi
@@ -1214,6 +1246,7 @@ jobs:
 
             cd "$GITHUB_WORKSPACE"
           }
+
           
           build_nonroot() {
             mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/$OUT_DIR"
