@@ -1161,8 +1161,8 @@ jobs:
               tail -n 200 config.log >&2 || true
               exit 1
             fi
-
-            echo "Generating Coreutils build headers"
+            
+            echo "Generating Coreutils build headers needed by stty"
 
             make V=1 \
               CC="$CC" \
@@ -1172,14 +1172,25 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
-              lib/configmake.h src/version.h src/speedlist.h \
+              lib/configmake.h \
+              lib/stdckdint.h \
+              lib/stdcountof.h \
+              lib/idx.h \
+              lib/setlocale_null.h \
+              lib/time_rz.h \
+              lib/verify.h \
+              lib/attribute.h \
+              lib/cdefs.h \
+              lib/minmax.h \
+              src/version.h \
+              src/speedlist.h \
               > "$logdir/generated-stty-headers-simple.log" 2>&1 || {
                 echo "Coreutils generated-header step failed. Last 160 lines:" >&2
                 tail -n 160 "$logdir/generated-stty-headers-simple.log" >&2 || true
                 exit 1
               }
 
-            echo "Building only Coreutils stty"
+            echo "Generating Coreutils build headers needed by stty"
 
             make V=1 \
               CC="$CC" \
@@ -1189,10 +1200,21 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
-              src/stty \
-              > "$logdir/build-stty-simple.log" 2>&1 || {
-                echo "Coreutils stty build failed. Last 240 lines:" >&2
-                tail -n 240 "$logdir/build-stty-simple.log" >&2 || true
+              lib/configmake.h \
+              lib/stdckdint.h \
+              lib/stdcountof.h \
+              lib/idx.h \
+              lib/setlocale_null.h \
+              lib/time_rz.h \
+              lib/verify.h \
+              lib/attribute.h \
+              lib/cdefs.h \
+              lib/minmax.h \
+              src/version.h \
+              src/speedlist.h \
+              > "$logdir/generated-stty-headers-simple.log" 2>&1 || {
+                echo "Coreutils generated-header step failed. Last 160 lines:" >&2
+                tail -n 160 "$logdir/generated-stty-headers-simple.log" >&2 || true
                 exit 1
               }
 
