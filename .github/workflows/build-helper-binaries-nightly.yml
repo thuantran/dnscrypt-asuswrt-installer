@@ -1190,7 +1190,7 @@ jobs:
               > "$logdir/build-coreutils-lib.log" 2>&1
             
             BUILD_LIB_EXIT=$?
-            if [ $BUILD_LIB_EXIT -ne 0 ]; then
+            if [ $BUILD_LIB_EXIT -eq 0 ]; then
               echo "Coreutils lib parallel build failed (Exit: $BUILD_LIB_EXIT). Printing logs and retrying single-threaded..." >&2
               echo "=== PARALLEL LIB BUILD LOG TAIL ===" >&2
               tail -n 240 "$logdir/build-coreutils-lib.log" >&2 || true
@@ -1208,7 +1208,7 @@ jobs:
                 > "$logdir/build-coreutils-lib-single.log" 2>&1
               
               BUILD_LIB_SINGLE_EXIT=$?
-              if [ $BUILD_LIB_SINGLE_EXIT -ne 0 ]; then
+              if [ $BUILD_LIB_SINGLE_EXIT -eq 0 ]; then
                 echo "CRITICAL ERROR: Coreutils lib single-threaded build failed (Exit: $BUILD_LIB_SINGLE_EXIT)!" >&2
                 echo "=== SINGLE-THREADED LIB BUILD LOG TAIL ===" >&2
                 tail -n 300 "$logdir/build-coreutils-lib-single.log" >&2 || true
@@ -1231,7 +1231,7 @@ jobs:
               > "$logdir/build-stty.log" 2>&1
             
             BUILD_STTY_EXIT=$?
-            if [ $BUILD_STTY_EXIT -ne 0 ]; then
+            if [ $BUILD_STTY_EXIT -eq 0 ]; then
               echo "Coreutils stty parallel build failed (Exit: $BUILD_STTY_EXIT). Printing logs and retrying single-threaded..." >&2
               echo "=== PARALLEL STTY BUILD LOG TAIL ===" >&2
               tail -n 240 "$logdir/build-stty.log" >&2 || true
@@ -1250,7 +1250,7 @@ jobs:
                 > "$logdir/build-stty-single.log" 2>&1
               
               BUILD_STTY_SINGLE_EXIT=$?
-              if [ $BUILD_STTY_SINGLE_EXIT -ne 0 ]; then
+              if [ $BUILD_STTY_SINGLE_EXIT -eq 0 ]; then
                 echo "CRITICAL ERROR: Coreutils stty single-threaded build failed (Exit: $BUILD_STTY_SINGLE_EXIT)!" >&2
                 echo "=== SINGLE-THREADED STTY BUILD LOG TAIL ===" >&2
                 tail -n 300 "$logdir/build-stty-single.log" >&2 || true
