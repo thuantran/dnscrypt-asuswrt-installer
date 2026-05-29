@@ -1110,7 +1110,7 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
-          build_stty_() {
+          build_stty() {
             : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
             : "${COREUTILS_SHA256_BASE64:?COREUTILS_SHA256_BASE64 is not set}"
 
