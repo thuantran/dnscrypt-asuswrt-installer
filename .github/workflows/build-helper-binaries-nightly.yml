@@ -18,10 +18,15 @@ concurrency:
   group: helper-binaries-nightly-${{ inputs.target_branch || github.ref_name }}
   cancel-in-progress: true
 
+env:
+  COREUTILS_VERSION: "9.11"
+  COREUTILS_CACHE_REV: "1"
+
 jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
@@ -30,21 +35,28 @@ jobs:
             repo_dir: armv7
             host_triplet: arm-linux-gnueabihf
             cc_prefix: arm-linux-gnueabihf
+            libc_dev: libc6-dev-armhf-cross
+            openssl_target: linux-armv4
+
           - target: linux-armv8
             repo_dir: armv8
             host_triplet: aarch64-linux-gnu
             cc_prefix: aarch64-linux-gnu
+            libc_dev: libc6-dev-arm64-cross
+            openssl_target: linux-aarch64
 
     steps:
       - name: Resolve checkout ref
         id: ref
         run: |
           set -eu
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
             checkout_ref="${{ inputs.target_branch }}"
           else
             checkout_ref="${{ github.sha }}"
           fi
+
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
@@ -55,162 +67,1220 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eu
+
           export DEBIAN_FRONTEND=noninteractive
+
           # Keep host-arch-only apt metadata; do not enable foreign architectures here.
           # Ubuntu Noble runners can return 404s for armhf indexes on security.ubuntu.com.
           # IMPORTANT: never run `dpkg --add-architecture` in this workflow.
           sudo apt-get update
-          sudo apt-get install -y \
-            autoconf automake build-essential ca-certificates curl file git make gcc \
-            libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
+
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake autopoint bison build-essential ca-certificates curl file git \
+            gcc g++ gettext gperf gzip help2man m4 make perl pkg-config tar texinfo wget xz-utils \
+            libtool cmake ninja-build meson python3 python3-pip gawk \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
-            libp11-dev libp11-kit-dev libjitterentropy3 libjitterentropy3-dev librtlsdr-dev \
-            libseccomp-dev libsysfs-dev sysfsutils
+            libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils
+
+          gcc --version
+          make --version
+          pkg-config --version
+          cmake --version
+          meson --version || true
 
       - name: Install cross toolchain
         run: |
           set -eu
-          export DEBIAN_FRONTEND=noninteractive
-          sudo apt-get install -y gcc-${{ matrix.host_triplet }} binutils-${{ matrix.host_triplet }}
 
+          export DEBIAN_FRONTEND=noninteractive
+
+          sudo apt-get install -y --no-install-recommends \
+            gcc-${{ matrix.host_triplet }} \
+            g++-${{ matrix.host_triplet }} \
+            binutils-${{ matrix.host_triplet }} \
+            ${{ matrix.libc_dev }}
+
+          ${{ matrix.cc_prefix }}-gcc --version
+          ${{ matrix.cc_prefix }}-ld --version
+          
       - name: Build helper binaries from source
         env:
           HOST: ${{ matrix.host_triplet }}
           CC_PREFIX: ${{ matrix.cc_prefix }}
           OUT_DIR: dist/${{ matrix.repo_dir }}
+          OPENSSL_TARGET: ${{ matrix.openssl_target }}
         run: |
           set -eu
 
           mkdir -p "$OUT_DIR" _src _build
+
           export CC="$CC_PREFIX-gcc"
+          export CXX="$CC_PREFIX-g++"
           export AR="$CC_PREFIX-ar"
           export RANLIB="$CC_PREFIX-ranlib"
           export STRIP="$CC_PREFIX-strip"
-          export PKG_CONFIG_LIBDIR="/usr/lib/${HOST}/pkgconfig:/usr/share/pkgconfig"
+          export LD="$CC_PREFIX-ld"
+          export CC="$CC_PREFIX-gcc"
+          export OBJCOPY="$CC_PREFIX-objcopy"
+          export OBJDUMP="$CC_PREFIX-objdump"
+          export READELF="$CC_PREFIX-readelf"
+
+          export DEPS_DIR="$GITHUB_WORKSPACE/_deps/$HOST"
+
+          mkdir -p "$DEPS_DIR"
+
+          # Cross-build isolation:
+          # Keep target-built dependencies in a per-architecture prefix.
+          export PATH="$DEPS_DIR/bin:$PATH"
+
+          export PKG_CONFIG_PATH="$DEPS_DIR/lib/pkgconfig:$DEPS_DIR/lib64/pkgconfig:$DEPS_DIR/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$DEPS_DIR/lib/pkgconfig:$DEPS_DIR/lib64/pkgconfig:$DEPS_DIR/share/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR=""
+
+          export COMMON_CPPFLAGS="-D_GNU_SOURCE -I$DEPS_DIR/include"
           export COMMON_CFLAGS="-Os -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -D_FORTIFY_SOURCE=2"
-          export COMMON_CPPFLAGS="-D_GNU_SOURCE"
-          export COMMON_LDFLAGS="-Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
+          export COMMON_CXXFLAGS="$COMMON_CFLAGS"
+          export COMMON_LDFLAGS="-L$DEPS_DIR/lib -L$DEPS_DIR/lib64 -Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
+
           RNG_TOOLS_REPO="https://github.com/nhorman/rng-tools.git"
           RNG_TOOLS_REF="bd00c08b0c3c6a880b0988befe97fd35b315468c"
+
           JITTERENTROPY_REPO="https://github.com/smuellerDD/jitterentropy-rngd.git"
           JITTERENTROPY_REF="b94ef60f888ad442641a25c4599e24296bde4959"
-          COREUTILS_VERSION="9.5"
-          COREUTILS_SHA256="cd80eb5b247f87670353197a8fc3e3f7fb77f607f9f10925a60214790514d31a"
+
+          JITTERENTROPY_LIBRARY_REPO="https://github.com/smuellerDD/jitterentropy-library.git"
+          JITTERENTROPY_LIBRARY_REF="v3.7.0"
+
+          LIBCAP_REPO="https://git.kernel.org/pub/scm/libs/libcap/libcap.git"
+          LIBCAP_REF="libcap-2.78"
+
+          EUDEV_REPO="https://github.com/eudev-project/eudev.git"
+          EUDEV_REF="v3.2.14"
+          ZLIB_VERSION="1.3.2"
+          OPENSSL_VERSION="3.5.6"
+          JANSSON_VERSION="2.15.0"
+          LIBUSB_VERSION="v1.0.30"
+          RTLSDR_REPO="https://github.com/osmocom/rtl-sdr.git"
+          RTLSDR_REF="master"
+          LIBXML2_VERSION="v2.12.7"
+          CURL_VERSION="curl-8_11_1"
+          LIBP11_REPO="https://github.com/OpenSC/libp11.git"
+          LIBP11_REF="master"
+
+          COREUTILS_VERSION="9.11"
+          COREUTILS_SHA256_BASE64="OUAk7aCllVIXztqc0SAeZdyPo6opwpURNaSVIdV8PMM="
 
           clone_repo_at_ref() {
             repo_url="$1"
             repo_ref="$2"
             destination="$3"
 
+            rm -rf "$destination"
             git clone --depth=1 "$repo_url" "$destination"
+
             cd "$destination"
+
             if ! git fetch --depth=1 origin "$repo_ref" \
               && ! git fetch --depth=1 origin "refs/tags/$repo_ref" \
               && ! git fetch --depth=1 origin "refs/heads/$repo_ref"; then
+
               case "$repo_ref" in
                 v*) fallback_ref="${repo_ref#v}" ;;
                 *) fallback_ref="v$repo_ref" ;;
               esac
+
               if ! git fetch --depth=1 origin "$fallback_ref" \
                 && ! git fetch --depth=1 origin "refs/tags/$fallback_ref" \
                 && ! git fetch --depth=1 origin "refs/heads/$fallback_ref"; then
-                echo "Failed to fetch pinned ref $repo_ref (and fallback $fallback_ref) from $repo_url" >&2
+                echo "Failed to fetch pinned ref $repo_ref from $repo_url" >&2
                 exit 1
               fi
             fi
+
             git checkout --detach FETCH_HEAD
+
             if printf '%s' "$repo_ref" | grep -Eq '^[0-9a-f]{40}$'; then
               if [ "$(git rev-parse HEAD)" != "$repo_ref" ]; then
                 echo "Resolved revision for $repo_url did not match pinned ref $repo_ref" >&2
                 exit 1
               fi
             fi
-            cd "${GITHUB_WORKSPACE}"
+
+            cd "$GITHUB_WORKSPACE"
+          }
+
+          build_zlib() {
+            curl -fsSL "https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz" -o "_build/zlib-${ZLIB_VERSION}.tar.gz"
+            tar -xf "_build/zlib-${ZLIB_VERSION}.tar.gz" -C _src
+
+            cd "_src/zlib-${ZLIB_VERSION}"
+
+            CHOST="$HOST" \
+            CC="$CC" \
+            AR="$AR" \
+            RANLIB="$RANLIB" \
+            CFLAGS="$COMMON_CFLAGS" \
+            ./configure \
+              --prefix="$DEPS_DIR" \
+              --static
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+          }
+
+          build_openssl() {
+            url="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
+            out="_build/openssl-${OPENSSL_VERSION}.tar.gz"
+
+            echo "Downloading OpenSSL: $url"
+            curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
+
+            tar -xf "$out" -C _src
+
+            cd "_src/openssl-${OPENSSL_VERSION}"
+
+            old_CC="${CC:-}"
+            old_CXX="${CXX:-}"
+            old_AR="${AR:-}"
+            old_RANLIB="${RANLIB:-}"
+            old_STRIP="${STRIP:-}"
+            old_LD="${LD:-}"
+            old_CPPFLAGS="${CPPFLAGS:-}"
+            old_CFLAGS="${CFLAGS:-}"
+            old_CXXFLAGS="${CXXFLAGS:-}"
+            old_LDFLAGS="${LDFLAGS:-}"
+            old_LIBS="${LIBS:-}"
+            old_PKG_CONFIG="${PKG_CONFIG:-}"
+            old_PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}"
+            old_PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR:-}"
+            old_PKG_CONFIG_SYSROOT_DIR="${PKG_CONFIG_SYSROOT_DIR:-}"
+
+            # OpenSSL handles cross tools through --cross-compile-prefix.
+            # Do not let global dependency flags leak into OpenSSL.
+            unset CC CXX AR RANLIB STRIP LD
+            unset CPPFLAGS CFLAGS CXXFLAGS LDFLAGS LIBS
+            unset PKG_CONFIG PKG_CONFIG_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR
+
+            ./Configure \
+              "$OPENSSL_TARGET" \
+              --cross-compile-prefix="${CC_PREFIX}-" \
+              --prefix="$DEPS_DIR" \
+              --openssldir="$DEPS_DIR/ssl" \
+              no-shared \
+              no-tests \
+              no-module \
+              no-engine
+
+            make -j"$(nproc)"
+            make install_sw
+
+            cd "$GITHUB_WORKSPACE"
+
+            export CC="$old_CC"
+            export CXX="$old_CXX"
+            export AR="$old_AR"
+            export RANLIB="$old_RANLIB"
+            export STRIP="$old_STRIP"
+            export LD="$old_LD"
+            export CPPFLAGS="$old_CPPFLAGS"
+            export CFLAGS="$old_CFLAGS"
+            export CXXFLAGS="$old_CXXFLAGS"
+            export LDFLAGS="$old_LDFLAGS"
+            export LIBS="$old_LIBS"
+            export PKG_CONFIG="$old_PKG_CONFIG"
+            export PKG_CONFIG_PATH="$old_PKG_CONFIG_PATH"
+            export PKG_CONFIG_LIBDIR="$old_PKG_CONFIG_LIBDIR"
+            export PKG_CONFIG_SYSROOT_DIR="$old_PKG_CONFIG_SYSROOT_DIR"
+
+            pkg-config --modversion openssl
+            pkg-config --cflags --libs openssl
+          }          
+
+          build_eudev() {
+            clone_repo_at_ref "$EUDEV_REPO" "$EUDEV_REF" _src/eudev
+
+            cd _src/eudev
+
+            # Do not use ./autogen.sh here.
+            # eudev's autogen.sh enters man/ and runs make.sh, which requires xsltproc.
+            mkdir -p m4
+            autoreconf -fiv
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --disable-manpages \
+              --disable-selinux \
+              --disable-introspection \
+              --disable-hwdb \
+              --disable-programs \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libudev
+            pkg-config --cflags --libs libudev
+          }
+
+          build_jansson() {
+            curl -fsSL "https://github.com/akheron/jansson/releases/download/v${JANSSON_VERSION}/jansson-${JANSSON_VERSION}.tar.gz" -o "_build/jansson-${JANSSON_VERSION}.tar.gz"
+            tar -xf "_build/jansson-${JANSSON_VERSION}.tar.gz" -C _src
+
+            cd "_src/jansson-${JANSSON_VERSION}"
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion jansson
+          }
+
+          build_libusb() {
+            clone_repo_at_ref "https://github.com/libusb/libusb.git" "$LIBUSB_VERSION" _src/libusb
+
+            cd _src/libusb
+
+            ./bootstrap.sh
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --enable-udev \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              PKG_CONFIG=pkg-config \
+              CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags libudev)" \
+              CFLAGS="$COMMON_CFLAGS -fPIC" \
+              LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L libudev)" \
+              LIBS="$(pkg-config --libs libudev) -pthread"
+
+            make -j"$(nproc)"
+            make install
+
+            mkdir -p "$DEPS_DIR/lib/pkgconfig"
+
+            if [ ! -f "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc" ]; then
+              echo "libusb-1.0.pc was not installed" >&2
+              find "$DEPS_DIR" -name 'libusb-1.0.pc' -o -name 'libusb*'
+              exit 1
+            fi
+
+            # libusb was built with udev support, so static consumers must link libudev too.
+            # Keep Libs minimal and put transitive static deps in Libs.private.
+            if grep -q '^Libs.private:' "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc"; then
+              sed -i 's/^Libs.private:.*/Libs.private: -ludev -pthread/' "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc"
+            else
+              printf '%s\n' 'Libs.private: -ludev -pthread' >> "$DEPS_DIR/lib/pkgconfig/libusb-1.0.pc"
+            fi
+
+            echo "libusb pkg-config:"
+            pkg-config --modversion libusb-1.0
+            pkg-config --cflags libusb-1.0
+            pkg-config --libs libusb-1.0
+            pkg-config --libs --static libusb-1.0
+
+            cd "$GITHUB_WORKSPACE"
+          }
+
+          build_librtlsdr() {
+            clone_repo_at_ref "$RTLSDR_REPO" "$RTLSDR_REF" _src/rtl-sdr
+
+            rm -rf _build/rtl-sdr
+
+            cmake -S _src/rtl-sdr -B _build/rtl-sdr \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR="$HOST" \
+              -DCMAKE_C_COMPILER="$CC" \
+              -DCMAKE_AR="$AR" \
+              -DCMAKE_RANLIB="$RANLIB" \
+              -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" \
+              -DCMAKE_PREFIX_PATH="$DEPS_DIR" \
+              -DCMAKE_FIND_ROOT_PATH="$DEPS_DIR" \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+              -DCMAKE_C_FLAGS="$COMMON_CPPFLAGS $COMMON_CFLAGS -fPIC" \
+              -DCMAKE_EXE_LINKER_FLAGS="$COMMON_LDFLAGS" \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DBUILD_STATIC_LIBS=ON \
+              -DINSTALL_UDEV_RULES=OFF \
+              -DDETACH_KERNEL_DRIVER=ON
+
+            cmake --build _build/rtl-sdr -j"$(nproc)" --target rtlsdr_static
+
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig"
+
+            if [ ! -f _build/rtl-sdr/src/librtlsdr.a ]; then
+              echo "librtlsdr.a was not created" >&2
+              find _build/rtl-sdr -name 'librtlsdr*' -o -name '*rtl*'
+              exit 1
+            fi
+
+            cp -v _build/rtl-sdr/src/librtlsdr.a "$DEPS_DIR/lib/"
+            "$RANLIB" "$DEPS_DIR/lib/librtlsdr.a" || true
+
+            cp -v _src/rtl-sdr/include/rtl-sdr.h "$DEPS_DIR/include/"
+
+            if [ -f _build/rtl-sdr/include/rtl-sdr_export.h ]; then
+              cp -v _build/rtl-sdr/include/rtl-sdr_export.h "$DEPS_DIR/include/"
+            elif [ -f _src/rtl-sdr/include/rtl-sdr_export.h ]; then
+              cp -v _src/rtl-sdr/include/rtl-sdr_export.h "$DEPS_DIR/include/"
+            else
+              echo "rtl-sdr_export.h not found; continuing because some rtl-sdr versions generate it only for shared builds."
+            fi
+
+            # Manual pkg-config files for static-only librtlsdr.
+            # libusb carries -ludev in its Libs.private, but include it here too
+            # so rng-tools gets it even if it does not request --static deeply enough.
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: librtlsdr'
+              printf '%s\n' 'Description: RTL-SDR library'
+              printf '%s\n' 'Version: 2.0.2'
+              printf '%s\n' 'Requires.private: libusb-1.0 libudev'
+              printf '%s\n' 'Libs: -L${libdir} -lrtlsdr'
+              printf '%s\n' 'Libs.private: -lusb-1.0 -ludev -pthread'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/librtlsdr.pc"
+
+            cp -v "$DEPS_DIR/lib/pkgconfig/librtlsdr.pc" "$DEPS_DIR/lib/pkgconfig/rtlsdr.pc"
+
+            echo "librtlsdr pkg-config:"
+            pkg-config --cflags librtlsdr || true
+            pkg-config --libs librtlsdr || true
+            pkg-config --libs --static librtlsdr || true
+
+            echo "Installed librtlsdr files:"
+            find "$DEPS_DIR" \( \
+              -name '*rtlsdr*' -o \
+              -name '*rtl*pc' -o \
+              -name 'rtl-sdr.h' -o \
+              -name 'rtl-sdr_export.h' \
+            \) -print
+          }
+
+          build_libxml2() {
+            clone_repo_at_ref "https://github.com/GNOME/libxml2.git" "$LIBXML2_VERSION" _src/libxml2
+
+            cd _src/libxml2
+
+            ./autogen.sh \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --without-python \
+              --with-zlib="$DEPS_DIR" \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libxml-2.0
+          }
+
+          build_curl() {
+            clone_repo_at_ref "https://github.com/curl/curl.git" "$CURL_VERSION" _src/curl
+
+            cd _src/curl
+
+            autoreconf -fi
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --with-openssl="$DEPS_DIR" \
+              --with-zlib="$DEPS_DIR" \
+              --without-libpsl \
+              --without-zstd \
+              --without-brotli \
+              --without-nghttp2 \
+              --without-ngtcp2 \
+              --without-nghttp3 \
+              --without-quiche \
+              --without-ca-bundle \
+              --without-ca-path \
+              --disable-ldap \
+              --disable-ldaps \
+              --disable-manual \
+              --disable-ntlm-wb \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
+            make -j"$(nproc)"
+            make install
+
+            cd "$GITHUB_WORKSPACE"
+
+            pkg-config --modversion libcurl
+            pkg-config --cflags --libs libcurl
+          }
+
+          build_libp11() {
+            clone_repo_at_ref "$LIBP11_REPO" "$LIBP11_REF" _src/libp11
+
+            cd _src/libp11
+
+            ./bootstrap
+
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix="$DEPS_DIR" \
+              --disable-shared \
+              --enable-static \
+              --disable-doc \
+              --disable-api-doc \
+              --disable-tests \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              PKG_CONFIG=pkg-config \
+              CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags libcrypto)" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L libcrypto)" \
+              LIBS="$(pkg-config --libs libcrypto) -ldl -pthread -latomic"
+
+            echo "Building only the core libp11 target, not engine/provider modules."
+
+            make -C src V=1 libp11.la || {
+              echo "libp11 core target failed; retrying after clean" >&2
+              make -C src clean || true
+              make -C src V=1 libp11.la
+            }
+
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig"
+
+            if [ ! -f src/.libs/libp11.a ]; then
+              echo "src/.libs/libp11.a was not created" >&2
+              find src \( -name 'libp11*' -o -name '*.a' -o -name '*.la' \) -print
+              exit 1
+            fi
+
+            cp -v src/.libs/libp11.a "$DEPS_DIR/lib/"
+            "$RANLIB" "$DEPS_DIR/lib/libp11.a" || true
+
+            # Copy libtool metadata if present. This is optional, but some autotools
+            # projects still inspect .la files during static cross-builds.
+            cp -v src/libp11.la "$DEPS_DIR/lib/" 2>/dev/null || \
+              cp -v src/.libs/libp11.la "$DEPS_DIR/lib/" 2>/dev/null || true
+
+            echo "Installing libp11 public headers."
+
+            for hdr in \
+              libp11.h \
+              p11_ver.h \
+              pkcs11.h \
+              p11_err.h
+            do
+              found_hdr=""
+
+              for dir in src include .; do
+                if [ -f "$dir/$hdr" ]; then
+                  found_hdr="$dir/$hdr"
+                  break
+                fi
+              done
+
+              if [ -n "$found_hdr" ]; then
+                cp -v "$found_hdr" "$DEPS_DIR/include/"
+              fi
+            done
+
+            if [ ! -f "$DEPS_DIR/include/libp11.h" ]; then
+              echo "libp11.h was not installed" >&2
+              find . -name 'libp11.h' -o -name 'p11_ver.h' -o -name 'pkcs11.h'
+              exit 1
+            fi
+
+            if [ ! -f "$DEPS_DIR/include/p11_ver.h" ]; then
+              echo "p11_ver.h was not installed" >&2
+              find . -name 'p11_ver.h' -o -name 'libp11.h' -o -name 'pkcs11.h'
+              exit 1
+            fi
+
+            # Try to detect version from p11_ver.h; fall back if unavailable.
+            LIBP11_VERSION="$(
+              grep -E '#define[[:space:]]+PACKAGE_VERSION' "$DEPS_DIR/include/p11_ver.h" 2>/dev/null \
+                | awk '{print $3}' \
+                | tr -d '"' \
+                | head -n1
+            )"
+            LIBP11_VERSION="${LIBP11_VERSION:-0.4.19}"
+
+            # Always write our own pkg-config file so it points only to the
+            # target dependency prefix and target-built libcrypto.
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: libp11'
+              printf '%s\n' 'Description: libp11 PKCS#11 wrapper library'
+              printf '%s\n' "Version: $LIBP11_VERSION"
+              printf '%s\n' 'Libs: -L${libdir} -lp11 -lcrypto -ldl -pthread'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/libp11.pc"
+
+            # Validate header visibility and static linking.
+            {
+              printf '%s\n' '#include <libp11.h>'
+              printf '%s\n' ''
+              printf '%s\n' 'int main(void) {'
+              printf '%s\n' '  PKCS11_CTX *ctx = PKCS11_CTX_new();'
+              printf '%s\n' '  if (ctx) PKCS11_CTX_free(ctx);'
+              printf '%s\n' '  return 0;'
+              printf '%s\n' '}'
+            } > "$GITHUB_WORKSPACE/_build/test-libp11.c"
+
+            "$CC" \
+              -I"$DEPS_DIR/include" \
+              "$GITHUB_WORKSPACE/_build/test-libp11.c" \
+              -L"$DEPS_DIR/lib" \
+              -lp11 \
+              $(pkg-config --libs libcrypto) \
+              -ldl -pthread -latomic \
+              -o "$GITHUB_WORKSPACE/_build/test-libp11"
+
+            file "$GITHUB_WORKSPACE/_build/test-libp11" || true
+
+            cd "$GITHUB_WORKSPACE"
+
+            echo "Installed libp11 files:"
+            find "$DEPS_DIR" \( \
+              -name 'libp11*' -o \
+              -name '*p11*.pc' -o \
+              -name 'pkcs11*.la' -o \
+              -name 'pkcs11*.so' -o \
+              -name 'libpkcs11*' -o \
+              -name 'p11_ver.h' \
+            \) -print
+
+            echo "libp11 pkg-config:"
+            pkg-config --cflags libp11 || true
+            pkg-config --libs libp11 || true
+            pkg-config --libs --static libp11 || true
+          }
+
+          build_jitterentropy_library() {
+            clone_repo_at_ref "$JITTERENTROPY_LIBRARY_REPO" "$JITTERENTROPY_LIBRARY_REF" _src/jitterentropy-library
+
+            cd _src/jitterentropy-library
+
+            make clean || true
+
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include" "$DEPS_DIR/lib/pkgconfig" "$GITHUB_WORKSPACE/_build"
+
+            # jitterentropy intentionally refuses optimized builds.
+            # Do not use COMMON_CFLAGS here because it contains -Os.
+            JENT_CFLAGS="-O0 -D_GNU_SOURCE -I$DEPS_DIR/include -Iinclude -Isrc -I. -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
+            JENT_LDFLAGS="-L$DEPS_DIR/lib -L$DEPS_DIR/lib64"
+
+            echo "Building jitterentropy-library for $HOST"
+            echo "CC=$CC"
+            echo "AR=$AR"
+            echo "RANLIB=$RANLIB"
+            echo "CFLAGS=$JENT_CFLAGS"
+            echo "LDFLAGS=$JENT_LDFLAGS"
+
+            # Build the static library if the Makefile exposes that target.
+            # Otherwise fall back to the default build, then manually install
+            # only libjitterentropy.a and the public header.
+            if make -n libjitterentropy.a >/dev/null 2>&1; then
+              make -j"$(nproc)" libjitterentropy.a \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                CFLAGS="$JENT_CFLAGS" \
+                LDFLAGS="$JENT_LDFLAGS"
+            else
+              make -j"$(nproc)" \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                CFLAGS="$JENT_CFLAGS" \
+                LDFLAGS="$JENT_LDFLAGS"
+            fi
+
+            if [ ! -f libjitterentropy.a ]; then
+              echo "libjitterentropy.a was not created. Searching build tree..." >&2
+              find . \( \
+                -name 'libjitterentropy.a' -o \
+                -name 'libjitterentropy.so*' -o \
+                -name 'jitterentropy*.o' \
+              \) -print
+              exit 1
+            fi
+
+            cp -v libjitterentropy.a "$DEPS_DIR/lib/"
+            "$RANLIB" "$DEPS_DIR/lib/libjitterentropy.a" || true
+
+            # Install all public jitterentropy headers needed by jitterentropy.h.
+            for hdr in \
+              jitterentropy.h \
+              jitterentropy-base-user.h \
+              jitterentropy-base.h \
+              jitterentropy-health.h \
+              jitterentropy-noise.h \
+              jitterentropy-timer.h \
+              jitterentropy-gcd.h \
+              jitterentropy-sha3.h \
+              jitterentropy-status.h \
+              jitterentropy-internal.h
+            do
+              found_hdr=""
+
+              for dir in include src .; do
+                if [ -f "$dir/$hdr" ]; then
+                  found_hdr="$dir/$hdr"
+                  break
+                fi
+              done
+
+              if [ -n "$found_hdr" ]; then
+                cp -v "$found_hdr" "$DEPS_DIR/include/"
+              fi
+            done
+
+            if [ ! -f "$DEPS_DIR/include/jitterentropy.h" ]; then
+              echo "jitterentropy.h not installed" >&2
+              find . -name 'jitterentropy*.h' -print
+              exit 1
+            fi
+
+            if [ ! -f "$DEPS_DIR/include/jitterentropy-base-user.h" ]; then
+              echo "jitterentropy-base-user.h not installed" >&2
+              find . -name 'jitterentropy*.h' -print
+              exit 1
+            fi
+            
+            # Try to extract a version from the header; fall back safely.
+            JENT_VERSION="$(
+              grep -E '#define[[:space:]]+JENT_VERSION' "$DEPS_DIR/include/jitterentropy.h" 2>/dev/null \
+                | awk '{print $3}' \
+                | tr -d '"' \
+                | head -n1
+            )"
+            JENT_VERSION="${JENT_VERSION:-3.7.0}"
+
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: jitterentropy'
+              printf '%s\n' 'Description: CPU Jitter Random Number Generator library'
+              printf '%s\n' "Version: $JENT_VERSION"
+              printf '%s\n' 'Libs: -L${libdir} -ljitterentropy'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/jitterentropy.pc"
+
+            cp -v "$DEPS_DIR/lib/pkgconfig/jitterentropy.pc" "$DEPS_DIR/lib/pkgconfig/libjitterentropy.pc"
+
+            echo "Validating jitterentropy-library output:"
+            file "$DEPS_DIR/lib/libjitterentropy.a" || true
+            "$AR" t "$DEPS_DIR/lib/libjitterentropy.a" | head || true
+
+            {
+              printf '%s\n' '#include <jitterentropy.h>'
+              printf '%s\n' ''
+              printf '%s\n' 'int main(void) {'
+              printf '%s\n' '  return 0;'
+              printf '%s\n' '}'
+            } > "$GITHUB_WORKSPACE/_build/test-jitterentropy.c"
+
+            "$CC" \
+              -I"$DEPS_DIR/include" \
+              "$GITHUB_WORKSPACE/_build/test-jitterentropy.c" \
+              -L"$DEPS_DIR/lib" \
+              -ljitterentropy \
+              -o "$GITHUB_WORKSPACE/_build/test-jitterentropy"
+
+            file "$GITHUB_WORKSPACE/_build/test-jitterentropy" || true
+
+            cd "$GITHUB_WORKSPACE"
+
+            echo "Installed jitterentropy files:"
+            find "$DEPS_DIR" \( \
+              -name '*jitter*' -o \
+              -name 'jitterentropy.pc' -o \
+              -name 'libjitterentropy.pc' \
+            \) -print
+
+            echo "jitterentropy pkg-config:"
+            pkg-config --cflags jitterentropy || true
+            pkg-config --libs jitterentropy || true
+            pkg-config --cflags libjitterentropy || true
+            pkg-config --libs libjitterentropy || true
+          }
+
+          build_libcap() {
+            clone_repo_at_ref "$LIBCAP_REPO" "$LIBCAP_REF" _src/libcap
+
+            cd _src/libcap
+
+            make clean || true
+
+            # Build only static libcap.a. Avoid top-level/shared libcap.so build.
+            make -C libcap -j"$(nproc)" libcap.a \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              OBJCOPY="$OBJCOPY" \
+              OBJDUMP="$OBJDUMP" \
+              READELF="$READELF" \
+              BUILD_CC="gcc" \
+              PAM_CAP=no \
+              RAISE_SETFCAP=no \
+              DYNAMIC=no \
+              GOLANG=no
+
+            mkdir -p "$DEPS_DIR/lib" "$DEPS_DIR/include/sys" "$DEPS_DIR/include/linux" "$DEPS_DIR/lib/pkgconfig"
+
+            if [ -f libcap/libcap.a ]; then
+              cp -v libcap/libcap.a "$DEPS_DIR/lib/"
+              "$RANLIB" "$DEPS_DIR/lib/libcap.a" || true
+            else
+              echo "libcap.a not found" >&2
+              find . -name 'libcap.a' -o -name 'capability.h'
+              exit 1
+            fi
+
+            if [ -f libcap/include/sys/capability.h ]; then
+              cp -v libcap/include/sys/capability.h "$DEPS_DIR/include/sys/"
+            else
+              echo "sys/capability.h not found" >&2
+              find . -path '*/sys/capability.h' -o -name 'capability.h'
+              exit 1
+            fi
+
+            if [ -f libcap/include/uapi/linux/capability.h ]; then
+              cp -v libcap/include/uapi/linux/capability.h "$DEPS_DIR/include/linux/"
+            fi
+
+            {
+              printf '%s\n' "prefix=$DEPS_DIR"
+              printf '%s\n' 'exec_prefix=${prefix}'
+              printf '%s\n' 'libdir=${prefix}/lib'
+              printf '%s\n' 'includedir=${prefix}/include'
+              printf '%s\n' ''
+              printf '%s\n' 'Name: libcap'
+              printf '%s\n' 'Description: POSIX capabilities library'
+              printf '%s\n' 'Version: 2.78'
+              printf '%s\n' 'Libs: -L${libdir} -lcap'
+              printf '%s\n' 'Cflags: -I${includedir}'
+            } > "$DEPS_DIR/lib/pkgconfig/libcap.pc"
+
+            cd "$GITHUB_WORKSPACE"
+
+            echo "Installed libcap files:"
+            find "$DEPS_DIR" \( \
+              -name 'libcap*' -o \
+              -path '*/sys/capability.h' -o \
+              -path '*/linux/capability.h' \
+            \) -print
+
+            echo "libcap pkg-config:"
+            pkg-config --cflags libcap
+            pkg-config --libs libcap
+          }
+          
+          build_all_rng_dependencies() {
+            build_zlib
+            build_openssl
+            build_jansson
+            build_libxml2
+            build_curl
+            build_libcap
+            build_eudev
+            build_libusb
+            build_librtlsdr
+            build_libp11
+            build_jitterentropy_library
+
+            echo "Dependency prefix contents:"
+            find "$DEPS_DIR" -maxdepth 4 -type f | sort
+
+            echo "pkg-config modules:"
+            pkg-config --list-all | sort || true
           }
 
           build_haveged() {
             clone_repo_at_ref "$HAVEGED_REPO" "$HAVEGED_REF" _src/haveged
+
             cd _src/haveged
+
             autoreconf -fiv
+
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
-              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
-              CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS"
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS"
+
             make -j"$(nproc)" || {
               echo "haveged parallel build failed; retrying single-threaded" >&2
               make clean
-              make || {
-                echo "haveged build failed" >&2
-                exit 1
-              }
+              make
             }
 
-            # Check multiple possible binary locations
             if [ -f haveged/.libs/haveged ]; then
               binary_path="haveged/.libs/haveged"
             elif [ -f haveged/haveged ]; then
               binary_path="haveged/haveged"
             elif [ -f src/.libs/haveged ]; then
               binary_path="src/.libs/haveged"
+            elif [ -f src/haveged ]; then
+              binary_path="src/haveged"
             else
-              echo "haveged binary not found. Searching for it..." >&2
+              echo "haveged binary not found. Searching..." >&2
               find . -name "haveged" -type f -executable 2>/dev/null || true
-              echo "haveged build failed: binary not found in expected locations" >&2
               exit 1
             fi
 
-            cp "$binary_path" "${GITHUB_WORKSPACE}/${OUT_DIR}/haveged"
-            cd "${GITHUB_WORKSPACE}"
+            cp "$binary_path" "$GITHUB_WORKSPACE/$OUT_DIR/haveged"
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_rngd() {
             clone_repo_at_ref "$RNG_TOOLS_REPO" "$RNG_TOOLS_REF" _src/rng-tools
+
             cd _src/rng-tools
+
             ./autogen.sh
+
+            echo "Checking rng-tools dependency pkg-config modules:"
+            for pc in \
+              libcap \
+              openssl \
+              libcrypto \
+              libcurl \
+              jansson \
+              libxml-2.0 \
+              librtlsdr \
+              rtlsdr \
+              libusb-1.0 \
+              libudev \
+              libp11 \
+              jitterentropy \
+              libjitterentropy
+            do
+              if pkg-config --exists "$pc"; then
+                echo "  found: $pc"
+                pkg-config --cflags "$pc" || true
+                pkg-config --libs --static "$pc" || true
+              else
+                echo "  missing: $pc"
+              fi
+            done
+
+            RNGD_CPPFLAGS="$COMMON_CPPFLAGS"
+            RNGD_LDFLAGS="$COMMON_LDFLAGS"
+
+            RNGD_PKG_CFLAGS="$(
+              pkg-config --cflags \
+                libcap \
+                openssl \
+                libcurl \
+                jansson \
+                libxml-2.0 \
+                librtlsdr \
+                libusb-1.0 \
+                libudev \
+                libp11 \
+                jitterentropy 2>/dev/null || true
+            )"
+
+            RNGD_PKG_LIBS="$(
+              pkg-config --libs --static \
+                libcap \
+                openssl \
+                libcurl \
+                jansson \
+                libxml-2.0 \
+                librtlsdr \
+                libusb-1.0 \
+                libudev \
+                libp11 \
+                jitterentropy 2>/dev/null || true
+            )"
+
+            # Safety net for static transitive dependencies that some .pc files may omit.
+            RNGD_EXTRA_LIBS="-ludev -lcap -lrtlsdr -lusb-1.0 -lp11 -lxml2 -lcurl -ljansson -lssl -lcrypto -ljitterentropy -lz -ldl -pthread -latomic"
+
+            echo "RNGD_PKG_CFLAGS=$RNGD_PKG_CFLAGS"
+            echo "RNGD_PKG_LIBS=$RNGD_PKG_LIBS"
+            echo "RNGD_EXTRA_LIBS=$RNGD_EXTRA_LIBS"
+
+            # Let rng-tools detect the target-built libraries from $DEPS_DIR.
+            # No --without-* feature disables here.
             ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
               --disable-silent-rules \
-              CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
-              CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS" \
-              PKG_CONFIG=pkg-config
-            make -j"$(nproc)" || {
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              PKG_CONFIG=pkg-config \
+              CPPFLAGS="$RNGD_CPPFLAGS $RNGD_PKG_CFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$RNGD_LDFLAGS" \
+              LIBS="$RNGD_PKG_LIBS $RNGD_EXTRA_LIBS"
+
+            make V=1 -j"$(nproc)" || {
               echo "rngd parallel build failed; retrying single-threaded" >&2
               make clean
-              make || {
-                echo "rngd build failed" >&2
-                exit 1
-              }
+              make V=1
             }
-            cp rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/rngd"
-            cd "${GITHUB_WORKSPACE}"
+
+            if [ -f rngd ]; then
+              cp -v rngd "$GITHUB_WORKSPACE/$OUT_DIR/rngd"
+            else
+              echo "rngd binary not found. Searching..." >&2
+              find . -name "rngd" -type f -executable 2>/dev/null || true
+              exit 1
+            fi
+
+            cd "$GITHUB_WORKSPACE"
           }
 
           build_stty() {
-            curl -fsSL "https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz" -o _build/coreutils.tar.xz
-            echo "${COREUTILS_SHA256}  _build/coreutils.tar.xz" | sha256sum -c -
-            tar -xf _build/coreutils.tar.xz -C _src
-            coreutils_dir="_src/coreutils-${COREUTILS_VERSION}"
-            cd "$coreutils_dir"
-            ./configure --host="$HOST" --prefix=/usr CFLAGS="$COMMON_CFLAGS" CPPFLAGS="$COMMON_CPPFLAGS" LDFLAGS="$COMMON_LDFLAGS"
-            make -j"$(nproc)" src/stty || {
-              echo "stty parallel build failed; retrying single-threaded" >&2
-              make src/stty || {
-                echo "stty build failed" >&2
-                exit 1
-              }
-            }
-            cp src/stty "${GITHUB_WORKSPACE}/${OUT_DIR}/stty"
-            cd "${GITHUB_WORKSPACE}"
-          }
+            : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
+            : "${COREUTILS_SHA256_BASE64:?COREUTILS_SHA256_BASE64 is not set}"
 
+            url="https://ftp.gnu.org/gnu/coreutils/coreutils-${COREUTILS_VERSION}.tar.xz"
+            out="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.tar.xz"
+            srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
+            logdir="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}-logs"
+            final_stty="$GITHUB_WORKSPACE/$OUT_DIR/stty"
+
+            mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir" "$GITHUB_WORKSPACE/$OUT_DIR"
+
+            if [ -x "$srcdir/src/stty" ]; then
+              echo "Using existing Coreutils stty: $srcdir/src/stty"
+              cp -v "$srcdir/src/stty" "$final_stty"
+              "$STRIP" "$final_stty" 2>/dev/null || true
+              chmod 0755 "$final_stty"
+              file "$final_stty" || true
+              return 0
+            fi
+
+            rm -rf "$srcdir"
+            rm -f "$out"
+
+            echo "Downloading coreutils: $url"
+            curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
+
+            echo "Verifying coreutils base64 SHA256:"
+            python3 -c 'import base64, hashlib, sys; p=sys.argv[1]; exp=sys.argv[2]; data=open(p,"rb").read(); got=base64.b64encode(hashlib.sha256(data).digest()).decode(); print(f"{p}: {got}"); sys.exit(0 if got == exp else 1)' "$out" "$COREUTILS_SHA256_BASE64"
+
+            tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
+
+            cd "$srcdir"
+
+            echo "Configuring Coreutils for $HOST"
+
+            # Execute directly to prevent pipeline redirection status masking
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
+              --host="$HOST" \
+              --prefix=/usr \
+              --without-selinux \
+              --disable-acl \
+              --disable-xattr \
+              --disable-nls \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
+              > "$logdir/configure.log" 2>&1
+            
+            CONF_EXIT=$?
+            if [ $CONF_EXIT -ne 0 ]; then
+              echo "CRITICAL ERROR: Coreutils configure failed with exit code $CONF_EXIT!" >&2
+              echo "=== DISPLAYING LAST 200 LINES OF config.log ===" >&2
+              if [ -f config.log ]; then
+                tail -n 200 config.log >&2
+              else
+                tail -n 200 "$logdir/configure.log" >&2
+              fi
+              echo "===============================================" >&2
+              exit 1
+            fi
+
+            echo "Building Coreutils internal library dependencies (Parallel)"
+
+            make V=1 -j"$(nproc)" -C lib \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
+              > "$logdir/build-coreutils-lib.log" 2>&1
+            
+            BUILD_LIB_EXIT=$?
+            if [ $BUILD_LIB_EXIT -eq 0 ]; then
+              echo "Coreutils lib parallel build failed (Exit: $BUILD_LIB_EXIT). Printing logs and retrying single-threaded..." >&2
+              echo "=== PARALLEL LIB BUILD LOG TAIL ===" >&2
+              tail -n 240 "$logdir/build-coreutils-lib.log" >&2 || true
+              echo "===================================" >&2
+
+              echo "Building Coreutils internal library dependencies (Single-Threaded)"
+              make V=1 -j1 -C lib \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                STRIP="$STRIP" \
+                CPPFLAGS="$COMMON_CPPFLAGS" \
+                CFLAGS="$COMMON_CFLAGS" \
+                LDFLAGS="$COMMON_LDFLAGS -static" \
+                > "$logdir/build-coreutils-lib-single.log" 2>&1
+              
+              BUILD_LIB_SINGLE_EXIT=$?
+              if [ $BUILD_LIB_SINGLE_EXIT -eq 0 ]; then
+                echo "CRITICAL ERROR: Coreutils lib single-threaded build failed (Exit: $BUILD_LIB_SINGLE_EXIT)!" >&2
+                echo "=== SINGLE-THREADED LIB BUILD LOG TAIL ===" >&2
+                tail -n 300 "$logdir/build-coreutils-lib-single.log" >&2 || true
+                echo "==========================================" >&2
+                exit 1
+              fi
+            fi
+
+            echo "Building only Coreutils stty (Parallel)"
+
+            make V=1 -j"$(nproc)" -C src \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS -I.. -I../lib -I." \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
+              stty \
+              > "$logdir/build-stty.log" 2>&1
+            
+            BUILD_STTY_EXIT=$?
+            if [ $BUILD_STTY_EXIT -eq 0 ]; then
+              echo "Coreutils stty parallel build failed (Exit: $BUILD_STTY_EXIT). Printing logs and retrying single-threaded..." >&2
+              echo "=== PARALLEL STTY BUILD LOG TAIL ===" >&2
+              tail -n 240 "$logdir/build-stty.log" >&2 || true
+              echo "====================================" >&2
+
+              echo "Building only Coreutils stty (Single-Threaded)"
+              make V=1 -j1 -C src \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                STRIP="$STRIP" \
+                CPPFLAGS="$COMMON_CPPFLAGS -I.. -I../lib -I." \
+                CFLAGS="$COMMON_CFLAGS" \
+                LDFLAGS="$COMMON_LDFLAGS -static" \
+                stty \
+                > "$logdir/build-stty-single.log" 2>&1
+              
+              BUILD_STTY_SINGLE_EXIT=$?
+              if [ $BUILD_STTY_SINGLE_EXIT -eq 0 ]; then
+                echo "CRITICAL ERROR: Coreutils stty single-threaded build failed (Exit: $BUILD_STTY_SINGLE_EXIT)!" >&2
+                echo "=== SINGLE-THREADED STTY BUILD LOG TAIL ===" >&2
+                tail -n 300 "$logdir/build-stty-single.log" >&2 || true
+                echo "===========================================" >&2
+                exit 1
+              fi
+            fi
+
+            if [ ! -f "src/stty" ]; then
+              echo "CRITICAL ERROR: src/stty was not created despite build completing!" >&2
+              echo "Coreutils logs are in: $logdir" >&2
+              find . -name 'stty' -type f -print
+              exit 1
+            fi
+
+            cp -v src/stty "$final_stty"
+            "$STRIP" "$final_stty" 2>/dev/null || true
+            chmod 0755 "$final_stty"
+            file "$final_stty" || true
+
+            echo "Successfully built and packaged stty target."
+            cd "$GITHUB_WORKSPACE"
+          }
+          
           build_nonroot() {
+            mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/$OUT_DIR"
+
+            src="$GITHUB_WORKSPACE/_build/nonroot.c"
+            out="$GITHUB_WORKSPACE/$OUT_DIR/nonroot"
+
             printf '%s\n' \
               '#include <errno.h>' \
               '#include <grp.h>' \
@@ -233,40 +1303,92 @@ jobs:
               '    return 65;' \
               '  }' \
               '' \
-              '  if (setgroups(0, NULL) != 0 || setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {' \
+              '  if (initgroups(argv[1], pw->pw_gid) != 0) {' \
+              '    fprintf(stderr, "nonroot: failed to initialize groups for '\''%s'\'': %s\\n", argv[1], strerror(errno));' \
+              '    return 66;' \
+              '  }' \
+              '' \
+              '  if (setgid(pw->pw_gid) != 0 || setuid(pw->pw_uid) != 0) {' \
               '    fprintf(stderr, "nonroot: failed to switch to '\''%s'\'': %s\\n", argv[1], strerror(errno));' \
               '    return 66;' \
               '  }' \
               '' \
               '  execvp(argv[2], &argv[2]);' \
+              '' \
               '  fprintf(stderr, "nonroot: failed to exec '\''%s'\'': %s\\n", argv[2], strerror(errno));' \
               '  return 67;' \
-              '}' > _build/nonroot.c
-            "$CC" $COMMON_CPPFLAGS $COMMON_CFLAGS $COMMON_LDFLAGS -s _build/nonroot.c -o "${OUT_DIR}/nonroot"
+              '}' > "$src"
+
+            echo "Building nonroot for $HOST"
+
+            "$CC" \
+              ${COMMON_CPPFLAGS:-} \
+              ${COMMON_CFLAGS:-} \
+              "$src" \
+              ${COMMON_LDFLAGS:-} \
+              -o "$out"
+
+            "$STRIP" "$out" 2>/dev/null || true
+
+            chmod 0755 "$out"
+
+            file "$out" || true
           }
- 
+          
           build_jitterentropy_rngd() {
             clone_repo_at_ref "$JITTERENTROPY_REPO" "$JITTERENTROPY_REF" _src/jitterentropy-rngd
+
             cd _src/jitterentropy-rngd
-            make -j"$(nproc)" \
+
+            JENT_RNGD_CPPFLAGS="$COMMON_CPPFLAGS $(pkg-config --cflags jitterentropy 2>/dev/null || true)"
+            JENT_RNGD_LDFLAGS="$COMMON_LDFLAGS $(pkg-config --libs-only-L jitterentropy 2>/dev/null || true)"
+            JENT_RNGD_LIBS="$(pkg-config --libs jitterentropy 2>/dev/null || printf '%s\n' '-ljitterentropy') -pthread"
+
+            echo "Building jitterentropy-rngd for $HOST"
+            echo "JENT_RNGD_CPPFLAGS=$JENT_RNGD_CPPFLAGS"
+            echo "JENT_RNGD_LDFLAGS=$JENT_RNGD_LDFLAGS"
+            echo "JENT_RNGD_LIBS=$JENT_RNGD_LIBS"
+
+            make V=1 -j"$(nproc)" \
               CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$JENT_RNGD_LDFLAGS" \
+              LDLIBS="$JENT_RNGD_LIBS" \
+              LIBS="$JENT_RNGD_LIBS" \
+              EXTRA_CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
               EXTRA_CFLAGS="$COMMON_CFLAGS" \
-              EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
-              EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
-              echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
-              make clean || true
-              make \
-                CC="$CC" \
-                EXTRA_CFLAGS="$COMMON_CFLAGS" \
-                EXTRA_CPPFLAGS="$COMMON_CPPFLAGS" \
-                EXTRA_LDFLAGS="$COMMON_LDFLAGS" || {
-                echo "jitterentropy-rngd build failed" >&2
-                exit 1
+              EXTRA_LDFLAGS="$JENT_RNGD_LDFLAGS $JENT_RNGD_LIBS" || {
+                echo "jitterentropy-rngd parallel build failed; retrying single-threaded" >&2
+                make clean || true
+                make V=1 \
+                  CC="$CC" \
+                  AR="$AR" \
+                  RANLIB="$RANLIB" \
+                  CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
+                  CFLAGS="$COMMON_CFLAGS" \
+                  LDFLAGS="$JENT_RNGD_LDFLAGS" \
+                  LDLIBS="$JENT_RNGD_LIBS" \
+                  LIBS="$JENT_RNGD_LIBS" \
+                  EXTRA_CPPFLAGS="$JENT_RNGD_CPPFLAGS" \
+                  EXTRA_CFLAGS="$COMMON_CFLAGS" \
+                  EXTRA_LDFLAGS="$JENT_RNGD_LDFLAGS $JENT_RNGD_LIBS"
               }
-            }
-            cp jitterentropy-rngd "${GITHUB_WORKSPACE}/${OUT_DIR}/jitterentropy-rngd"
-            cd "${GITHUB_WORKSPACE}"
+
+            if [ -f jitterentropy-rngd ]; then
+              cp -v jitterentropy-rngd "$GITHUB_WORKSPACE/$OUT_DIR/jitterentropy-rngd"
+            else
+              echo "jitterentropy-rngd binary not found. Searching..." >&2
+              find . -name "jitterentropy-rngd" -type f -executable 2>/dev/null || true
+              exit 1
+            fi
+
+            cd "$GITHUB_WORKSPACE"
           }
+
+          build_all_rng_dependencies
 
           build_haveged
           build_rngd
@@ -274,14 +1396,32 @@ jobs:
           build_nonroot
           build_jitterentropy_rngd
 
-          chmod 755 "${OUT_DIR}/haveged" "${OUT_DIR}/rngd" "${OUT_DIR}/stty" "${OUT_DIR}/nonroot" "${OUT_DIR}/jitterentropy-rngd"
-          "$STRIP" "${OUT_DIR}/haveged" "${OUT_DIR}/rngd" "${OUT_DIR}/stty" "${OUT_DIR}/nonroot" "${OUT_DIR}/jitterentropy-rngd" || true
+          chmod 755 \
+            "$OUT_DIR/haveged" \
+            "$OUT_DIR/rngd" \
+            "$OUT_DIR/stty" \
+            "$OUT_DIR/nonroot" \
+            "$OUT_DIR/jitterentropy-rngd"
 
-          md5sum "${OUT_DIR}/haveged" | awk '{print $1}' > "${OUT_DIR}/haveged.md5sum"
-          md5sum "${OUT_DIR}/rngd" | awk '{print $1}' > "${OUT_DIR}/rngd.md5sum"
-          md5sum "${OUT_DIR}/stty" | awk '{print $1}' > "${OUT_DIR}/stty.md5sum"
-          md5sum "${OUT_DIR}/nonroot" | awk '{print $1}' > "${OUT_DIR}/nonroot.md5sum"
-          md5sum "${OUT_DIR}/jitterentropy-rngd" | awk '{print $1}' > "${OUT_DIR}/jitterentropy-rngd.md5sum"
+          "$STRIP" \
+            "$OUT_DIR/haveged" \
+            "$OUT_DIR/rngd" \
+            "$OUT_DIR/stty" \
+            "$OUT_DIR/nonroot" \
+            "$OUT_DIR/jitterentropy-rngd" || true
+
+          file \
+            "$OUT_DIR/haveged" \
+            "$OUT_DIR/rngd" \
+            "$OUT_DIR/stty" \
+            "$OUT_DIR/nonroot" \
+            "$OUT_DIR/jitterentropy-rngd"
+
+          md5sum "$OUT_DIR/haveged" | awk '{print $1}' > "$OUT_DIR/haveged.md5sum"
+          md5sum "$OUT_DIR/rngd" | awk '{print $1}' > "$OUT_DIR/rngd.md5sum"
+          md5sum "$OUT_DIR/stty" | awk '{print $1}' > "$OUT_DIR/stty.md5sum"
+          md5sum "$OUT_DIR/nonroot" | awk '{print $1}' > "$OUT_DIR/nonroot.md5sum"
+          md5sum "$OUT_DIR/jitterentropy-rngd" | awk '{print $1}' > "$OUT_DIR/jitterentropy-rngd.md5sum"
 
       - name: Upload helper binaries
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.0
@@ -310,11 +1450,13 @@ jobs:
         id: ref
         run: |
           set -eu
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
             checkout_ref="${{ inputs.target_branch }}"
           else
             checkout_ref="${{ github.sha }}"
           fi
+
           echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
@@ -331,20 +1473,40 @@ jobs:
       - name: Stage nightly helper binaries
         run: |
           set -eu
+
           find _helper-artifacts/helper-binaries-nightly-linux-armv7 -type f -exec cp -f {} armv7/ \;
           find _helper-artifacts/helper-binaries-nightly-linux-armv8 -type f -exec cp -f {} armv8/ \;
-          chmod 755 armv7/haveged armv7/rngd armv7/stty armv7/nonroot armv7/jitterentropy-rngd
-          chmod 755 armv8/haveged armv8/rngd armv8/stty armv8/nonroot armv8/jitterentropy-rngd
+
+          chmod 755 \
+            armv7/haveged \
+            armv7/rngd \
+            armv7/stty \
+            armv7/nonroot \
+            armv7/jitterentropy-rngd \
+            armv8/haveged \
+            armv8/rngd \
+            armv8/stty \
+            armv8/nonroot \
+            armv8/jitterentropy-rngd
 
       - name: Commit nightly helper binaries
         run: |
           set -eu
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
-            armv7/haveged armv7/haveged.md5sum armv7/rngd armv7/rngd.md5sum armv7/stty armv7/stty.md5sum armv7/nonroot armv7/nonroot.md5sum armv7/jitterentropy-rngd armv7/jitterentropy-rngd.md5sum \
-            armv8/haveged armv8/haveged.md5sum armv8/rngd armv8/rngd.md5sum armv8/stty armv8/stty.md5sum armv8/nonroot armv8/nonroot.md5sum armv8/jitterentropy-rngd armv8/jitterentropy-rngd.md5sum
+            armv7/haveged armv7/haveged.md5sum \
+            armv7/rngd armv7/rngd.md5sum \
+            armv7/stty armv7/stty.md5sum \
+            armv7/nonroot armv7/nonroot.md5sum \
+            armv7/jitterentropy-rngd armv7/jitterentropy-rngd.md5sum \
+            armv8/haveged armv8/haveged.md5sum \
+            armv8/rngd armv8/rngd.md5sum \
+            armv8/stty armv8/stty.md5sum \
+            armv8/nonroot armv8/nonroot.md5sum \
+            armv8/jitterentropy-rngd armv8/jitterentropy-rngd.md5sum
 
           if git diff --cached --quiet; then
             echo "No helper-binaries-nightly changes to commit."
