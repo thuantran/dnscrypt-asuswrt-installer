@@ -102,18 +102,7 @@ jobs:
 
           ${{ matrix.cc_prefix }}-gcc --version
           ${{ matrix.cc_prefix }}-ld --version
-
-      - name: Restore Coreutils stty build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            _src/coreutils-${{ env.COREUTILS_VERSION }}
-            _build/coreutils-${{ env.COREUTILS_VERSION }}.config.cache
-            _build/coreutils-cross-compat.h
-          key: coreutils-stty-${{ env.COREUTILS_VERSION }}-${{ matrix.host_triplet }}-${{ env.COREUTILS_CACHE_REV }}
-          restore-keys: |
-            coreutils-stty-${{ env.COREUTILS_VERSION }}-${{ matrix.host_triplet }}-
-
+          
       - name: Build helper binaries from source
         env:
           HOST: ${{ matrix.host_triplet }}
@@ -181,7 +170,7 @@ jobs:
           LIBP11_REPO="https://github.com/OpenSC/libp11.git"
           LIBP11_REF="master"
 
-          : "${COREUTILS_VERSION:=9.11}"
+          COREUTILS_VERSION="9.11"
           COREUTILS_SHA256_BASE64="OUAk7aCllVIXztqc0SAeZdyPo6opwpURNaSVIdV8PMM="
 
           clone_repo_at_ref() {
@@ -1121,7 +1110,7 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
-          build_coreutils_dependencies() {
+          build_stty_() {
             : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
             : "${COREUTILS_SHA256_BASE64:?COREUTILS_SHA256_BASE64 is not set}"
 
@@ -1129,144 +1118,80 @@ jobs:
             out="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.tar.xz"
             srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
             logdir="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}-logs"
-            cache_file="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.config.cache"
 
-            mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir"
+            mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir" "$GITHUB_WORKSPACE/$OUT_DIR"
 
-            if [ -x "$srcdir/src/stty" ] && [ -f "$srcdir/Makefile" ]; then
-              echo "Coreutils stty already built: $srcdir/src/stty"
+            if [ -x "$srcdir/src/stty" ]; then
+              echo "Using existing Coreutils stty: $srcdir/src/stty"
+              cp -v "$srcdir/src/stty" "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+              "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" 2>/dev/null || true
+              chmod 0755 "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+              file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
               return 0
             fi
 
-            if [ ! -d "$srcdir" ]; then
-              rm -f "$out"
+            rm -rf "$srcdir"
+            rm -f "$out"
 
-              echo "Downloading coreutils: $url"
-              curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
+            echo "Downloading coreutils: $url"
+            curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
 
-              echo "Verifying coreutils base64 SHA256:"
-              python3 -c 'import base64, hashlib, sys; p=sys.argv[1]; exp=sys.argv[2]; data=open(p,"rb").read(); got=base64.b64encode(hashlib.sha256(data).digest()).decode(); print(f"{p}: {got}"); sys.exit(0 if got == exp else 1)' "$out" "$COREUTILS_SHA256_BASE64"
+            echo "Verifying coreutils base64 SHA256:"
+            python3 -c 'import base64, hashlib, sys; p=sys.argv[1]; exp=sys.argv[2]; data=open(p,"rb").read(); got=base64.b64encode(hashlib.sha256(data).digest()).decode(); print(f"{p}: {got}"); sys.exit(0 if got == exp else 1)' "$out" "$COREUTILS_SHA256_BASE64"
 
-              tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
-            else
-              echo "Using existing Coreutils tree: $srcdir"
-            fi
+            tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
 
             cd "$srcdir"
 
-            {
-              printf '%s\n' 'ac_cv_func_malloc_0_nonnull=yes'
-              printf '%s\n' 'ac_cv_func_realloc_0_nonnull=yes'
-              printf '%s\n' 'gl_cv_func_malloc_0_nonnull=yes'
-              printf '%s\n' 'gl_cv_func_realloc_0_nonnull=yes'
-              printf '%s\n' 'gl_cv_func_working_mkstemp=yes'
-              printf '%s\n' 'gl_cv_func_getcwd_null=yes'
-              printf '%s\n' 'gl_cv_func_gettimeofday_clobber=no'
-              printf '%s\n' 'gl_cv_func_tzset_clobber=no'
-              printf '%s\n' 'gl_cv_func_working_utimes=yes'
-              printf '%s\n' 'gl_cv_func_working_mktime=yes'
-              printf '%s\n' 'gl_cv_func_working_strerror=yes'
-              printf '%s\n' 'gl_cv_func_working_strerror_r=yes'
-              printf '%s\n' 'gl_cv_func_strerror_0_works=yes'
+            echo "Configuring Coreutils for $HOST"
 
-              # AsusWRT/Merlin does not use SELinux.
-              printf '%s\n' 'ac_cv_header_selinux_selinux_h=no'
-              printf '%s\n' 'ac_cv_header_selinux_context_h=no'
-              printf '%s\n' 'ac_cv_header_selinux_label_h=no'
-              printf '%s\n' 'ac_cv_lib_selinux_getfilecon=no'
-              printf '%s\n' 'ac_cv_lib_selinux_lgetfilecon=no'
-              printf '%s\n' 'ac_cv_lib_selinux_fgetfilecon=no'
-              printf '%s\n' 'ac_cv_search_getfilecon=no'
-              printf '%s\n' 'ac_cv_search_lgetfilecon=no'
-              printf '%s\n' 'ac_cv_search_fgetfilecon=no'
-              printf '%s\n' 'gl_cv_header_selinux_selinux_h=no'
-              printf '%s\n' 'gl_cv_lib_selinux=no'
-              printf '%s\n' 'with_selinux=no'
-            } > "$cache_file"
-
-            if [ ! -f Makefile ]; then
-              echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
-
-              if ! ./configure \
-                --cache-file="$cache_file" \
-                --build="$(gcc -dumpmachine)" \
-                --host="$HOST" \
-                --prefix=/usr \
-                --without-selinux \
-                --disable-acl \
-                --disable-xattr \
-                CC="$CC" \
-                AR="$AR" \
-                RANLIB="$RANLIB" \
-                STRIP="$STRIP" \
-                CPPFLAGS="$COMMON_CPPFLAGS" \
-                CFLAGS="$COMMON_CFLAGS" \
-                LDFLAGS="$COMMON_LDFLAGS" \
-                > "$logdir/configure.log" 2>&1
-              then
-                echo "coreutils configure failed. Last 200 lines of configure.log:" >&2
-                tail -n 200 "$logdir/configure.log" >&2 || true
-
-                echo "Last 200 lines of config.log:" >&2
-                tail -n 200 config.log >&2 || true
-
-                exit 1
-              fi
-            else
-              echo "Using existing Coreutils Makefile"
-            fi
-
-            if [ ! -f Makefile ]; then
-              echo "coreutils configure completed but Makefile was not created." >&2
+            if ! ./configure \
+              --host="$HOST" \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
+              > "$logdir/configure-simple.log" 2>&1
+            then
+              echo "Coreutils configure failed. Last 200 lines:" >&2
+              tail -n 200 "$logdir/configure-simple.log" >&2 || true
+              tail -n 200 config.log >&2 || true
               exit 1
             fi
 
-            echo "Building Coreutils dependency graph needed for stty"
+            echo "Building only Coreutils stty"
 
-            if ! make V=1 -j"$(nproc)" src/stty \
-              > "$logdir/build-coreutils-stty.log" 2>&1
+            if ! make V=1 -C src \
+              CC="$CC" \
+              AR="$AR" \
+              RANLIB="$RANLIB" \
+              STRIP="$STRIP" \
+              CPPFLAGS="$COMMON_CPPFLAGS" \
+              CFLAGS="$COMMON_CFLAGS" \
+              LDFLAGS="$COMMON_LDFLAGS -static" \
+              stty \
+              > "$logdir/build-stty-simple.log" 2>&1
             then
-              echo "Coreutils stty dependency build failed; retrying single-threaded" >&2
-              tail -n 240 "$logdir/build-coreutils-stty.log" >&2 || true
-
-              if ! make V=1 -j1 src/stty \
-                > "$logdir/build-coreutils-stty-single.log" 2>&1
-              then
-                echo "Coreutils stty single-threaded build failed." >&2
-                tail -n 300 "$logdir/build-coreutils-stty-single.log" >&2 || true
-                exit 1
-              fi
+              echo "Coreutils stty build failed. Last 240 lines:" >&2
+              tail -n 240 "$logdir/build-stty-simple.log" >&2 || true
+              exit 1
             fi
 
             if [ ! -x src/stty ]; then
-              echo "Coreutils build completed but src/stty was not created." >&2
+              echo "src/stty was not created" >&2
               find . -name 'stty' -type f -print
               exit 1
             fi
 
-            echo "Coreutils stty is ready: $srcdir/src/stty"
+            cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+            "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" 2>/dev/null || true
+            chmod 0755 "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+            file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
 
             cd "$GITHUB_WORKSPACE"
-          }
-
-          build_stty() {
-            : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
-
-            srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
-            final_stty="$GITHUB_WORKSPACE/$OUT_DIR/stty"
-
-            mkdir -p "$GITHUB_WORKSPACE/$OUT_DIR"
-
-            if [ ! -x "$srcdir/src/stty" ]; then
-              echo "stty not found at $srcdir/src/stty" >&2
-              echo "Run build_coreutils_dependencies first." >&2
-              exit 1
-            fi
-
-            cp -v "$srcdir/src/stty" "$final_stty"
-            "$STRIP" "$final_stty" 2>/dev/null || true
-            chmod 0755 "$final_stty"
-            file "$final_stty" || true
           }
 
           build_nonroot() {
@@ -1383,7 +1308,6 @@ jobs:
           }
 
           build_all_rng_dependencies
-          build_coreutils_dependencies
 
           build_haveged
           build_rngd
