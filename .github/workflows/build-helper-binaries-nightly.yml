@@ -1146,25 +1146,24 @@ jobs:
 
             echo "Configuring Coreutils for $HOST"
 
-            if ! ./configure \
+            # Pass variables as environment arguments BEFORE ./configure to avoid strict toolchain sanity checks failing on static links
+            if ! CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
+               CPPFLAGS="$COMMON_CPPFLAGS" CFLAGS="$COMMON_CFLAGS" \
+               ./configure \
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
               --without-selinux \
               --disable-acl \
               --disable-xattr \
-              CC="$CC" \
-              AR="$AR" \
-              RANLIB="$RANLIB" \
-              STRIP="$STRIP" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS -static" \
               > "$logdir/configure.log" 2>&1
             then
               echo "Coreutils configure failed. Last 200 lines:" >&2
               tail -n 200 "$logdir/configure.log" >&2 || true
-              tail -n 200 config.log >&2 || true
+              if [ -f config.log ]; then
+                echo "=== config.log Snippet ===" >&2
+                tail -n 200 config.log >&2 || true
+              fi
               exit 1
             fi
 
@@ -1206,7 +1205,7 @@ jobs:
               AR="$AR" \
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
-              CPPFLAGS="$COMMON_CPPFLAGS -I.. -I../lib -I."
+              CPPFLAGS="$COMMON_CPPFLAGS -I.. -I../lib -I." \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
               stty \
@@ -1246,7 +1245,6 @@ jobs:
 
             cd "$GITHUB_WORKSPACE"
           }
-
           
           build_nonroot() {
             mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/$OUT_DIR"
