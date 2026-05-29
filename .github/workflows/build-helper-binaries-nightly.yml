@@ -33,6 +33,7 @@ jobs:
             cc_prefix: arm-linux-gnueabihf
             libc_dev: libc6-dev-armhf-cross
             openssl_target: linux-armv4
+            stty_file_pattern: 'ELF 32-bit.*ARM'
 
           - target: linux-armv8
             repo_dir: armv8
@@ -40,6 +41,7 @@ jobs:
             cc_prefix: aarch64-linux-gnu
             libc_dev: libc6-dev-arm64-cross
             openssl_target: linux-aarch64
+            stty_file_pattern: 'ELF 64-bit.*ARM aarch64'
 
     steps:
       - name: Resolve checkout ref
@@ -105,6 +107,7 @@ jobs:
           CC_PREFIX: ${{ matrix.cc_prefix }}
           OUT_DIR: dist/${{ matrix.repo_dir }}
           OPENSSL_TARGET: ${{ matrix.openssl_target }}
+          STTY_FILE_PATTERN: ${{ matrix.stty_file_pattern }}
         run: |
           set -eu
 
@@ -1362,7 +1365,13 @@ jobs:
 
             chmod 0755 "$out"
 
-            file "$out" || true
+            stty_file_output="$(file "$out")"
+            echo "$stty_file_output"
+
+            if ! printf '%s\n' "$stty_file_output" | grep -Eq "$STTY_FILE_PATTERN"; then
+              echo "stty helper for $HOST did not match expected file pattern: $STTY_FILE_PATTERN" >&2
+              exit 1
+            fi
           }
 
           build_nonroot() {
@@ -1473,11 +1482,15 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
+          # stty is a tiny standalone compatibility helper used only by rngd.
+          # Build and validate it first so both matrix targets produce their own
+          # architecture-specific stty before the heavier RNG dependency chain can fail.
+          build_stty
+
           build_all_rng_dependencies
 
           build_haveged
           build_rngd
-          build_stty
           build_nonroot
           build_jitterentropy_rngd
 
