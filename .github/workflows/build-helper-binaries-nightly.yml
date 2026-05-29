@@ -18,6 +18,10 @@ concurrency:
   group: helper-binaries-nightly-${{ inputs.target_branch || github.ref_name }}
   cancel-in-progress: true
 
+env:
+  COREUTILS_VERSION: "9.11"
+  COREUTILS_CACHE_REV: "1"
+
 jobs:
   build:
     name: Build ${{ matrix.target }}
@@ -72,9 +76,9 @@ jobs:
           sudo apt-get update
 
           sudo apt-get install -y --no-install-recommends \
-            autoconf automake build-essential ca-certificates curl file git make gcc g++ \
-            libtool pkg-config gettext autopoint texinfo gperf bison gawk xz-utils \
-            cmake ninja-build meson python3 python3-pip perl \
+            autoconf automake autopoint bison build-essential ca-certificates curl file git \
+            gcc g++ gettext gperf gzip help2man m4 make perl pkg-config tar texinfo wget xz-utils \
+            libtool cmake ninja-build meson python3 python3-pip gawk \
             libcap-dev libcurl4-openssl-dev libjansson-dev libxml2-dev libssl-dev \
             libp11-dev libp11-kit-dev librtlsdr-dev libseccomp-dev libsysfs-dev sysfsutils
 
@@ -98,6 +102,17 @@ jobs:
 
           ${{ matrix.cc_prefix }}-gcc --version
           ${{ matrix.cc_prefix }}-ld --version
+
+      - name: Restore Coreutils stty build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            _src/coreutils-${{ env.COREUTILS_VERSION }}
+            _build/coreutils-${{ env.COREUTILS_VERSION }}.config.cache
+            _build/coreutils-cross-compat.h
+          key: coreutils-stty-${{ env.COREUTILS_VERSION }}-${{ matrix.host_triplet }}-${{ env.COREUTILS_CACHE_REV }}
+          restore-keys: |
+            coreutils-stty-${{ env.COREUTILS_VERSION }}-${{ matrix.host_triplet }}-
 
       - name: Build helper binaries from source
         env:
@@ -166,7 +181,7 @@ jobs:
           LIBP11_REPO="https://github.com/OpenSC/libp11.git"
           LIBP11_REF="master"
 
-          COREUTILS_VERSION="9.11"
+          : "${COREUTILS_VERSION:=9.11}"
           COREUTILS_SHA256_BASE64="OUAk7aCllVIXztqc0SAeZdyPo6opwpURNaSVIdV8PMM="
 
           clone_repo_at_ref() {
@@ -1106,7 +1121,7 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
-          build_stty() {
+          build_coreutils_dependencies() {
             : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
             : "${COREUTILS_SHA256_BASE64:?COREUTILS_SHA256_BASE64 is not set}"
 
@@ -1115,197 +1130,29 @@ jobs:
             srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
             logdir="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}-logs"
             cache_file="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.config.cache"
-            compat_header="$GITHUB_WORKSPACE/_build/coreutils-cross-compat.h"
 
             mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir"
 
-            rm -f "$out"
-            rm -rf "$srcdir"
+            if [ -x "$srcdir/src/stty" ] && [ -f "$srcdir/Makefile" ]; then
+              echo "Coreutils stty already built: $srcdir/src/stty"
+              return 0
+            fi
 
-            echo "Downloading coreutils: $url"
-            curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
+            if [ ! -d "$srcdir" ]; then
+              rm -f "$out"
 
-            echo "Verifying coreutils base64 SHA256:"
-            python3 -c 'import base64, hashlib, sys; p=sys.argv[1]; exp=sys.argv[2]; data=open(p,"rb").read(); got=base64.b64encode(hashlib.sha256(data).digest()).decode(); print(f"{p}: {got}"); sys.exit(0 if got == exp else 1)' "$out" "$COREUTILS_SHA256_BASE64"
+              echo "Downloading coreutils: $url"
+              curl -fL --retry 5 --retry-delay 3 "$url" -o "$out"
 
-            tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
+              echo "Verifying coreutils base64 SHA256:"
+              python3 -c 'import base64, hashlib, sys; p=sys.argv[1]; exp=sys.argv[2]; data=open(p,"rb").read(); got=base64.b64encode(hashlib.sha256(data).digest()).decode(); print(f"{p}: {got}"); sys.exit(0 if got == exp else 1)' "$out" "$COREUTILS_SHA256_BASE64"
+
+              tar -xf "$out" -C "$GITHUB_WORKSPACE/_src"
+            else
+              echo "Using existing Coreutils tree: $srcdir"
+            fi
 
             cd "$srcdir"
-
-            echo "Creating Coreutils cross-build compatibility header: $compat_header"
-
-            {
-              printf '%s\n' '#ifndef COREUTILS_CROSS_COMPAT_H'
-              printf '%s\n' '#define COREUTILS_CROSS_COMPAT_H 1'
-              printf '%s\n' ''
-              printf '%s\n' '#include <sys/types.h>'
-              printf '%s\n' '#include <sys/stat.h>'
-              printf '%s\n' '#include <fcntl.h>'
-              printf '%s\n' '#include <stddef.h>'
-              printf '%s\n' '#include <stdint.h>'
-              printf '%s\n' '#include <stdlib.h>'
-              printf '%s\n' '#include <string.h>'
-              printf '%s\n' '#include <strings.h>'
-              printf '%s\n' '#include <ctype.h>'
-              printf '%s\n' '#include <locale.h>'
-              printf '%s\n' '#include <time.h>'
-              printf '%s\n' '#include <wchar.h>'
-              printf '%s\n' '#include <wctype.h>'
-              printf '%s\n' '#include <uchar.h>'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef O_SEARCH'
-              printf '%s\n' '# ifdef O_PATH'
-              printf '%s\n' '#  define O_SEARCH O_PATH'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define O_SEARCH 0'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef O_BINARY'
-              printf '%s\n' '# define O_BINARY 0'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef O_TEXT'
-              printf '%s\n' '# define O_TEXT 0'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef GNULIB_defined_F_DUPFD_CLOEXEC'
-              printf '%s\n' '# ifdef F_DUPFD_CLOEXEC'
-              printf '%s\n' '#  define GNULIB_defined_F_DUPFD_CLOEXEC 1'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define GNULIB_defined_F_DUPFD_CLOEXEC 0'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef GNULIB_defined_O_CLOEXEC'
-              printf '%s\n' '# ifdef O_CLOEXEC'
-              printf '%s\n' '#  define GNULIB_defined_O_CLOEXEC 1'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define GNULIB_defined_O_CLOEXEC 0'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef GNULIB_defined_O_NOFOLLOW'
-              printf '%s\n' '# ifdef O_NOFOLLOW'
-              printf '%s\n' '#  define GNULIB_defined_O_NOFOLLOW 1'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define GNULIB_defined_O_NOFOLLOW 0'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef S_IRWXUGO'
-              printf '%s\n' '# define S_IRWXUGO (S_IRWXU | S_IRWXG | S_IRWXO)'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef S_IRUGO'
-              printf '%s\n' '# define S_IRUGO (S_IRUSR | S_IRGRP | S_IROTH)'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef S_IWUGO'
-              printf '%s\n' '# define S_IWUGO (S_IWUSR | S_IWGRP | S_IWOTH)'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef S_IXUGO'
-              printf '%s\n' '# define S_IXUGO (S_IXUSR | S_IXGRP | S_IXOTH)'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef S_TYPEISTMO'
-              printf '%s\n' '# define S_TYPEISTMO(statbuf) 0'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef streq'
-              printf '%s\n' '# define streq(a, b) (strcmp ((a), (b)) == 0)'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef memeq'
-              printf '%s\n' '# define memeq(a, b, n) (memcmp ((a), (b), (n)) == 0)'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef unreachable'
-              printf '%s\n' '# define unreachable() abort()'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef ATTRIBUTE_PURE'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define ATTRIBUTE_PURE __attribute__ ((__pure__))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define ATTRIBUTE_PURE'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef ATTRIBUTE_CONST'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define ATTRIBUTE_CONST __attribute__ ((__const__))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define ATTRIBUTE_CONST'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef ATTRIBUTE_FORMAT'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define ATTRIBUTE_FORMAT(spec) __attribute__ ((__format__ spec))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define ATTRIBUTE_FORMAT(spec)'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef _GL_ATTRIBUTE_FORMAT_PRINTF_STANDARD'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define _GL_ATTRIBUTE_FORMAT_PRINTF_STANDARD(a, b) __attribute__ ((__format__ (__printf__, a, b)))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define _GL_ATTRIBUTE_FORMAT_PRINTF_STANDARD(a, b)'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef _GL_ARG_NONNULL'
-              printf '%s\n' '# define _GL_ARG_NONNULL(args)'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef ATTRIBUTE_NORETURN'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define ATTRIBUTE_NORETURN'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef MAYBE_UNUSED'
-              printf '%s\n' '# if defined(__GNUC__) || defined(__clang__)'
-              printf '%s\n' '#  define MAYBE_UNUSED __attribute__ ((__unused__))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define MAYBE_UNUSED'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef FALLTHROUGH'
-              printf '%s\n' '# if defined(__GNUC__) && __GNUC__ >= 7'
-              printf '%s\n' '#  define FALLTHROUGH __attribute__ ((__fallthrough__))'
-              printf '%s\n' '# else'
-              printf '%s\n' '#  define FALLTHROUGH ((void) 0)'
-              printf '%s\n' '# endif'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef UNNAMED'
-              printf '%s\n' '# define UNNAMED(name) name'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef _GL_DT_NOTDIR'
-              printf '%s\n' '# define _GL_DT_NOTDIR 0'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef stdcountof'
-              printf '%s\n' '# define stdcountof(a) (sizeof (a) / sizeof ((a)[0]))'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef countof'
-              printf '%s\n' '# define countof(a) (sizeof (a) / sizeof ((a)[0]))'
-              printf '%s\n' '#endif'
-              printf '%s\n' '#ifndef SETLOCALE_NULL_MAX'
-              printf '%s\n' '# define SETLOCALE_NULL_MAX 257'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#ifndef COREUTILS_CROSS_C32_PROTO_FIX'
-              printf '%s\n' '#define COREUTILS_CROSS_C32_PROTO_FIX 1'
-              printf '%s\n' 'typedef int (*c32_type_test_t) (wint_t);'
-              printf '%s\n' 'extern int c32isalnum (wint_t);'
-              printf '%s\n' 'extern int c32isalpha (wint_t);'
-              printf '%s\n' 'extern int c32isblank (wint_t);'
-              printf '%s\n' 'extern int c32iscntrl (wint_t);'
-              printf '%s\n' 'extern int c32isdigit (wint_t);'
-              printf '%s\n' 'extern int c32isgraph (wint_t);'
-              printf '%s\n' 'extern int c32islower (wint_t);'
-              printf '%s\n' 'extern int c32isprint (wint_t);'
-              printf '%s\n' 'extern int c32ispunct (wint_t);'
-              printf '%s\n' 'extern int c32isspace (wint_t);'
-              printf '%s\n' 'extern int c32isupper (wint_t);'
-              printf '%s\n' 'extern int c32isxdigit (wint_t);'
-              printf '%s\n' 'extern wint_t c32tolower (wint_t);'
-              printf '%s\n' 'extern int c32width (char32_t);'
-              printf '%s\n' '#endif'
-              printf '%s\n' ''
-              printf '%s\n' '#endif'
-            } > "$compat_header"
 
             {
               printf '%s\n' 'ac_cv_func_malloc_0_nonnull=yes'
@@ -1314,12 +1161,6 @@ jobs:
               printf '%s\n' 'gl_cv_func_realloc_0_nonnull=yes'
               printf '%s\n' 'gl_cv_func_working_mkstemp=yes'
               printf '%s\n' 'gl_cv_func_getcwd_null=yes'
-              printf '%s\n' 'ac_cv_header_stdckdint_h=no'
-              printf '%s\n' 'gl_cv_header_working_stdckdint_h=no'
-              printf '%s\n' 'ac_cv_header_stdcountof_h=no'
-              printf '%s\n' 'gl_cv_header_working_stdcountof_h=no'
-              printf '%s\n' 'ac_cv_header_obstack_h=no'
-              printf '%s\n' 'gl_cv_header_working_obstack_h=no'
               printf '%s\n' 'gl_cv_func_gettimeofday_clobber=no'
               printf '%s\n' 'gl_cv_func_tzset_clobber=no'
               printf '%s\n' 'gl_cv_func_working_utimes=yes'
@@ -1327,6 +1168,8 @@ jobs:
               printf '%s\n' 'gl_cv_func_working_strerror=yes'
               printf '%s\n' 'gl_cv_func_working_strerror_r=yes'
               printf '%s\n' 'gl_cv_func_strerror_0_works=yes'
+
+              # AsusWRT/Merlin does not use SELinux.
               printf '%s\n' 'ac_cv_header_selinux_selinux_h=no'
               printf '%s\n' 'ac_cv_header_selinux_context_h=no'
               printf '%s\n' 'ac_cv_header_selinux_label_h=no'
@@ -1341,789 +1184,89 @@ jobs:
               printf '%s\n' 'with_selinux=no'
             } > "$cache_file"
 
-            echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
+            if [ ! -f Makefile ]; then
+              echo "Configuring coreutils ${COREUTILS_VERSION} for $HOST"
 
-            # Configure must use clean compiler flags.
-            # Do not use -include "$compat_header" or -Wno-implicit-function-declaration here.
-            if ! ./configure \
-              --cache-file="$cache_file" \
-              --build="$(gcc -dumpmachine)" \
-              --host="$HOST" \
-              --prefix=/usr \
-              --without-selinux \
-              CC="$CC" \
-              AR="$AR" \
-              RANLIB="$RANLIB" \
-              STRIP="$STRIP" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS" \
-              > "$logdir/configure.log" 2>&1
-            then
-              echo "coreutils configure failed. Last 200 lines of configure.log:" >&2
-              tail -n 200 "$logdir/configure.log" >&2 || true
+              if ! ./configure \
+                --cache-file="$cache_file" \
+                --build="$(gcc -dumpmachine)" \
+                --host="$HOST" \
+                --prefix=/usr \
+                --without-selinux \
+                --disable-acl \
+                --disable-xattr \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                STRIP="$STRIP" \
+                CPPFLAGS="$COMMON_CPPFLAGS" \
+                CFLAGS="$COMMON_CFLAGS" \
+                LDFLAGS="$COMMON_LDFLAGS" \
+                > "$logdir/configure.log" 2>&1
+              then
+                echo "coreutils configure failed. Last 200 lines of configure.log:" >&2
+                tail -n 200 "$logdir/configure.log" >&2 || true
 
-              echo "Last 200 lines of config.log:" >&2
-              tail -n 200 config.log >&2 || true
+                echo "Last 200 lines of config.log:" >&2
+                tail -n 200 config.log >&2 || true
 
-              exit 1
+                exit 1
+              fi
+            else
+              echo "Using existing Coreutils Makefile"
             fi
 
             if [ ! -f Makefile ]; then
               echo "coreutils configure completed but Makefile was not created." >&2
-              echo "Last 200 lines of configure.log:" >&2
-              tail -n 200 "$logdir/configure.log" >&2 || true
-
-              echo "Last 200 lines of config.log:" >&2
-              tail -n 200 config.log >&2 || true
-
               exit 1
             fi
 
-            # Make-time compatibility flags only.
-            COREUTILS_MAKE_CPPFLAGS="$COMMON_CPPFLAGS -include $compat_header"
-            COREUTILS_MAKE_CFLAGS="$COMMON_CFLAGS -Wno-error -Wno-implicit-function-declaration"
+            echo "Building Coreutils dependency graph needed for stty"
 
-            ensure_coreutils_fallback_headers() {
-              mkdir -p lib src
-
-              if [ ! -f lib/stdckdint.h ]; then
-                echo "Creating fallback lib/stdckdint.h"
-                {
-                  printf '%s\n' '#ifndef _GL_STDCKDINT_H'
-                  printf '%s\n' '#define _GL_STDCKDINT_H 1'
-                  printf '%s\n' '#if defined(__GNUC__) || defined(__clang__)'
-                  printf '%s\n' '# define ckd_add(r, a, b) __builtin_add_overflow((a), (b), (r))'
-                  printf '%s\n' '# define ckd_sub(r, a, b) __builtin_sub_overflow((a), (b), (r))'
-                  printf '%s\n' '# define ckd_mul(r, a, b) __builtin_mul_overflow((a), (b), (r))'
-                  printf '%s\n' '#else'
-                  printf '%s\n' '# define ckd_add(r, a, b) ((*(r) = (a) + (b)), 0)'
-                  printf '%s\n' '# define ckd_sub(r, a, b) ((*(r) = (a) - (b)), 0)'
-                  printf '%s\n' '# define ckd_mul(r, a, b) ((*(r) = (a) * (b)), 0)'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#endif'
-                } > lib/stdckdint.h
-              fi
-
-              if [ ! -f lib/stdcountof.h ]; then
-                echo "Creating fallback lib/stdcountof.h"
-                {
-                  printf '%s\n' '#ifndef _GL_STDCOUNTOF_H'
-                  printf '%s\n' '#define _GL_STDCOUNTOF_H 1'
-                  printf '%s\n' '#ifndef stdcountof'
-                  printf '%s\n' '# define stdcountof(a) (sizeof (a) / sizeof ((a)[0]))'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef countof'
-                  printf '%s\n' '# define countof(a) (sizeof (a) / sizeof ((a)[0]))'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#endif'
-                } > lib/stdcountof.h
-              fi
-
-              if [ ! -f src/version.h ]; then
-                echo "Creating fallback src/version.h"
-                {
-                  printf '%s\n' '#ifndef COREUTILS_VERSION_H'
-                  printf '%s\n' '#define COREUTILS_VERSION_H 1'
-                  printf '%s\n' 'extern char const *Version;'
-                  printf '%s\n' '#endif'
-                } > src/version.h
-              fi
-
-              if [ ! -f lib/configmake.h ]; then
-                echo "Creating fallback lib/configmake.h"
-                {
-                  printf '%s\n' '#ifndef CONFIGMAKE_H'
-                  printf '%s\n' '#define CONFIGMAKE_H 1'
-                  printf '%s\n' '#define PREFIX "/usr"'
-                  printf '%s\n' '#define EXEC_PREFIX "/usr"'
-                  printf '%s\n' '#define BINDIR "/usr/bin"'
-                  printf '%s\n' '#define SBINDIR "/usr/sbin"'
-                  printf '%s\n' '#define LIBEXECDIR "/usr/libexec"'
-                  printf '%s\n' '#define DATAROOTDIR "/usr/share"'
-                  printf '%s\n' '#define DATADIR "/usr/share"'
-                  printf '%s\n' '#define SYSCONFDIR "/etc"'
-                  printf '%s\n' '#define LOCALSTATEDIR "/var"'
-                  printf '%s\n' '#define RUNSTATEDIR "/run"'
-                  printf '%s\n' '#define LOCALEDIR "/usr/share/locale"'
-                  printf '%s\n' '#endif'
-                } > lib/configmake.h
-              fi
-
-              if [ ! -f lib/unitypes.h ]; then
-                echo "Creating fallback lib/unitypes.h"
-                {
-                  printf '%s\n' '#ifndef UNITYPES_H'
-                  printf '%s\n' '#define UNITYPES_H 1'
-                  printf '%s\n' '#include <stdint.h>'
-                  printf '%s\n' '#include <uchar.h>'
-                  printf '%s\n' '#include <wchar.h>'
-                  printf '%s\n' 'typedef uint32_t ucs4_t;'
-                  printf '%s\n' 'typedef uint16_t ucs2_t;'
-                  printf '%s\n' 'typedef unsigned char unit_t;'
-                  printf '%s\n' '#endif'
-                } > lib/unitypes.h
-              fi
-
-              if [ ! -f lib/unictype.h ]; then
-                echo "Creating fallback lib/unictype.h"
-                {
-                  printf '%s\n' '#ifndef UNICTYPE_H'
-                  printf '%s\n' '#define UNICTYPE_H 1'
-                  printf '%s\n' '#include <ctype.h>'
-                  printf '%s\n' '#include <wchar.h>'
-                  printf '%s\n' '#include <uchar.h>'
-                  printf '%s\n' '#include "unitypes.h"'
-                  printf '%s\n' '#define uc_is_alnum(wc)   ((0 <= (wc) && (wc) <= 127) ? isalnum  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_alpha(wc)   ((0 <= (wc) && (wc) <= 127) ? isalpha  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_blank(wc)   ((0 <= (wc) && (wc) <= 127) ? isblank  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_cntrl(wc)   ((0 <= (wc) && (wc) <= 127) ? iscntrl  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_digit(wc)   ((0 <= (wc) && (wc) <= 127) ? isdigit  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_graph(wc)   ((0 <= (wc) && (wc) <= 127) ? isgraph  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_lower(wc)   ((0 <= (wc) && (wc) <= 127) ? islower  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_print(wc)   ((0 <= (wc) && (wc) <= 127) ? isprint  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_punct(wc)   ((0 <= (wc) && (wc) <= 127) ? ispunct  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_space(wc)   ((0 <= (wc) && (wc) <= 127) ? isspace  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_upper(wc)   ((0 <= (wc) && (wc) <= 127) ? isupper  ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#define uc_is_xdigit(wc)  ((0 <= (wc) && (wc) <= 127) ? isxdigit ((unsigned char) (wc)) : 0)'
-                  printf '%s\n' '#endif'
-                } > lib/unictype.h
-              fi
-
-               if [ ! -f lib/unicase.h ]; then
-                echo "Creating fallback lib/unicase.h"
-                {
-                  printf '%s\n' '#ifndef UNICASE_H'
-                  printf '%s\n' '#define UNICASE_H 1'
-                  printf '%s\n' '#include <ctype.h>'
-                  printf '%s\n' '#include <wchar.h>'
-                  printf '%s\n' '#include <uchar.h>'
-                  printf '%s\n' '#include "unitypes.h"'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static inline ucs4_t'
-                  printf '%s\n' 'uc_tolower (ucs4_t uc)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  return (uc <= 127) ? (ucs4_t) tolower ((unsigned char) uc) : uc;'
-                  printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static inline ucs4_t'
-                  printf '%s\n' 'uc_toupper (ucs4_t uc)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  return (uc <= 127) ? (ucs4_t) toupper ((unsigned char) uc) : uc;'
-                  printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static inline ucs4_t'
-                  printf '%s\n' 'uc_totitle (ucs4_t uc)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  return uc_toupper (uc);'
-                  printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' '#endif'
-                } > lib/unicase.h
-              fi   
-
-              if [ ! -f lib/uniwidth.h ]; then
-                echo "Creating fallback lib/uniwidth.h"
-                {
-                  printf '%s\n' '#ifndef UNIWIDTH_H'
-                  printf '%s\n' '#define UNIWIDTH_H 1'
-                  printf '%s\n' '#include "unitypes.h"'
-                  printf '%s\n' 'static inline int uc_width (ucs4_t uc, const char *encoding) { (void) encoding; return (uc < 32 || uc == 127) ? 0 : 1; }'
-                  printf '%s\n' '#endif'
-                } > lib/uniwidth.h
-              fi
-
-              if [ ! -f lib/uniname.h ]; then
-                echo "Creating fallback lib/uniname.h"
-                {
-                  printf '%s\n' '#ifndef UNINAME_H'
-                  printf '%s\n' '#define UNINAME_H 1'
-                  printf '%s\n' '#include "unitypes.h"'
-                  printf '%s\n' 'static inline const char *unicode_character_name (ucs4_t uc) { (void) uc; return ""; }'
-                  printf '%s\n' '#endif'
-                } > lib/uniname.h
-              fi
-
-              for h in unistr uniconv uninorm unilbrk uniwbrk; do
-                if [ ! -f "lib/${h}.h" ]; then
-                  echo "Creating fallback lib/${h}.h"
-                  {
-                    upper="$(printf '%s' "$h" | tr '[:lower:]' '[:upper:]')"
-                    printf '%s\n' "#ifndef ${upper}_H"
-                    printf '%s\n' "#define ${upper}_H 1"
-                    printf '%s\n' '#include "unitypes.h"'
-                    printf '%s\n' '#endif'
-                  } > "lib/${h}.h"
-                fi
-              done
-
-              for h in \
-                c32isalnum c32isalpha c32isblank c32iscntrl c32isdigit c32isgraph \
-                c32islower c32isprint c32ispunct c32isspace c32isupper c32isxdigit \
-                c32tolower c32width c32_apply_type_test c32_get_type_test
-              do
-                if [ ! -f "lib/${h}.h" ]; then
-                  echo "Creating fallback lib/${h}.h"
-                  {
-                    printf '%s\n' "#ifndef COREUTILS_FALLBACK_${h}_H"
-                    printf '%s\n' "#define COREUTILS_FALLBACK_${h}_H 1"
-                    printf '%s\n' '#include <ctype.h>'
-                    printf '%s\n' '#include <wchar.h>'
-                    printf '%s\n' '#include <uchar.h>'
-                    printf '%s\n' '#include "unictype.h"'
-                    printf '%s\n' '#ifndef c32_type_test_t'
-                    printf '%s\n' 'typedef int (*c32_type_test_t) (wint_t);'
-                    printf '%s\n' '#endif'
-                    printf '%s\n' '#endif'
-                  } > "lib/${h}.h"
-                fi
-              done
-
-              if [ ! -f lib/malloc/scratch_buffer.gl.h ]; then
-                echo "Creating fallback lib/malloc/scratch_buffer.gl.h"
-                mkdir -p lib/malloc
-                {
-                  printf '%s\n' '#ifndef MALLOC_SCRATCH_BUFFER_GL_H'
-                  printf '%s\n' '#define MALLOC_SCRATCH_BUFFER_GL_H 1'
-                  printf '%s\n' ''
-                  printf '%s\n' '#include <stdbool.h>'
-                  printf '%s\n' '#include <stddef.h>'
-                  printf '%s\n' '#include <stdint.h>'
-                  printf '%s\n' '#include <stdlib.h>'
-                  printf '%s\n' '#include <string.h>'
-                  printf '%s\n' ''
-                  printf '%s\n' '#ifndef SCRATCH_BUFFER_INITIAL_SIZE'
-                  printf '%s\n' '# define SCRATCH_BUFFER_INITIAL_SIZE 1024'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' ''
-                  printf '%s\n' 'struct scratch_buffer'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  void *data;'
-                  printf '%s\n' '  size_t length;'
-                  printf '%s\n' '  union'
-                  printf '%s\n' '  {'
-                  printf '%s\n' '    max_align_t __align;'
-                  printf '%s\n' '    char __c[SCRATCH_BUFFER_INITIAL_SIZE];'
-                  printf '%s\n' '  } __space;'
-                  printf '%s\n' '};'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static inline void'
-                  printf '%s\n' 'scratch_buffer_init (struct scratch_buffer *buffer)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  buffer->data = buffer->__space.__c;'
-                  printf '%s\n' '  buffer->length = sizeof buffer->__space.__c;'
-                  printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static inline void'
-                  printf '%s\n' 'scratch_buffer_free (struct scratch_buffer *buffer)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  if (buffer->data != buffer->__space.__c)'
-                  printf '%s\n' '    free (buffer->data);'
-                  printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' 'bool scratch_buffer_grow (struct scratch_buffer *buffer);'
-                  printf '%s\n' 'bool scratch_buffer_grow_preserve (struct scratch_buffer *buffer);'
-                  printf '%s\n' 'bool scratch_buffer_set_array_size (struct scratch_buffer *buffer, size_t nelem, size_t size);'
-                  printf '%s\n' 'void *scratch_buffer_dupfree (struct scratch_buffer *buffer, size_t size);'
-                  printf '%s\n' ''
-                  printf '%s\n' '#endif'
-                } > lib/malloc/scratch_buffer.gl.h
-              fi
-
-              if [ ! -f lib/idx.h ]; then
-                echo "Creating fallback lib/idx.h"
-                {
-                  printf '%s\n' '#ifndef IDX_H'
-                  printf '%s\n' '#define IDX_H 1'
-                  printf '%s\n' '#include <limits.h>'
-                  printf '%s\n' '#include <stddef.h>'
-                  printf '%s\n' '#include <stdint.h>'
-                  printf '%s\n' ''
-                  printf '%s\n' 'typedef ptrdiff_t idx_t;'
-                  printf '%s\n' ''
-                  printf '%s\n' '#ifndef IDX_MAX'
-                  printf '%s\n' '# ifdef PTRDIFF_MAX'
-                  printf '%s\n' '#  define IDX_MAX PTRDIFF_MAX'
-                  printf '%s\n' '# else'
-                  printf '%s\n' '#  define IDX_MAX ((idx_t) (((size_t) -1) / 2))'
-                  printf '%s\n' '# endif'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' ''
-                  printf '%s\n' '#ifndef IDX_MIN'
-                  printf '%s\n' '# ifdef PTRDIFF_MIN'
-                  printf '%s\n' '#  define IDX_MIN PTRDIFF_MIN'
-                  printf '%s\n' '# else'
-                  printf '%s\n' '#  define IDX_MIN (-IDX_MAX - 1)'
-                  printf '%s\n' '# endif'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' ''
-                  printf '%s\n' '#endif'
-                } > lib/idx.h
-              fi
-
-              if [ ! -f lib/attribute.h ]; then
-                echo "Creating fallback lib/attribute.h"
-                {
-                  printf '%s\n' '#ifndef ATTRIBUTE_H'
-                  printf '%s\n' '#define ATTRIBUTE_H 1'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_ALLOC_SIZE'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_ALLOC_SIZE(args)'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_DEALLOC'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_DEALLOC(func, idx)'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_MALLOC'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_MALLOC'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_NODISCARD'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_NODISCARD'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_RETURNS_NONNULL'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_RETURNS_NONNULL'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ARG_NONNULL'
-                  printf '%s\n' '# define _GL_ARG_NONNULL(args)'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_PURE'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_PURE'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef _GL_ATTRIBUTE_CONST'
-                  printf '%s\n' '# define _GL_ATTRIBUTE_CONST'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#endif'
-                } > lib/attribute.h
-              fi
-
-              if [ ! -f lib/cdefs.h ]; then
-                echo "Creating fallback lib/cdefs.h"
-                {
-                  printf '%s\n' '#ifndef CDEFS_H'
-                  printf '%s\n' '#define CDEFS_H 1'
-                  printf '%s\n' '#ifndef _Noreturn'
-                  printf '%s\n' '# if defined(__STDC_VERSION__) && 201112 <= __STDC_VERSION__'
-                  printf '%s\n' '# else'
-                  printf '%s\n' '#  define _Noreturn __attribute__ ((__noreturn__))'
-                  printf '%s\n' '# endif'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#endif'
-                } > lib/cdefs.h
-              fi
-
-              if [ ! -f lib/minmax.h ]; then
-                echo "Creating fallback lib/minmax.h"
-                {
-                  printf '%s\n' '#ifndef MINMAX_H'
-                  printf '%s\n' '#define MINMAX_H 1'
-                  printf '%s\n' '#ifndef MIN'
-                  printf '%s\n' '# define MIN(a, b) ((a) < (b) ? (a) : (b))'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifndef MAX'
-                  printf '%s\n' '# define MAX(a, b) ((a) > (b) ? (a) : (b))'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#endif'
-                } > lib/minmax.h
-              fi
-
-              if [ ! -f lib/verify.h ]; then
-                echo "Creating fallback lib/verify.h"
-                {
-                  printf '%s\n' '#ifndef VERIFY_H'
-                  printf '%s\n' '#define VERIFY_H 1'
-                  printf '%s\n' '#if defined(__STDC_VERSION__) && 201112 <= __STDC_VERSION__'
-                  printf '%s\n' '# define verify(expr) _Static_assert ((expr), "verify failed")'
-                  printf '%s\n' '#else'
-                  printf '%s\n' '# define verify(expr) typedef int verify_failed[(expr) ? 1 : -1]'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#endif'
-                } > lib/verify.h
-              fi
-
-              if [ ! -f lib/assure.h ]; then
-                echo "Creating fallback lib/assure.h"
-                {
-                  printf '%s\n' '#ifndef ASSURE_H'
-                  printf '%s\n' '#define ASSURE_H 1'
-                  printf '%s\n' '#define assure(expr) ((void) 0)'
-                  printf '%s\n' '#endif'
-                } > lib/assure.h
-              fi
-
-              if [ ! -f lib/intprops.h ]; then
-                echo "Creating fallback lib/intprops.h"
-                {
-                  printf '%s\n' '#ifndef INTPROPS_H'
-                  printf '%s\n' '#define INTPROPS_H 1'
-                  printf '%s\n' '#include <limits.h>'
-                  printf '%s\n' '#include <stdint.h>'
-                  printf '%s\n' '#define TYPE_SIGNED(t) (((t) -1) < 0)'
-                  printf '%s\n' '#define TYPE_WIDTH(t) (sizeof (t) * CHAR_BIT)'
-                  printf '%s\n' '#define TYPE_MAXIMUM(t) ((t) (TYPE_SIGNED (t) ? ((((t) 1 << (TYPE_WIDTH (t) - 2)) - 1) * 2 + 1) : ~(t) 0))'
-                  printf '%s\n' '#define TYPE_MINIMUM(t) ((t) (TYPE_SIGNED (t) ? - TYPE_MAXIMUM (t) - 1 : 0))'
-                  printf '%s\n' '#endif'
-                } > lib/intprops.h
-              fi
-
-              if [ ! -f lib/malloc/scratch_buffer.h ]; then
-                echo "Creating fallback lib/malloc/scratch_buffer.h"
-                mkdir -p lib/malloc
-                {
-                  printf '%s\n' '#ifndef MALLOC_SCRATCH_BUFFER_H'
-                  printf '%s\n' '#define MALLOC_SCRATCH_BUFFER_H 1'
-                  printf '%s\n' '#include <stddef.h>'
-                  printf '%s\n' '#include <stdlib.h>'
-                  printf '%s\n' '#include <string.h>'
-                  printf '%s\n' 'struct scratch_buffer { void *data; size_t length; char __space[1024]; };'
-                  printf '%s\n' 'static inline void scratch_buffer_init (struct scratch_buffer *b) { b->data = b->__space; b->length = sizeof b->__space; }'
-                  printf '%s\n' 'static inline void scratch_buffer_free (struct scratch_buffer *b) { if (b->data != b->__space) free (b->data); }'
-                  printf '%s\n' 'static inline int scratch_buffer_set_array_size (struct scratch_buffer *b, size_t n, size_t s) { size_t z = n * s; if (s && z / s != n) return 0; if (z <= b->length) return 1; void *p = malloc (z); if (!p) return 0; if (b->data != b->__space) free (b->data); b->data = p; b->length = z; return 1; }'
-                  printf '%s\n' '#endif'
-                } > lib/malloc/scratch_buffer.h
-              fi
-
-              if [ ! -f lib/malloc/dynarray.gl.h ]; then
-                echo "Creating fallback lib/malloc/dynarray.gl.h"
-                mkdir -p lib/malloc
-                {
-                  printf '%s\n' '#ifndef MALLOC_DYNARRAY_GL_H'
-                  printf '%s\n' '#define MALLOC_DYNARRAY_GL_H 1'
-                  printf '%s\n' '#include <stddef.h>'
-                  printf '%s\n' '#include <stdlib.h>'
-                  printf '%s\n' '#endif'
-                } > lib/malloc/dynarray.gl.h
-              fi
-
-              if [ ! -f lib/malloc/dynarray-skeleton.gl.h ]; then
-                echo "Creating fallback lib/malloc/dynarray-skeleton.gl.h"
-                mkdir -p lib/malloc
-                {
-                  printf '%s\n' '#ifndef MALLOC_DYNARRAY_SKELETON_GL_H'
-                  printf '%s\n' '#define MALLOC_DYNARRAY_SKELETON_GL_H 1'
-                  printf '%s\n' '#endif'
-                } > lib/malloc/dynarray-skeleton.gl.h
-              fi
-
-              # Force a complete fallback speedlist.h if the generated one is missing
-              # or if an earlier bad fallback exists.
-              if [ ! -f src/speedlist.h ] || ! grep -q 'baud_to_value (speed_t speed)' src/speedlist.h; then
-                echo "Creating fallback src/speedlist.h"
-                {
-                  printf '%s\n' '#ifndef SPEEDLIST_H'
-                  printf '%s\n' '#define SPEEDLIST_H 1'
-                  printf '%s\n' ''
-                  printf '%s\n' '#include <stddef.h>'
-                  printf '%s\n' '#include <termios.h>'
-                  printf '%s\n' ''
-                  printf '%s\n' 'struct speed_map'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  char const *string;'
-                  printf '%s\n' '  speed_t speed;'
-                  printf '%s\n' '  unsigned long int value;'
-                  printf '%s\n' '};'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static struct speed_map const speeds[] ='
-                  printf '%s\n' '{'
-                  printf '%s\n' '#ifdef B0'
-                  printf '%s\n' '  {"0", B0, 0},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B50'
-                  printf '%s\n' '  {"50", B50, 50},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B75'
-                  printf '%s\n' '  {"75", B75, 75},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B110'
-                  printf '%s\n' '  {"110", B110, 110},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B134'
-                  printf '%s\n' '  {"134", B134, 134},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B150'
-                  printf '%s\n' '  {"150", B150, 150},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B200'
-                  printf '%s\n' '  {"200", B200, 200},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B300'
-                  printf '%s\n' '  {"300", B300, 300},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B600'
-                  printf '%s\n' '  {"600", B600, 600},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B1200'
-                  printf '%s\n' '  {"1200", B1200, 1200},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B1800'
-                  printf '%s\n' '  {"1800", B1800, 1800},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B2400'
-                  printf '%s\n' '  {"2400", B2400, 2400},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B4800'
-                  printf '%s\n' '  {"4800", B4800, 4800},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B9600'
-                  printf '%s\n' '  {"9600", B9600, 9600},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B19200'
-                  printf '%s\n' '  {"19200", B19200, 19200},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B38400'
-                  printf '%s\n' '  {"38400", B38400, 38400},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B57600'
-                  printf '%s\n' '  {"57600", B57600, 57600},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B115200'
-                  printf '%s\n' '  {"115200", B115200, 115200},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B230400'
-                  printf '%s\n' '  {"230400", B230400, 230400},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B460800'
-                  printf '%s\n' '  {"460800", B460800, 460800},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B500000'
-                  printf '%s\n' '  {"500000", B500000, 500000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B576000'
-                  printf '%s\n' '  {"576000", B576000, 576000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B921600'
-                  printf '%s\n' '  {"921600", B921600, 921600},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B1000000'
-                  printf '%s\n' '  {"1000000", B1000000, 1000000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B1152000'
-                  printf '%s\n' '  {"1152000", B1152000, 1152000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B1500000'
-                  printf '%s\n' '  {"1500000", B1500000, 1500000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B2000000'
-                  printf '%s\n' '  {"2000000", B2000000, 2000000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B2500000'
-                  printf '%s\n' '  {"2500000", B2500000, 2500000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B3000000'
-                  printf '%s\n' '  {"3000000", B3000000, 3000000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B3500000'
-                  printf '%s\n' '  {"3500000", B3500000, 3500000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '#ifdef B4000000'
-                  printf '%s\n' '  {"4000000", B4000000, 4000000},'
-                  printf '%s\n' '#endif'
-                  printf '%s\n' '  {NULL, 0, 0}'
-                  printf '%s\n' '};'
-                  printf '%s\n' ''
-                  printf '%s\n' 'static unsigned long int'
-                  printf '%s\n' 'baud_to_value (speed_t speed)'
-                  printf '%s\n' '{'
-                  printf '%s\n' '  for (size_t i = 0; speeds[i].string != NULL; i++)'
-                  printf '%s\n' '    if (speeds[i].speed == speed)'
-                  printf '%s\n' '      return speeds[i].value;'
-                  printf '%s\n' '  return (unsigned long int) speed;'
-                  printf '%s\n' '}'
-                  printf '%s\n' ''
-                  printf '%s\n' '#endif'
-                } > src/speedlist.h
-              fi
-            }
-
-            patch_coreutils_selinux_stubs() {
-              echo "Patching Coreutils SELinux helpers as disabled stubs"
-
-              if [ -f lib/selinux-at.c ] || [ -f lib/selinux-at.h ]; then
-                cp -v lib/selinux-at.h lib/selinux-at.h.orig 2>/dev/null || true
-
-                {
-                  printf '%s\n' '#ifndef SELINUX_AT_H'
-                  printf '%s\n' '#define SELINUX_AT_H 1'
-                  printf '%s\n' '#include <errno.h>'
-                  printf '%s\n' '#define lgetfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#define getfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#define setfileconat(fd, file, con) ((void) (fd), (void) (file), (void) (con), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#endif'
-                } > lib/selinux-at.h
-              fi
-
-              if [ -f lib/selinux-at.c ]; then
-                cp -v lib/selinux-at.c lib/selinux-at.c.orig 2>/dev/null || true
-
-                {
-                  printf '%s\n' '#include <errno.h>'
-                  printf '%s\n' '#include "selinux-at.h"'
-                } > lib/selinux-at.c
-              fi
-
-              if [ -f lib/se-context.c ] || [ -f lib/se-context.h ]; then
-                cp -v lib/se-context.h lib/se-context.h.orig 2>/dev/null || true
-
-                {
-                  printf '%s\n' '#ifndef SE_CONTEXT_H'
-                  printf '%s\n' '#define SE_CONTEXT_H 1'
-                  printf '%s\n' '#include <errno.h>'
-                  printf '%s\n' ''
-                  printf '%s\n' 'typedef char *security_context_t;'
-                  printf '%s\n' 'typedef char *context_t;'
-                  printf '%s\n' 'typedef char *se_context_t;'
-                  printf '%s\n' 'typedef char const *se_const_context_t;'
-                  printf '%s\n' ''
-                  printf '%s\n' '#define se_context_new(s) ((void) (s), errno = ENOTSUP, (se_context_t) 0)'
-                  printf '%s\n' '#define se_context_free(c) ((void) (c))'
-                  printf '%s\n' '#define se_context_user_get(c) ((void) (c), (char const *) 0)'
-                  printf '%s\n' '#define se_context_role_get(c) ((void) (c), (char const *) 0)'
-                  printf '%s\n' '#define se_context_type_get(c) ((void) (c), (char const *) 0)'
-                  printf '%s\n' '#define se_context_range_get(c) ((void) (c), (char const *) 0)'
-                  printf '%s\n' '#define se_context_user_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#define se_context_role_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#define se_context_type_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#define se_context_range_set(c, s) ((void) (c), (void) (s), errno = ENOTSUP, -1)'
-                  printf '%s\n' '#endif'
-                } > lib/se-context.h
-              fi
-
-              if [ -f lib/se-context.c ]; then
-                cp -v lib/se-context.c lib/se-context.c.orig 2>/dev/null || true
-
-                {
-                  printf '%s\n' '#include <errno.h>'
-                  printf '%s\n' '#include "se-context.h"'
-                } > lib/se-context.c
-              fi
-
-              for f in lib/*selinux*.c lib/*selinux*.h lib/se-*.c lib/se-*.h; do
-                [ -f "$f" ] || continue
-                sed -i \
-                  -e '/#include[[:space:]]*<selinux\/selinux.h>/d' \
-                  -e '/#include[[:space:]]*<selinux\/context.h>/d' \
-                  -e '/#include[[:space:]]*<selinux\/label.h>/d' \
-                  "$f"
-              done
-
-              echo "SELinux stub files present:"
-              ls -l lib/selinux-at.h lib/selinux-at.c lib/se-context.h lib/se-context.c 2>/dev/null || true
-            }
-
-            patch_coreutils_selinux_stubs
-            
-            ensure_coreutils_fallback_headers
-            
-            if ! make V=1 \
-              CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
-              CFLAGS="$COREUTILS_MAKE_CFLAGS" \
-              src/version.h \
-              lib/configmake.h \
-              lib/stdckdint.h \
-              lib/stdcountof.h \
-              lib/setlocale_null.h \
-              lib/time_rz.h \
-              lib/obstack.h \
-              lib/fts_.h \
-              lib/idx.h \
-              lib/unitypes.h \
-              lib/unictype.h \
-              lib/unicase.h \
-              lib/uniwidth.h \
-              lib/uniname.h \
-              lib/unistr.h \
-              lib/uniconv.h \
-              lib/uninorm.h \
-              lib/unilbrk.h \
-              lib/uniwbrk.h \
-              lib/malloc/scratch_buffer.gl.h \
-              src/speedlist.h \
-              > "$logdir/generated-headers.log" 2>&1
+            if ! make V=1 -j"$(nproc)" src/stty \
+              > "$logdir/build-coreutils-stty.log" 2>&1
             then
-              echo "Generated-header make step failed; continuing with fallback headers." >&2
-              tail -n 160 "$logdir/generated-headers.log" >&2 || true
-            fi
+              echo "Coreutils stty dependency build failed; retrying single-threaded" >&2
+              tail -n 240 "$logdir/build-coreutils-stty.log" >&2 || true
 
-            rm -f src/speedlist.h
-            rm -f src/version.h
-            rm -f lib/stdcountof.h
-            rm -f lib/stdckdint.h
-            rm -f lib/idx.h
-            rm -f lib/unitypes.h
-            rm -f lib/unictype.h
-            rm -f lib/unicase.h
-            rm -f lib/uniwidth.h
-            rm -f lib/uniname.h
-            rm -f lib/unistr.h
-            rm -f lib/uniconv.h
-            rm -f lib/uninorm.h
-            rm -f lib/unilbrk.h
-            rm -f lib/uniwbrk.h
-            rm -f lib/malloc/scratch_buffer.gl.h
-            rm -f lib/c32isalnum.h
-            rm -f lib/c32isalpha.h
-            rm -f lib/c32isblank.h
-            rm -f lib/c32iscntrl.h
-            rm -f lib/c32isdigit.h
-            rm -f lib/c32isgraph.h
-            rm -f lib/c32islower.h
-            rm -f lib/c32isprint.h
-            rm -f lib/c32ispunct.h
-            rm -f lib/c32isspace.h
-            rm -f lib/c32isupper.h
-            rm -f lib/c32isxdigit.h
-            rm -f lib/c32tolower.h
-            rm -f lib/c32width.h
-            rm -f lib/c32_apply_type_test.h
-            rm -f lib/c32_get_type_test.h
-
-            ensure_coreutils_fallback_headers
-
-            echo "Building GNU coreutils stty"
-
-            if ! make V=1 -j"$(nproc)" \
-              CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
-              CFLAGS="$COREUTILS_MAKE_CFLAGS" \
-              src/stty \
-              > "$logdir/build-parallel.log" 2>&1
-            then
-              echo "stty parallel build failed; applying known fallbacks and retrying single-threaded" >&2
-              tail -n 180 "$logdir/build-parallel.log" >&2 || true
-
-              ensure_coreutils_fallback_headers
-
-              if ! make V=1 -j1 \
-                CPPFLAGS="$COREUTILS_MAKE_CPPFLAGS" \
-                CFLAGS="$COREUTILS_MAKE_CFLAGS" \
-                src/stty \
-                > "$logdir/build-single.log" 2>&1
+              if ! make V=1 -j1 src/stty \
+                > "$logdir/build-coreutils-stty-single.log" 2>&1
               then
-                echo "stty single-threaded build failed." >&2
-                tail -n 240 "$logdir/build-single.log" >&2 || true
+                echo "Coreutils stty single-threaded build failed." >&2
+                tail -n 300 "$logdir/build-coreutils-stty-single.log" >&2 || true
                 exit 1
               fi
             fi
 
-            if [ ! -f src/stty ]; then
-              echo "stty binary was not created" >&2
-              echo "Coreutils logs are in: $logdir" >&2
-
-              echo "Last 180 lines of parallel build log:" >&2
-              tail -n 180 "$logdir/build-parallel.log" 2>/dev/null || true
-
-              echo "Last 180 lines of single build log:" >&2
-              tail -n 180 "$logdir/build-single.log" 2>/dev/null || true
-
+            if [ ! -x src/stty ]; then
+              echo "Coreutils build completed but src/stty was not created." >&2
               find . -name 'stty' -type f -print
               exit 1
             fi
 
-            mkdir -p "$GITHUB_WORKSPACE/$OUT_DIR"
-
-            cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
-
-            "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
-
-            file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
+            echo "Coreutils stty is ready: $srcdir/src/stty"
 
             cd "$GITHUB_WORKSPACE"
+          }
+
+          build_stty() {
+            : "${COREUTILS_VERSION:?COREUTILS_VERSION is not set}"
+
+            srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
+            final_stty="$GITHUB_WORKSPACE/$OUT_DIR/stty"
+
+            mkdir -p "$GITHUB_WORKSPACE/$OUT_DIR"
+
+            if [ ! -x "$srcdir/src/stty" ]; then
+              echo "stty not found at $srcdir/src/stty" >&2
+              echo "Run build_coreutils_dependencies first." >&2
+              exit 1
+            fi
+
+            cp -v "$srcdir/src/stty" "$final_stty"
+            "$STRIP" "$final_stty" 2>/dev/null || true
+            chmod 0755 "$final_stty"
+            file "$final_stty" || true
           }
 
           build_nonroot() {
@@ -2240,6 +1383,7 @@ jobs:
           }
 
           build_all_rng_dependencies
+          build_coreutils_dependencies
 
           build_haveged
           build_rngd
