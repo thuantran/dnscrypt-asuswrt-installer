@@ -1544,23 +1544,30 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
-      - name: Resolve checkout ref
-        id: ref
+      - name: Resolve publish branch
+        id: branch
         run: |
           set -eu
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.target_branch }}" ]; then
-            checkout_ref="${{ inputs.target_branch }}"
+            publish_branch="${{ inputs.target_branch }}"
           else
-            checkout_ref="${{ github.sha }}"
+            publish_branch="${{ github.ref_name }}"
           fi
 
-          echo "checkout_ref=${checkout_ref}" >> "$GITHUB_OUTPUT"
+          case "${publish_branch}" in
+            ""|*..*|/*|*' '*|*'~'*|*'^'*|*':'*|*'?'*|*'['*|*'\'*)
+              echo "Invalid publish branch: ${publish_branch}" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "publish_branch=${publish_branch}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout installer repository
         uses: actions/checkout@v5
         with:
-          ref: ${{ steps.ref.outputs.checkout_ref }}
+          ref: ${{ steps.branch.outputs.publish_branch }}
 
       - name: Download helper binary artifacts
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
@@ -1612,4 +1619,4 @@ jobs:
           fi
 
           git commit -m "chore: update helper binaries nightly builds"
-          git push
+          git push origin HEAD:${{ steps.branch.outputs.publish_branch }}
