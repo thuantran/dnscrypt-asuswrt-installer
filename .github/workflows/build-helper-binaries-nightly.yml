@@ -1118,15 +1118,16 @@ jobs:
             out="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}.tar.xz"
             srcdir="$GITHUB_WORKSPACE/_src/coreutils-${COREUTILS_VERSION}"
             logdir="$GITHUB_WORKSPACE/_build/coreutils-${COREUTILS_VERSION}-logs"
+            final_stty="$GITHUB_WORKSPACE/$OUT_DIR/stty"
 
             mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/_src" "$logdir" "$GITHUB_WORKSPACE/$OUT_DIR"
 
             if [ -x "$srcdir/src/stty" ]; then
               echo "Using existing Coreutils stty: $srcdir/src/stty"
-              cp -v "$srcdir/src/stty" "$GITHUB_WORKSPACE/$OUT_DIR/stty"
-              "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" 2>/dev/null || true
-              chmod 0755 "$GITHUB_WORKSPACE/$OUT_DIR/stty"
-              file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
+              cp -v "$srcdir/src/stty" "$final_stty"
+              "$STRIP" "$final_stty" 2>/dev/null || true
+              chmod 0755 "$final_stty"
+              file "$final_stty" || true
               return 0
             fi
 
@@ -1146,7 +1147,12 @@ jobs:
             echo "Configuring Coreutils for $HOST"
 
             if ! ./configure \
+              --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
+              --prefix=/usr \
+              --without-selinux \
+              --disable-acl \
+              --disable-xattr \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1161,10 +1167,10 @@ jobs:
               tail -n 200 config.log >&2 || true
               exit 1
             fi
-            
-            echo "Generating Coreutils build headers needed by stty"
 
-            make V=1 \
+            echo "Building Coreutils stty through the top-level dependency graph"
+
+            if ! make V=1 -j"$(nproc)" \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1172,49 +1178,28 @@ jobs:
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS -static" \
-              lib/configmake.h \
-              lib/stdckdint.h \
-              lib/stdcountof.h \
-              lib/idx.h \
-              lib/setlocale_null.h \
-              lib/verify.h \
-              lib/attribute.h \
-              lib/cdefs.h \
-              lib/minmax.h \
-              src/version.h \
-              src/speedlist.h \
-              > "$logdir/generated-stty-headers-simple.log" 2>&1 || {
-                echo "Coreutils generated-header step failed. Last 160 lines:" >&2
-                tail -n 160 "$logdir/generated-stty-headers-simple.log" >&2 || true
-                exit 1
-              }
+              src/stty \
+              > "$logdir/build-stty-simple.log" 2>&1
+            then
+              echo "Coreutils stty build failed; retrying single-threaded." >&2
+              tail -n 240 "$logdir/build-stty-simple.log" >&2 || true
 
-            echo "Generating Coreutils build headers needed by stty"
-
-            make V=1 \
-              CC="$CC" \
-              AR="$AR" \
-              RANLIB="$RANLIB" \
-              STRIP="$STRIP" \
-              CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS -static" \
-              lib/configmake.h \
-              lib/stdckdint.h \
-              lib/stdcountof.h \
-              lib/idx.h \
-              lib/setlocale_null.h \
-              lib/verify.h \
-              lib/attribute.h \
-              lib/cdefs.h \
-              lib/minmax.h \
-              src/version.h \
-              src/speedlist.h \
-              > "$logdir/generated-stty-headers-simple.log" 2>&1 || {
-                echo "Coreutils generated-header step failed. Last 160 lines:" >&2
-                tail -n 160 "$logdir/generated-stty-headers-simple.log" >&2 || true
+              if ! make V=1 -j1 \
+                CC="$CC" \
+                AR="$AR" \
+                RANLIB="$RANLIB" \
+                STRIP="$STRIP" \
+                CPPFLAGS="$COMMON_CPPFLAGS" \
+                CFLAGS="$COMMON_CFLAGS" \
+                LDFLAGS="$COMMON_LDFLAGS -static" \
+                src/stty \
+                > "$logdir/build-stty-simple-single.log" 2>&1
+              then
+                echo "Coreutils stty single-threaded build failed. Last 300 lines:" >&2
+                tail -n 300 "$logdir/build-stty-simple-single.log" >&2 || true
                 exit 1
-              }
+              fi
+            fi
 
             if [ ! -x src/stty ]; then
               echo "src/stty was not created" >&2
@@ -1222,14 +1207,14 @@ jobs:
               exit 1
             fi
 
-            cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
-            "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" 2>/dev/null || true
-            chmod 0755 "$GITHUB_WORKSPACE/$OUT_DIR/stty"
-            file "$GITHUB_WORKSPACE/$OUT_DIR/stty" || true
+            cp -v src/stty "$final_stty"
+            "$STRIP" "$final_stty" 2>/dev/null || true
+            chmod 0755 "$final_stty"
+            file "$final_stty" || true
 
             cd "$GITHUB_WORKSPACE"
           }
-
+          
           build_nonroot() {
             mkdir -p "$GITHUB_WORKSPACE/_build" "$GITHUB_WORKSPACE/$OUT_DIR"
 
