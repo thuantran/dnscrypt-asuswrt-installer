@@ -1175,11 +1175,10 @@ jobs:
               STRIP="$STRIP" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$coreutils_stty_cflags" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$COMMON_LDFLAGS -static"
 
             # Building the leaf target directly can skip generated headers that
             # the full coreutils build would create first.
-            make V=1 lib/configmake.h
             make V=1 src/stty
 
             cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
@@ -1305,14 +1304,11 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
-          # Build GNU coreutils stty first so both matrix targets publish a full
-          # architecture-specific stty before the heavier RNG dependency chain can fail.
-          build_stty
-
           build_all_rng_dependencies
-
+          
           build_haveged
           build_rngd
+          build_stty
           build_nonroot
           build_jitterentropy_rngd
 
