@@ -1134,6 +1134,10 @@ jobs:
 
             echo "Building GNU coreutils stty ${COREUTILS_VERSION} for $HOST"
 
+            # Keep coreutils stty on a pre-C23 GNU dialect for older cross
+            # compilers; gnulib supplies the needed fallbacks under GNU11.
+            coreutils_stty_cflags="-std=gnu11 -Os -fdata-sections -ffunction-sections"
+
             FORCE_UNSAFE_CONFIGURE=1 ./configure \
               --host="$HOST" \
               --prefix=/usr \
@@ -1146,7 +1150,7 @@ jobs:
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
-              CFLAGS="$COMMON_CFLAGS" \
+              CFLAGS="$coreutils_stty_cflags" \
               LDFLAGS="$COMMON_LDFLAGS"
 
             # Building the leaf target directly can skip generated headers that
