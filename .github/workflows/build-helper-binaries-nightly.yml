@@ -1136,26 +1136,24 @@ jobs:
 
             # Keep coreutils stty on a pre-C23 GNU dialect for older cross
             # compilers; gnulib supplies the needed fallbacks under GNU11.
-            coreutils_stty_cflags="-std=gnu11 -Os -fdata-sections -ffunction-sections"
+            coreutils_stty_cflags="-std=gnu99 -Os -fdata-sections -ffunction-sections"
+
 
             FORCE_UNSAFE_CONFIGURE=1 ./configure \
               --host="$HOST" \
               --prefix=/usr \
-              --disable-acl \
-              --disable-nls \
-              --disable-xattr \
-              --without-openssl \
+              --enable-static \
+              --disable-shared \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
               STRIP="$STRIP" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$coreutils_stty_cflags" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$COMMON_LDFLAGS -static"
 
             # Building the leaf target directly can skip generated headers that
             # the full coreutils build would create first.
-            make V=1 lib/configmake.h
             make V=1 src/stty
 
             cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
@@ -1281,14 +1279,11 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
-          # Build GNU coreutils stty first so both matrix targets publish a full
-          # architecture-specific stty before the heavier RNG dependency chain can fail.
-          build_stty
-
           build_all_rng_dependencies
-
+          
           build_haveged
           build_rngd
+          build_stty
           build_nonroot
           build_jitterentropy_rngd
 
