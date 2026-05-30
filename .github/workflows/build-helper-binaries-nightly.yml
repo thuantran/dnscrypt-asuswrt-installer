@@ -1140,7 +1140,6 @@ jobs:
               --disable-acl \
               --disable-nls \
               --disable-xattr \
-              --without-gmp \
               --without-openssl \
               CC="$CC" \
               AR="$AR" \
@@ -1150,6 +1149,9 @@ jobs:
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$COMMON_LDFLAGS"
 
+            # Building the leaf target directly can skip generated headers that
+            # the full coreutils build would create first.
+            make V=1 lib/configmake.h
             make V=1 src/stty
 
             cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
