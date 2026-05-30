@@ -499,14 +499,7 @@ init_hwrng() {
 	COUNT="0"
 	while [ ! -c "${RNG_DEV}" ]; do
 		if [ "${COUNT}" -gt 120 ]; then
-			logger -st "${NAME}" "ERROR: Unable to find HWRNG device. Aborting..."
-			if [ -x "/jffs/dnscrypt/haveged" ]; then
-				if /jffs/dnscrypt/haveged -w 1024 -d 32 -i 32 -v 1; then
-					logger -st "${NAME}" "Haveged: Using available haveged instead..."
-				else
-					logger -st "${NAME}" "Warning: haveged exists but failed to start."
-				fi
-			fi
+			logger -st "${NAME}" "ERROR: Unable to find HWRNG device. Aborting rngd startup..."
 			return 1
 		fi
 		COUNT="$((COUNT + 1))"
