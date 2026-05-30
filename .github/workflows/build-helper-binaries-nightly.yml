@@ -169,7 +169,9 @@ jobs:
           LIBP11_REPO="https://github.com/OpenSC/libp11.git"
           LIBP11_REF="master"
 
-          COREUTILS_VERSION="9.11"
+          # Match Entware's coreutils package baseline for the standalone stty helper.
+          COREUTILS_VERSION="9.9"
+          COREUTILS_HASH="19bcb6ca867183c57d77155eae946c5eced88183143b45ca51ad7d26c628ca75"
 
           clone_repo_at_ref() {
             repo_url="$1"
@@ -1127,6 +1129,8 @@ jobs:
               exit 1
             }
 
+            printf '%s  %s\n' "$COREUTILS_HASH" "$coreutils_tar" | sha256sum -c -
+
             rm -rf "$coreutils_src"
             tar -xf "$coreutils_tar" -C "$GITHUB_WORKSPACE/_src"
 
@@ -1134,16 +1138,37 @@ jobs:
 
             echo "Building GNU coreutils stty ${COREUTILS_VERSION} for $HOST"
 
-            # Keep coreutils stty on a pre-C23 GNU dialect for older cross
-            # compilers; gnulib supplies the needed fallbacks under GNU11.
-            coreutils_stty_cflags="-std=gnu99 -Os -fdata-sections -ffunction-sections"
+            # Entware builds coreutils with GNU17 plus gnulib cache answers that
+            # avoid target runtime probes during cross-compilation. Keep those
+            # stty-relevant settings, but do not enable ACL/libcap because this
+            # workflow builds only src/stty instead of the complete applet set.
+            coreutils_stty_cflags="-std=gnu17 $COMMON_CFLAGS"
 
-
-            FORCE_UNSAFE_CONFIGURE=1 ./configure \
+            FORCE_UNSAFE_CONFIGURE=1 \
+            gl_cv_func_mbrtowc_incomplete_state=yes \
+            gl_cv_func_mbrtowc_retval=yes \
+            gl_cv_func_wcrtomb_retval=yes \
+            ac_cv_header_selinux_context_h=no \
+            ac_cv_header_selinux_flash_h=no \
+            ac_cv_header_selinux_selinux_h=no \
+            ac_cv_search_setfilecon=no \
+            ac_cv_sys_year2038_opts="none needed" \
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
-              --enable-static \
-              --disable-shared \
+              --disable-acl \
+              --disable-nls \
+              --disable-xattr \
+              --enable-threads=posix \
+              --disable-assert \
+              --disable-rpath \
+              --disable-libsmack \
+              --without-gmp \
+              --without-linux-crypto \
+              --without-openssl \
+              --without-selinux \
+              --without-included-regex \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
