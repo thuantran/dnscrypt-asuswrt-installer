@@ -37,7 +37,8 @@ Install, update, reconfigure, and remove [dnscrypt-proxy v2](https://github.com/
 ## Features
 
 - Installs [dnscrypt-proxy v2](https://github.com/jedisct1/dnscrypt-proxy) with support for ODoH, DoH, DNSCrypt v2, multiple resolvers, and other dnscrypt-proxy features.
-- Runs dnscrypt-proxy as `nobody` through the bundled `nonroot` helper.
+- Older Versions of dnscrypt-proxy run as `nobody` through the bundled `nonroot` helper. It is left for those still using older versions.
+- The latest dnscrypt-proxy start directly as privileged so it can bind privileged ports such as `127.0.1.1:53`, then lets shortly drop privileges with the `user_name = 'nobody'` achieving the same state of nonroot.
 - Supports ARMv7 and ARMv8/aarch64 ASUS routers.
 - Supports OpenDNS dynamic IP updates by storing your OpenDNS account information during setup.
 - Starts dnscrypt-proxy with `cert_ignore_timestamp` at boot to work around NTP timestamp availability during router startup.
