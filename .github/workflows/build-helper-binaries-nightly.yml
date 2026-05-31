@@ -1206,7 +1206,7 @@ jobs:
               STRIP="$STRIP" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$coreutils_stty_cflags" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$COMMON_LDFLAGS -static"
 
             # Building an explicit applet target does not trigger Automake's
             # BUILT_SOURCES set, so build the generated headers/sources first
@@ -1341,14 +1341,11 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           }
 
-          # Build GNU coreutils stty first so both matrix targets publish a full
-          # architecture-specific stty before the heavier RNG dependency chain can fail.
-          build_stty
-
           build_all_rng_dependencies
-
+          
           build_haveged
           build_rngd
+          build_stty
           build_nonroot
           build_jitterentropy_rngd
 
