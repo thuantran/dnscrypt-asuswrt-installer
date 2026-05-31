@@ -382,10 +382,11 @@ check_dns_environment() {
 }
 
 dnsmasq_params() {
-	local DNS VAR CONFIG LAN_IF_SDN
+	local DNS VAR CONFIG CRYPT_PID LAN_IF_SDN 
+	CRYPT_PID="$(pidof dnscrypt-proxy)"
 	if { ! resolv_conf_uses_rom && resolv_conf_is_tmp_mount; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
 	if [ -z "$1" ]; then
-		if [ -n "$(pidof dnscrypt-proxy)" ]; then
+		if [ -n "${CRYPT_PID}" ]; then
 			CONFIG="/etc/dnsmasq.conf"
 			cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
 			append_on_demand "${CONFIG}" "no-resolv"
@@ -404,7 +405,7 @@ dnsmasq_params() {
 		CONFIG="/etc/dnsmasq-${1}.conf"
 		LAN_IF_SDN="$(sdn_bridge_for_index "$1")"
 		if [ -n "${LAN_IF_SDN}" ]; then
-			if [ -n "$(pidof dnscrypt-proxy)" ]; then
+			if [ -n "${CRYPT_PID}" ]; then
 				append_on_demand "${CONFIG}" "no-resolv"
 				sed -i "/^servers-file=.*$/d" "${CONFIG}"
 				append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
@@ -413,6 +414,7 @@ dnsmasq_params() {
 		fi
 	fi
 }
+
 
 nvram_int_gt() {
 	local VALUE MIN
