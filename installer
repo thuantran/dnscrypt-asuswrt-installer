@@ -795,7 +795,7 @@ check_dns_environment() {
 	MODE="$1"
 	NVCHECK="0"
 	case "${MODE}" in
-		0 )
+		0)
 			# Save original values only once.
 			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
 				save_dns_nvram_environment
@@ -806,7 +806,7 @@ check_dns_environment() {
 			fi
 			if dns_env_apply_profile; then NVCHECK="$((NVCHECK + 1))"; fi
 			;;
-		1 )
+		1)
 			# Do not restore if we never saved anything.
 			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
 				return 0
