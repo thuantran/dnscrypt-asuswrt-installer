@@ -171,8 +171,8 @@ jobs:
           LIBP11_REF="master"
 
           # Match Entware's coreutils package baseline for the standalone stty helper.
-          COREUTILS_VERSION="9.9"
-          COREUTILS_HASH="19bcb6ca867183c57d77155eae946c5eced88183143b45ca51ad7d26c628ca75"
+          COREUTILS_VERSION="9.11"
+          COREUTILS_HASH="394024eda0a5955217ceda9cd1201e65dc8fa3aa29c2951135a49521d57c3cc3"
           # Entware lists stty in COREUTILS_APPLETS and DIR_BIN, then its
           # BuildPlugin installs the applet from opt/bin/stty. Build exactly
           # that applet target instead of the full coreutils package set.
