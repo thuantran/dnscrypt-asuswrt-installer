@@ -382,7 +382,7 @@ check_dns_environment() {
 }
 
 dnsmasq_params() {
-	local DNS VAR CONFIG CRYPT_PID LAN_IF_SDN 
+	local DNS VAR CONFIG CRYPT_PID LAN_IF_SDN
 	CRYPT_PID="$(pidof dnscrypt-proxy)"
 	if { ! resolv_conf_uses_rom && resolv_conf_is_tmp_mount; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
 	if [ -z "$1" ]; then
