@@ -383,10 +383,9 @@ check_dns_environment() {
 
 dnsmasq_params() {
 	local DNS VAR CONFIG CRYPT_PID LAN_IF_SDN
-	CRYPT_PID="$(pidof dnscrypt-proxy)"
 	if { ! resolv_conf_uses_rom && resolv_conf_is_tmp_mount; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
 	if [ -z "$1" ]; then
-		if [ -n "${CRYPT_PID}" ]; then
+		if [ "$(dnscrypt_process_count)" -ge "1" ]; then
 			CONFIG="/etc/dnsmasq.conf"
 			cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
 			append_on_demand "${CONFIG}" "no-resolv"
@@ -405,7 +404,7 @@ dnsmasq_params() {
 		CONFIG="/etc/dnsmasq-${1}.conf"
 		LAN_IF_SDN="$(sdn_bridge_for_index "$1")"
 		if [ -n "${LAN_IF_SDN}" ]; then
-			if [ -n "${CRYPT_PID}" ]; then
+			if [ "$(dnscrypt_process_count)" -ge "1" ]; then
 				append_on_demand "${CONFIG}" "no-resolv"
 				sed -i "/^servers-file=.*$/d" "${CONFIG}"
 				append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
@@ -682,21 +681,8 @@ start_dnscrypt_proxy() {
 		return 1
 	fi
 	logger -st "${NAME}" "Starting dnscrypt-proxy from ${NAME}."
-	if [ -x "./nonroot" ]; then
-		{ nohup ./nonroot nobody ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
-		if ! dnscrypt_wait_started 30; then
-			logger -st "${NAME}" "Warning: /jffs/dnscrypt/nonroot failed to start dnscrypt-proxy; retrying without nonroot helper."
-			{ kill_processes dnscrypt-proxy; }
-			if ! dnscrypt_wait_stopped 30; then
-				logger -st "${NAME}" "Warning: unable to stop failed dnscrypt-proxy processes before fallback start."
-				return 1
-			fi
-			{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
-		fi
-	else
-		logger -st "${NAME}" "Warning: /jffs/dnscrypt/nonroot is unavailable; starting dnscrypt-proxy without nonroot helper."
-		{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
-	fi
+	logger -st "${NAME}" "Skipping legacy nonroot helper; dnscrypt-proxy starts directly setting under privileged user to nobody after binding privileged ports."
+	{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
 	if ! grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
 	if { dnscrypt_wait_started 30; } && { service_wait netcheck 300; }; then return 0; else return 1; fi
 }
@@ -763,13 +749,13 @@ start_monitor() {
 						{ dnscrypt_proxy_run start_dnscrypt_proxy; }
 						;;
 				esac
-				case "$(pidof dnscrypt-proxy)" in
-					"")
+				case "$(dnscrypt_process_count)" in
+					0)
 						logger -st "${NAME}" "Warning: dnscrypt-proxy is dead; Monitor will start it!"
 						unset MONITOR_ELAPSED
 						sleep "${MONITOR_SLEEP_INTERVAL}s"
 						;;
-					*)
+					1)
 						if [ "${MONITOR_ELAPSED}" -ge "${MONITOR_HEALTHCHECK_INTERVAL}" ]; then
 							MONITOR_ELAPSED="0"
 							if { ! service_wait netcheck "${MONITOR_HEALTHCHECK_TIMEOUT}"; }; then
@@ -780,6 +766,10 @@ start_monitor() {
 							MONITOR_ELAPSED="$((MONITOR_ELAPSED + MONITOR_SLEEP_INTERVAL))"
 						fi
 						if [ -n "${MONITOR_ELAPSED}" ]; then sleep "${MONITOR_SLEEP_INTERVAL}s"; fi
+						;;
+					*)
+						logger -st "${NAME}" "Warning: multiple dnscrypt-proxy instances detected; Monitor will re-start it!"
+						unset MONITOR_ELAPSED
 						;;
 				esac
 				;;
