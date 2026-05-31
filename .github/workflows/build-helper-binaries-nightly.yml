@@ -999,6 +999,8 @@ jobs:
               --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
+              --disable-shared \
+              --enable-static \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1007,10 +1009,10 @@ jobs:
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$STATIC_LDFLAGS"
 
-            make -j"$(nproc)" || {
+            make -j"$(nproc)" LDFLAGS="$STATIC_LDFLAGS" || {
               echo "haveged parallel build failed; retrying single-threaded" >&2
               make clean
-              make
+              make LDFLAGS="$STATIC_LDFLAGS"
             }
 
             if [ -f haveged/.libs/haveged ]; then
@@ -1278,7 +1280,7 @@ jobs:
               ${COMMON_CPPFLAGS:-} \
               ${COMMON_CFLAGS:-} \
               "$src" \
-              ${COMMON_LDFLAGS:-} \
+              ${STATIC_LDFLAGS:-} \
               -o "$out"
 
             "$STRIP" "$out" 2>/dev/null || true
@@ -1367,6 +1369,7 @@ jobs:
 
           assert_static_binary "$OUT_DIR/haveged" haveged
           assert_static_binary "$OUT_DIR/rngd" rngd
+          assert_static_binary "$OUT_DIR/nonroot" nonroot
           assert_static_binary "$OUT_DIR/jitterentropy-rngd" jitterentropy-rngd
 
           md5sum "$OUT_DIR/haveged" | awk '{print $1}' > "$OUT_DIR/haveged.md5sum"
