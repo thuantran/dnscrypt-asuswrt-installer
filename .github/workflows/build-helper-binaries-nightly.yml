@@ -1009,27 +1009,30 @@ jobs:
               CFLAGS="$COMMON_CFLAGS" \
               LDFLAGS="$STATIC_LDFLAGS"
 
-            make -j"$(nproc)" LDFLAGS="$STATIC_LDFLAGS" || {
-              echo "haveged parallel build failed; retrying single-threaded" >&2
-              make clean
-              make LDFLAGS="$STATIC_LDFLAGS"
-            }
+            # Upstream haveged's Automake/libtool setup prefers a shared
+            # libhavege.la link, which can still yield a dynamic PIE even when
+            # LDFLAGS contains -static. Build the daemon directly from the same
+            # source list used by the project's non-libtool path so the final
+            # link command is controlled by the cross compiler and STATIC_LDFLAGS.
+            haveged_libs="-pthread -lrt -lm"
 
-            if [ -f haveged/.libs/haveged ]; then
-              binary_path="haveged/.libs/haveged"
-            elif [ -f haveged/haveged ]; then
-              binary_path="haveged/haveged"
-            elif [ -f src/.libs/haveged ]; then
-              binary_path="src/.libs/haveged"
-            elif [ -f src/haveged ]; then
-              binary_path="src/haveged"
-            else
-              echo "haveged binary not found. Searching..." >&2
-              find . -name "haveged" -type f -executable 2>/dev/null || true
-              exit 1
-            fi
+            "$CC" \
+              $COMMON_CPPFLAGS \
+              -DHAVE_CONFIG_H \
+              -I. \
+              -Isrc \
+              $COMMON_CFLAGS \
+              src/haveged.c \
+              src/havege.c \
+              src/havegetune.c \
+              src/havegecollect.c \
+              src/havegetest.c \
+              src/havegecmd.c \
+              $STATIC_LDFLAGS \
+              $haveged_libs \
+              -o "$GITHUB_WORKSPACE/$OUT_DIR/haveged"
 
-            cp "$binary_path" "$GITHUB_WORKSPACE/$OUT_DIR/haveged"
+            assert_static_binary "$GITHUB_WORKSPACE/$OUT_DIR/haveged" haveged
 
             cd "$GITHUB_WORKSPACE"
           }
