@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.2                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.3                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.8.2"
+DI_VERSION="v2.8.3"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -795,7 +795,7 @@ check_dns_environment() {
 	MODE="$1"
 	NVCHECK="0"
 	case "${MODE}" in
-		0 | running)
+		0 )
 			# Save original values only once.
 			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
 				save_dns_nvram_environment
@@ -806,7 +806,7 @@ check_dns_environment() {
 			fi
 			if dns_env_apply_profile; then NVCHECK="$((NVCHECK + 1))"; fi
 			;;
-		1 | stop)
+		1 )
 			# Do not restore if we never saved anything.
 			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
 				return 0
@@ -814,8 +814,7 @@ check_dns_environment() {
 			if dns_env_restore_profile; then NVCHECK="$((NVCHECK + 1))"; fi
 			;;
 		*)
-			logger -st "${NAME:-dnscrypt-installer}" "Invalid DNS environment mode: ${MODE}"
-			return 0
+			return 1
 			;;
 	esac
 	if [ "${NVCHECK}" != "0" ]; then
