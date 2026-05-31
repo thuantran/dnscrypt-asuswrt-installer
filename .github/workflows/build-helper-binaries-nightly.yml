@@ -140,6 +140,7 @@ jobs:
           export COMMON_CFLAGS="-Os -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -D_FORTIFY_SOURCE=2"
           export COMMON_CXXFLAGS="$COMMON_CFLAGS"
           export COMMON_LDFLAGS="-L$DEPS_DIR/lib -L$DEPS_DIR/lib64 -Wl,--gc-sections -Wl,-z,relro -Wl,-z,now"
+          export STATIC_LDFLAGS="-static $COMMON_LDFLAGS"
 
           HAVEGED_REPO="https://github.com/jirka-h/haveged.git"
           HAVEGED_REF="21bad00a09233855fbea14ac062bc72b5eabc9a6"
@@ -214,6 +215,27 @@ jobs:
             fi
 
             cd "$GITHUB_WORKSPACE"
+          }
+
+
+          assert_static_binary() {
+            binary_path="$1"
+            binary_name="$2"
+
+            echo "Checking ${binary_name} is statically linked"
+            file "$binary_path"
+
+            if "$READELF" -l "$binary_path" | grep -q 'INTERP'; then
+              echo "${binary_name} is dynamically linked: ELF interpreter was found" >&2
+              "$READELF" -l "$binary_path" >&2 || true
+              exit 1
+            fi
+
+            if "$READELF" -d "$binary_path" 2>/dev/null | grep -q '(NEEDED)'; then
+              echo "${binary_name} is dynamically linked: shared library dependencies were found" >&2
+              "$READELF" -d "$binary_path" >&2 || true
+              exit 1
+            fi
           }
 
           build_zlib() {
@@ -983,7 +1005,7 @@ jobs:
               STRIP="$STRIP" \
               CPPFLAGS="$COMMON_CPPFLAGS" \
               CFLAGS="$COMMON_CFLAGS" \
-              LDFLAGS="$COMMON_LDFLAGS"
+              LDFLAGS="$STATIC_LDFLAGS"
 
             make -j"$(nproc)" || {
               echo "haveged parallel build failed; retrying single-threaded" >&2
@@ -1043,7 +1065,7 @@ jobs:
             done
 
             RNGD_CPPFLAGS="$COMMON_CPPFLAGS"
-            RNGD_LDFLAGS="$COMMON_LDFLAGS"
+            RNGD_LDFLAGS="$STATIC_LDFLAGS"
 
             RNGD_PKG_CFLAGS="$(
               pkg-config --cflags \
@@ -1277,8 +1299,8 @@ jobs:
             # Passing COMMON_CFLAGS here would inject -Os and trip jitterentropy's
             # compile-time safety check on both ARM targets.
             JENT_RNGD_CPPFLAGS="-D_GNU_SOURCE -I$DEPS_DIR/include -I. -Ilib"
-            JENT_RNGD_CFLAGS="-O0 -fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
-            JENT_RNGD_LDFLAGS="$COMMON_LDFLAGS -pie -lrt -pthread"
+            JENT_RNGD_CFLAGS="-O0 -fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fdata-sections -ffunction-sections -fno-asynchronous-unwind-tables -fno-unwind-tables"
+            JENT_RNGD_LDFLAGS="$STATIC_LDFLAGS -lrt -pthread"
 
             echo "Building jitterentropy-rngd for $HOST"
             echo "JENT_RNGD_CPPFLAGS=$JENT_RNGD_CPPFLAGS"
@@ -1342,6 +1364,10 @@ jobs:
             "$OUT_DIR/stty" \
             "$OUT_DIR/nonroot" \
             "$OUT_DIR/jitterentropy-rngd"
+
+          assert_static_binary "$OUT_DIR/haveged" haveged
+          assert_static_binary "$OUT_DIR/rngd" rngd
+          assert_static_binary "$OUT_DIR/jitterentropy-rngd" jitterentropy-rngd
 
           md5sum "$OUT_DIR/haveged" | awk '{print $1}' > "$OUT_DIR/haveged.md5sum"
           md5sum "$OUT_DIR/rngd" | awk '{print $1}' > "$OUT_DIR/rngd.md5sum"
