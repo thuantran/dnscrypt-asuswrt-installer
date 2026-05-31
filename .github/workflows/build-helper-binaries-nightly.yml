@@ -1280,7 +1280,7 @@ jobs:
               ${COMMON_CPPFLAGS:-} \
               ${COMMON_CFLAGS:-} \
               "$src" \
-              ${COMMON_LDFLAGS:-} \
+              ${STATIC_LDFLAGS:-} \
               -o "$out"
 
             "$STRIP" "$out" 2>/dev/null || true
@@ -1372,6 +1372,7 @@ jobs:
 
           assert_static_binary "$OUT_DIR/haveged" haveged
           assert_static_binary "$OUT_DIR/rngd" rngd
+          assert_static_binary "$OUT_DIR/nonroot" nonroot
           assert_static_binary "$OUT_DIR/jitterentropy-rngd" jitterentropy-rngd
 
           md5sum "$OUT_DIR/haveged" | awk '{print $1}' > "$OUT_DIR/haveged.md5sum"
