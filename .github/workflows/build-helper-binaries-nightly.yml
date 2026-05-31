@@ -169,7 +169,13 @@ jobs:
           LIBP11_REPO="https://github.com/OpenSC/libp11.git"
           LIBP11_REF="master"
 
-          COREUTILS_VERSION="9.11"
+          # Match Entware's coreutils package baseline for the standalone stty helper.
+          COREUTILS_VERSION="9.9"
+          COREUTILS_HASH="19bcb6ca867183c57d77155eae946c5eced88183143b45ca51ad7d26c628ca75"
+          # Entware lists stty in COREUTILS_APPLETS and DIR_BIN, then its
+          # BuildPlugin installs the applet from opt/bin/stty. Build exactly
+          # that applet target instead of the full coreutils package set.
+          COREUTILS_APPLET="stty"
 
           clone_repo_at_ref() {
             repo_url="$1"
@@ -1127,6 +1133,8 @@ jobs:
               exit 1
             }
 
+            printf '%s  %s\n' "$COREUTILS_HASH" "$coreutils_tar" | sha256sum -c -
+
             rm -rf "$coreutils_src"
             tar -xf "$coreutils_tar" -C "$GITHUB_WORKSPACE/_src"
 
@@ -1134,17 +1142,37 @@ jobs:
 
             echo "Building GNU coreutils stty ${COREUTILS_VERSION} for $HOST"
 
-            # Keep coreutils stty on a pre-C23 GNU dialect for older cross
-            # compilers; gnulib supplies the needed fallbacks under GNU11.
-            coreutils_stty_cflags="-std=gnu11 -Os -fdata-sections -ffunction-sections"
+            # Entware builds coreutils with GNU17 plus gnulib cache answers that
+            # avoid target runtime probes during cross-compilation. Keep those
+            # stty-relevant settings, but do not enable ACL/libcap because this
+            # workflow builds only the stty applet instead of the complete
+            # applet set that Entware splits through BuildPlugin.
+            coreutils_stty_cflags="-std=gnu17 $COMMON_CFLAGS"
 
-            FORCE_UNSAFE_CONFIGURE=1 ./configure \
+            FORCE_UNSAFE_CONFIGURE=1 \
+            gl_cv_func_mbrtowc_incomplete_state=yes \
+            gl_cv_func_mbrtowc_retval=yes \
+            gl_cv_func_wcrtomb_retval=yes \
+            ac_cv_header_selinux_context_h=no \
+            ac_cv_header_selinux_flash_h=no \
+            ac_cv_header_selinux_selinux_h=no \
+            ac_cv_search_setfilecon=no \
+            ac_cv_sys_year2038_opts="none needed" \
+            ./configure \
+              --build="$(gcc -dumpmachine)" \
               --host="$HOST" \
               --prefix=/usr \
               --disable-acl \
               --disable-nls \
               --disable-xattr \
+              --enable-threads=posix \
+              --disable-assert \
+              --disable-rpath \
+              --disable-libsmack \
+              --without-linux-crypto \
               --without-openssl \
+              --without-selinux \
+              --without-included-regex \
               CC="$CC" \
               AR="$AR" \
               RANLIB="$RANLIB" \
@@ -1153,12 +1181,17 @@ jobs:
               CFLAGS="$coreutils_stty_cflags" \
               LDFLAGS="$COMMON_LDFLAGS"
 
-            # Building the leaf target directly can skip generated headers that
-            # the full coreutils build would create first.
-            make V=1 lib/configmake.h
-            make V=1 src/stty
+            # Building an explicit applet target does not trigger Automake's
+            # BUILT_SOURCES set, so build the generated headers/sources first
+            # without building the full coreutils applet set.
+            {
+              printf '%s\n' 'build-generated-sources: $(BUILT_SOURCES)'
+              printf '%s\n' '.PHONY: build-generated-sources'
+            } > "$GITHUB_WORKSPACE/_build/coreutils-built-sources.mk"
+            make V=1 -f Makefile -f "$GITHUB_WORKSPACE/_build/coreutils-built-sources.mk" build-generated-sources
+            make V=1 "src/$COREUTILS_APPLET"
 
-            cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+            cp -v "src/$COREUTILS_APPLET" "$GITHUB_WORKSPACE/$OUT_DIR/stty"
             "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" 2>/dev/null || true
             chmod 0755 "$GITHUB_WORKSPACE/$OUT_DIR/stty"
 
