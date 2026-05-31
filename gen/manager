@@ -681,7 +681,7 @@ start_dnscrypt_proxy() {
 		return 1
 	fi
 	logger -st "${NAME}" "Starting dnscrypt-proxy from ${NAME}."
-	logger -st "${NAME}" "Skipping legacy nonroot helper; dnscrypt-proxy starts and drops privileges directly as nobody after binding privileged ports."
+	logger -st "${NAME}" "Skipping legacy nonroot helper; dnscrypt-proxy starts directly setting under privileged user to nobody after binding privileged ports."
 	{ nohup ${DNSCRYPT_START} >/dev/null 2>&1 </dev/null & }
 	if ! grep -q '^servers-file=/jffs/dnscrypt/resolv.dnsmasq' "/etc/dnsmasq.conf"; then service restart_dnsmasq >/dev/null 2>&1; fi
 	if { dnscrypt_wait_started 30; } && { service_wait netcheck 300; }; then return 0; else return 1; fi
