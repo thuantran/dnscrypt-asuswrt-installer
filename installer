@@ -16,14 +16,14 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.2                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.3                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.8.2"
+DI_VERSION="v2.8.3"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
@@ -768,11 +768,11 @@ check_dns_environment() {
 	dns_env_apply_profile() {
 		local changed
 		changed="0"
-		dns_env_set_nvram "dnspriv_enable" "0" && changed="1"
-		dns_env_set_nvram "dhcpd_dns_router" "1" && changed="1"
-		dns_env_set_nvram "dhcp_dns1_x" "" && changed="1"
-		dns_env_set_nvram "dhcp_dns2_x" "" && changed="1"
-		[ "${changed}" = "1" ]
+		if dns_env_set_nvram "dnspriv_enable" "0"; then changed="$((changed + 1))"; fi
+		if dns_env_set_nvram "dhcpd_dns_router" "1"; then changed="$((changed + 1))"; fi
+		if dns_env_set_nvram "dhcp_dns1_x" ""; then changed="$((changed + 1))"; fi
+		if dns_env_set_nvram "dhcp_dns2_x" ""; then changed="$((changed + 1))"; fi
+		if [ "${changed}" != "0" ]; then return 0; else return 1; fi
 	}
 	dns_env_restore_profile() {
 		local changed key cur old
@@ -787,10 +787,10 @@ check_dns_environment() {
 			esac
 			if [ "${cur}" != "${old}" ]; then
 				nvram set "${key}=${old}"
-				changed="1"
+				changed="$((changed + 1))"
 			fi
 		done
-		[ "${changed}" = "1" ]
+		if [ "${changed}" != "0" ]; then return 0; else return 1; fi
 	}
 	MODE="$1"
 	NVCHECK="0"
@@ -804,14 +804,14 @@ check_dns_environment() {
 				{ kill_processes stubby; }
 				NVCHECK="$((NVCHECK + 1))"
 			fi
-			dns_env_apply_profile && NVCHECK="$((NVCHECK + 1))"
+			if dns_env_apply_profile; then NVCHECK="$((NVCHECK + 1))"; fi
 			;;
 		1)
 			# Do not restore if we never saved anything.
 			if [ "${_DNS_NVRAM_SAVED:-0}" != "1" ]; then
 				return 0
 			fi
-			dns_env_restore_profile && NVCHECK="$((NVCHECK + 1))"
+			if dns_env_restore_profile; then NVCHECK="$((NVCHECK + 1))"; fi
 			;;
 		*)
 			return 1
@@ -825,6 +825,7 @@ check_dns_environment() {
 		wait "${PID}" 2>/dev/null
 	fi
 	PTXT "${INFO} DNS Environment is Ready."
+	return 0
 }
 
 check_dns_filter() {
