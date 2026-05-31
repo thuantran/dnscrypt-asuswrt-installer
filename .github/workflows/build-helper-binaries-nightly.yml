@@ -172,6 +172,10 @@ jobs:
           # Match Entware's coreutils package baseline for the standalone stty helper.
           COREUTILS_VERSION="9.9"
           COREUTILS_HASH="19bcb6ca867183c57d77155eae946c5eced88183143b45ca51ad7d26c628ca75"
+          # Entware lists stty in COREUTILS_APPLETS and DIR_BIN, then its
+          # BuildPlugin installs the applet from opt/bin/stty. Build exactly
+          # that applet target instead of the full coreutils package set.
+          COREUTILS_APPLET="stty"
 
           clone_repo_at_ref() {
             repo_url="$1"
@@ -1141,7 +1145,8 @@ jobs:
             # Entware builds coreutils with GNU17 plus gnulib cache answers that
             # avoid target runtime probes during cross-compilation. Keep those
             # stty-relevant settings, but do not enable ACL/libcap because this
-            # workflow builds only src/stty instead of the complete applet set.
+            # workflow builds only the stty applet instead of the complete
+            # applet set that Entware splits through BuildPlugin.
             coreutils_stty_cflags="-std=gnu17 $COMMON_CFLAGS"
 
             FORCE_UNSAFE_CONFIGURE=1 \
@@ -1164,7 +1169,6 @@ jobs:
               --disable-assert \
               --disable-rpath \
               --disable-libsmack \
-              --without-gmp \
               --without-linux-crypto \
               --without-openssl \
               --without-selinux \
@@ -1177,11 +1181,17 @@ jobs:
               CFLAGS="$coreutils_stty_cflags" \
               LDFLAGS="$COMMON_LDFLAGS -static"
 
-            # Building the leaf target directly can skip generated headers that
-            # the full coreutils build would create first.
-            make V=1 src/stty
+            # Building an explicit applet target does not trigger Automake's
+            # BUILT_SOURCES set, so build the generated headers/sources first
+            # without building the full coreutils applet set.
+            {
+              printf '%s\n' 'build-generated-sources: $(BUILT_SOURCES)'
+              printf '%s\n' '.PHONY: build-generated-sources'
+            } > "$GITHUB_WORKSPACE/_build/coreutils-built-sources.mk"
+            make V=1 -f Makefile -f "$GITHUB_WORKSPACE/_build/coreutils-built-sources.mk" build-generated-sources
+            make V=1 "src/$COREUTILS_APPLET"
 
-            cp -v src/stty "$GITHUB_WORKSPACE/$OUT_DIR/stty"
+            cp -v "src/$COREUTILS_APPLET" "$GITHUB_WORKSPACE/$OUT_DIR/stty"
             "$STRIP" "$GITHUB_WORKSPACE/$OUT_DIR/stty" 2>/dev/null || true
             chmod 0755 "$GITHUB_WORKSPACE/$OUT_DIR/stty"
 
