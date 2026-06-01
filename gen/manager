@@ -382,35 +382,47 @@ check_dns_environment() {
 }
 
 dnsmasq_params() {
-	local DNS VAR CONFIG CRYPT_PID LAN_IF_SDN
-	if { ! resolv_conf_uses_rom && resolv_conf_is_tmp_mount; }; then { umount /tmp/resolv.conf 2>/dev/null; }; fi
-	if [ -z "$1" ]; then
-		if [ "$(dnscrypt_process_count)" -ge "1" ]; then
-			CONFIG="/etc/dnsmasq.conf"
-			cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq
-			append_on_demand "${CONFIG}" "no-resolv"
-			append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
-			for VAR in wan_dns wan0_dns wan1_dns wan_dns1_x wan_dns2_x wan0_dns1_x wan0_dns2_x wan1_dns1_x wan1_dns2_x wan0_xdns wan1_xdns ipv6_get_dns ipv6_dns1 ipv6_dns2 ipv6_dns3; do
-				for DNS in $(nvram get "${VAR}" 2>/dev/null); do
-					if [ "${DNS}" ]; then { remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"; }; else { continue; }; fi
-				done
-			done
-			sed -i "/^servers-file=.*$/d" "${CONFIG}"
-			append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
-			if { ! resolv_conf_uses_rom && [ "${DNSCRYPT_LOCAL}" = "YES" ]; }; then { mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf; }; fi
-		fi
-		append_on_demand "${CONFIG}" "except-interface=lo:0"
-	elif [ -n "$1" ] && nvram get rc_support | grep -q 'mtlancfg'; then
-		CONFIG="/etc/dnsmasq-${1}.conf"
-		LAN_IF_SDN="$(sdn_bridge_for_index "$1")"
-		if [ -n "${LAN_IF_SDN}" ]; then
-			if [ "$(dnscrypt_process_count)" -ge "1" ]; then
-				append_on_demand "${CONFIG}" "no-resolv"
-				sed -i "/^servers-file=.*$/d" "${CONFIG}"
-				append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+	local DNS VAR CONFIG LAN_IF_SDN DNSCRYPT_COUNT
+	DNSCRYPT_COUNT="$(dnscrypt_process_count)"
+	case "${DNSCRYPT_COUNT}" in
+		1)
+			:
+			;;
+		*)
+			if ! resolv_conf_uses_rom && resolv_conf_is_tmp_mount; then
+				umount /tmp/resolv.conf 2>/dev/null
 			fi
-			append_on_demand "${CONFIG}" "except-interface=lo:0"
-		fi
+			return 0
+			;;
+	esac
+	case "${1:-}" in
+		"")
+			CONFIG="/etc/dnsmasq.conf"
+			;;
+		*)
+			if nvram get rc_support 2>/dev/null | grep -q 'mtlancfg'; then
+				LAN_IF_SDN="$(sdn_bridge_for_index "$1")"
+				if [ -n "${LAN_IF_SDN}" ]; then
+					CONFIG="/etc/dnsmasq-${1}.conf"
+				fi
+			fi
+			;;
+	esac
+	[ -n "${CONFIG}" ] || return 0
+	append_on_demand "${CONFIG}" "no-resolv"
+	sed -i "/^servers-file=.*$/d" "${CONFIG}"
+	append_on_demand "${CONFIG}" "servers-file=/jffs/dnscrypt/resolv.dnsmasq"
+	append_on_demand "${CONFIG}" "except-interface=lo:0"
+	cp -a /tmp/resolv.dnsmasq /jffs/dnscrypt/resolv.dnsmasq || return 1
+	for VAR in wan_dns wan0_dns wan1_dns wan_dns1_x wan_dns2_x wan0_dns1_x wan0_dns2_x wan1_dns1_x wan1_dns2_x wan0_xdns wan1_xdns ipv6_get_dns ipv6_dns1 ipv6_dns2 ipv6_dns3; do
+		for DNS in $(nvram get "${VAR}" 2>/dev/null); do
+			[ -n "${DNS}" ] || continue
+			remove_dnsmasq_server /jffs/dnscrypt/resolv.dnsmasq "${DNS}"
+		done
+	done
+	append_on_demand /jffs/dnscrypt/resolv.dnsmasq "server=127.0.1.1"
+	if ! resolv_conf_uses_rom && [ "${DNSCRYPT_LOCAL:-}" = "YES" ]; then
+		mount -o bind /rom/etc/resolv.conf /tmp/resolv.conf
 	fi
 }
 
@@ -688,7 +700,7 @@ start_dnscrypt_proxy() {
 }
 
 start_monitor() {
-	local BINARY_UNAVAILABLE_LOGGED MONITOR_BINARY_RETRY_INTERVAL MONITOR_ELAPSED MONITOR_HEALTHCHECK_INTERVAL MONITOR_HEALTHCHECK_TIMEOUT MONITOR_SLEEP_INTERVAL MONITOR_STATE RANDOM_STATE
+	local BINARY_UNAVAILABLE_LOGGED DNSCRYPT_COUNT MONITOR_BINARY_RETRY_INTERVAL MONITOR_ELAPSED MONITOR_HEALTHCHECK_INTERVAL MONITOR_HEALTHCHECK_TIMEOUT MONITOR_SLEEP_INTERVAL MONITOR_STATE RANDOM_STATE
 	MONITOR_BINARY_RETRY_INTERVAL="10"
 	MONITOR_HEALTHCHECK_INTERVAL="300"
 	MONITOR_HEALTHCHECK_TIMEOUT="150"
@@ -749,7 +761,8 @@ start_monitor() {
 						{ dnscrypt_proxy_run start_dnscrypt_proxy; }
 						;;
 				esac
-				case "$(dnscrypt_process_count)" in
+				DNSCRYPT_COUNT="$(dnscrypt_process_count)"
+				case "${DNSCRYPT_COUNT}" in
 					0)
 						logger -st "${NAME}" "Warning: dnscrypt-proxy is dead; Monitor will start it!"
 						unset MONITOR_ELAPSED
@@ -772,6 +785,7 @@ start_monitor() {
 						unset MONITOR_ELAPSED
 						;;
 				esac
+				unset DNSCRYPT_COUNT
 				;;
 			"stop")
 				logger -st "${NAME}" "Stopping Monitor!"
