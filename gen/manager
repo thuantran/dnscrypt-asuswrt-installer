@@ -700,7 +700,7 @@ start_dnscrypt_proxy() {
 }
 
 start_monitor() {
-	local BINARY_UNAVAILABLE_LOGGED MONITOR_BINARY_RETRY_INTERVAL MONITOR_ELAPSED MONITOR_HEALTHCHECK_INTERVAL MONITOR_HEALTHCHECK_TIMEOUT MONITOR_SLEEP_INTERVAL MONITOR_STATE RANDOM_STATE
+	local BINARY_UNAVAILABLE_LOGGED DNSCRYPT_COUNT MONITOR_BINARY_RETRY_INTERVAL MONITOR_ELAPSED MONITOR_HEALTHCHECK_INTERVAL MONITOR_HEALTHCHECK_TIMEOUT MONITOR_SLEEP_INTERVAL MONITOR_STATE RANDOM_STATE
 	MONITOR_BINARY_RETRY_INTERVAL="10"
 	MONITOR_HEALTHCHECK_INTERVAL="300"
 	MONITOR_HEALTHCHECK_TIMEOUT="150"
@@ -761,7 +761,8 @@ start_monitor() {
 						{ dnscrypt_proxy_run start_dnscrypt_proxy; }
 						;;
 				esac
-				case "$(dnscrypt_process_count)" in
+				DNSCRYPT_COUNT="$(dnscrypt_process_count)"
+				case "${DNSCRYPT_COUNT}" in
 					0)
 						logger -st "${NAME}" "Warning: dnscrypt-proxy is dead; Monitor will start it!"
 						unset MONITOR_ELAPSED
@@ -784,6 +785,7 @@ start_monitor() {
 						unset MONITOR_ELAPSED
 						;;
 				esac
+				unset DNSCRYPT_COUNT
 				;;
 			"stop")
 				logger -st "${NAME}" "Stopping Monitor!"
