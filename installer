@@ -16,18 +16,21 @@
 #██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██║     ██║     ██╔════╝██╔══██╗           bigeyes0x0                      #
 #██║██╔██╗ ██║███████╗   ██║   ███████║██║     ██║     █████╗  ██████╔╝  Current Maintainer:                      #
 #██║██║╚██╗██║╚════██║   ██║   ██╔══██║██║     ██║     ██╔══╝  ██╔══██╗           SomeWhereOverTheRainBow         #
-#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.4                                   #
+#██║██║ ╚████║███████║   ██║   ██║  ██║███████╗███████╗███████╗██║  ██║  v2.8.5                                   #
 #╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝                                           #
 ###################################################################################################################
 
 export LC_ALL=C
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
 
-DI_VERSION="v2.8.4"
+DI_VERSION="v2.8.5"
 export DI_VERSION
 readonly API_FILE="/tmp/DI_GIT_API_$$.json"
 readonly API_HEADERS="/tmp/DI_GIT_API_$$_headers.out"
+readonly DNSCRYPT_REPO_URL="https://github.com/DNSCrypt/dnscrypt-proxy"
 readonly LATEST_URL="https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest"
+readonly LATEST_RELEASE_URL="${DNSCRYPT_REPO_URL}/releases/latest"
+readonly RELEASES_ATOM_URL="${DNSCRYPT_REPO_URL}/releases.atom"
 readonly DNSCRYPT_NIGHTLY_VER="nightly"
 readonly DNSCRYPT_WAIT_TIMEOUT="60"
 readonly DNSCRYPT_READY_TIMEOUT="180"
@@ -152,6 +155,117 @@ http_get_stdout() {
 		wget ${WGET_ARGS} -q -O - "${URL}"
 	else
 		return 127
+	fi
+}
+
+http_get_effective_url() {
+	local URL CURL_ARGS
+	URL="$1"
+	if di_have_cmd curl; then
+		CURL_ARGS="$(curl_common_args)"
+		curl_has_option '--write-out' || return 1
+		curl ${CURL_ARGS} -o /dev/null -w '%{url_effective}\n' "${URL}"
+	else
+		return 127
+	fi
+}
+
+dnscrypt_release_version_is_valid() {
+	case "$1" in
+		"" | *[!A-Za-z0-9._-]*) return 1 ;;
+	esac
+	PTXT "$1" | grep -q '[0-9]'
+}
+
+dnscrypt_release_version_is_stable() {
+	dnscrypt_release_version_is_valid "$1" || return 1
+	case "$1" in
+		*[A-Za-z]*) return 1 ;;
+	esac
+}
+
+normalize_dnscrypt_release_version() {
+	PTXT "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#^.*/tag/##; s#[/?#].*$##'
+}
+
+get_dnscrypt_release_version_api() {
+	rm -f "${API_FILE}" "${API_HEADERS}"
+	if http_get_file "${LATEST_URL}" "${API_FILE}" "${API_HEADERS}" && [ -s "${API_FILE}" ]; then
+		normalize_dnscrypt_release_version "$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"
+	else
+		return 1
+	fi
+}
+
+get_dnscrypt_release_version_redirect() {
+	normalize_dnscrypt_release_version "$(http_get_effective_url "${LATEST_RELEASE_URL}")"
+}
+
+get_dnscrypt_release_version_atom() {
+	local CANDIDATE
+	http_get_stdout "${RELEASES_ATOM_URL}" | sed -n 's#.*<title>\([^<]*\)</title>.*#\1#p' | while IFS= read -r CANDIDATE; do
+		CANDIDATE="$(normalize_dnscrypt_release_version "${CANDIDATE}")"
+		if dnscrypt_release_version_is_stable "${CANDIDATE}"; then
+			PTXT "${CANDIDATE}"
+			break
+		fi
+	done
+}
+
+choose_dnscrypt_release_version() {
+	local CANDIDATE SOURCE
+	DNSCRYPT_VER=""
+	DNSCRYPT_VER_SOURCE=""
+	for SOURCE in api redirect atom; do
+		case "${SOURCE}" in
+			api) CANDIDATE="${DNSCRYPT_VER_API}" ;;
+			redirect) CANDIDATE="${DNSCRYPT_VER_REDIRECT}" ;;
+			atom) CANDIDATE="${DNSCRYPT_VER_ATOM}" ;;
+		esac
+		if dnscrypt_release_version_is_valid "${CANDIDATE}"; then
+			DNSCRYPT_VER="${CANDIDATE}"
+			DNSCRYPT_VER_SOURCE="${SOURCE}"
+			break
+		fi
+	done
+	if [ -n "${DNSCRYPT_VER}" ]; then
+		for CANDIDATE in "${DNSCRYPT_VER_API}" "${DNSCRYPT_VER_REDIRECT}" "${DNSCRYPT_VER_ATOM}"; do
+			if dnscrypt_release_version_is_valid "${CANDIDATE}" && [ "${CANDIDATE}" != "${DNSCRYPT_VER}" ]; then
+				PTXT "${WARNING} dnscrypt-proxy release metadata sources disagree; using ${DNSCRYPT_VER} from ${DNSCRYPT_VER_SOURCE}."
+				break
+			fi
+		done
+	fi
+}
+
+collect_dnscrypt_release_metadata() {
+	DNSCRYPT_VER_API="$(get_dnscrypt_release_version_api 2>/dev/null || true)"
+	DNSCRYPT_VER_REDIRECT=""
+	DNSCRYPT_VER_ATOM=""
+	if dnscrypt_release_version_is_valid "${DNSCRYPT_VER_API}"; then
+		choose_dnscrypt_release_version
+		return
+	fi
+
+	DNSCRYPT_VER_REDIRECT="$(get_dnscrypt_release_version_redirect 2>/dev/null || true)"
+	if dnscrypt_release_version_is_valid "${DNSCRYPT_VER_REDIRECT}"; then
+		choose_dnscrypt_release_version
+		return
+	fi
+
+	DNSCRYPT_VER_ATOM="$(get_dnscrypt_release_version_atom 2>/dev/null || true)"
+	choose_dnscrypt_release_version
+}
+
+prepare_dnscrypt_download_vars() {
+	DNSCRYPT_NIGHTLY_TAR="dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_NIGHTLY_VER}.tar.gz"
+	DNSCRYPT_NIGHTLY_PACKAGE_URL="${URL_ARCH}/${DNSCRYPT_NIGHTLY_TAR}"
+	DNSCRYPT_NIGHTLY_MINISIG_URL="${DNSCRYPT_NIGHTLY_PACKAGE_URL}.minisig"
+	DNSCRYPT_RELEASE_TAR=""
+	DNSCRYPT_RELEASE_PACKAGE_URL=""
+	if [ -n "${DNSCRYPT_VER}" ]; then
+		DNSCRYPT_RELEASE_TAR="dnscrypt-proxy-${DNSCRYPT_ARCH}-${DNSCRYPT_VER}.tar.gz"
+		DNSCRYPT_RELEASE_PACKAGE_URL="${DNSCRYPT_REPO_URL}/releases/download/${DNSCRYPT_VER}/${DNSCRYPT_RELEASE_TAR}"
 	fi
 }
 
@@ -1306,18 +1420,27 @@ inst_dnscrypt() {
 			fi
 		fi
 	else
-		DNSCRYPT_TAR=dnscrypt-proxy-${DNSCRYPT_ARCH}-${2}.tar.gz
+		[ -z "${DNSCRYPT_NIGHTLY_PACKAGE_URL:-}" ] && prepare_dnscrypt_download_vars
 		if [ "$2" = "${DNSCRYPT_NIGHTLY_VER}" ]; then
-			DNSCRYPT_PACKAGE_URL="${URL_ARCH}/${DNSCRYPT_TAR}"
-			if ! download_file "${TARG_DIR}" 644 "${DNSCRYPT_PACKAGE_URL}" "${DNSCRYPT_PACKAGE_URL}.minisig"; then
+			DNSCRYPT_TAR="${DNSCRYPT_NIGHTLY_TAR}"
+			DNSCRYPT_PACKAGE_URL="${DNSCRYPT_NIGHTLY_PACKAGE_URL}"
+			if ! download_file "${TARG_DIR}" 644 "${DNSCRYPT_PACKAGE_URL}" "${DNSCRYPT_NIGHTLY_MINISIG_URL}"; then
 				PTXT "${ERROR} Unable to download dnscrypt-proxy nightly package for your router"
 				end_op_message 1 "$1"
 				return
 			fi
-		elif ! download_file "${TARG_DIR}" 644 "https://github.com/jedisct1/dnscrypt-proxy/releases/download/${2}/${DNSCRYPT_TAR}"; then
-			PTXT "${ERROR} Unable to download dnscrypt-proxy package for your router"
-			end_op_message 1 "$1"
-			return
+		else
+			DNSCRYPT_TAR="dnscrypt-proxy-${DNSCRYPT_ARCH}-${2}.tar.gz"
+			DNSCRYPT_PACKAGE_URL="${DNSCRYPT_REPO_URL}/releases/download/${2}/${DNSCRYPT_TAR}"
+			if [ "$2" = "${DNSCRYPT_VER}" ] && [ -n "${DNSCRYPT_RELEASE_PACKAGE_URL}" ]; then
+				DNSCRYPT_TAR="${DNSCRYPT_RELEASE_TAR}"
+				DNSCRYPT_PACKAGE_URL="${DNSCRYPT_RELEASE_PACKAGE_URL}"
+			fi
+			if ! download_file "${TARG_DIR}" 644 "${DNSCRYPT_PACKAGE_URL}"; then
+				PTXT "${ERROR} Unable to download dnscrypt-proxy package for your router"
+				end_op_message 1 "$1"
+				return
+			fi
 		fi
 		if ! dnscrypt_prepare_binary_replace; then
 			end_op_message 1 "$1"
@@ -2531,13 +2654,12 @@ trap 'on_installer_exit' EXIT
 varcnt=0
 readonly MAX_RETRIES="1"
 until [ -n "${DNSCRYPT_VER}" ]; do
-	http_get_file "${LATEST_URL}" "${API_FILE}" "${API_HEADERS}"
-	if [ -s "${API_FILE}" ]; then
-		DNSCRYPT_VER="$(awk -F'"' '/tag_name/ { print $4; exit }' "${API_FILE}")"
+	collect_dnscrypt_release_metadata
+	if [ -n "${DNSCRYPT_VER}" ]; then
 		break
 	fi
 	if [ "${varcnt}" -gt "${MAX_RETRIES}" ]; then
-		PTXT "${WARNING} Unable to determine the developer latest dnscrypt-proxy release." "It is possible we have hit the github api ratelimit (60req./hr) per requesters IP." "The installer can still use dnscrypt-proxy-nightly if network access to the installer repository is available."
+		PTXT "${WARNING} Unable to determine the developer latest dnscrypt-proxy release." "The github API, github releases/latest redirect, and github releases.atom metadata checks did not return a usable version." "The installer can still use dnscrypt-proxy-nightly if network access to the installer repository is available."
 		DNSCRYPT_VER=""
 		break
 	fi
@@ -2547,6 +2669,10 @@ cleanup_api_files
 wait
 unset varcnt
 readonly DNSCRYPT_VER
+readonly DNSCRYPT_VER_SOURCE
+readonly DNSCRYPT_VER_API
+readonly DNSCRYPT_VER_REDIRECT
+readonly DNSCRYPT_VER_ATOM
 case "${1}" in
 	"amtmupdate")
 		BRANCH="$(read_conf INSTALLER_BRANCH)"
@@ -2633,6 +2759,7 @@ case "${ROUTER_ARCH}" in
 		exit 1
 		;;
 esac
+prepare_dnscrypt_download_vars
 
 case "$2" in
 	"")
